@@ -10,3 +10,12 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+auth:
+  cookie:
+    secure: false
+
+cors:
+  allowed-origins:
+    - http://localhost:3000
+    - http://localhost:5173

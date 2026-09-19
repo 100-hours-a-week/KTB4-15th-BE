@@ -10,3 +10,17 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: create-drop
+
+jwt:
+  secret: dGVzdC1qd3Qtc2VjcmV0LWtleS1tdXN0LWJlLWF0LWxlYXN0LTMyLWJ5dGVz
+  access-token-expiration: 30m
+  refresh-token-expiration: 14d
+
+auth:
+  cookie:
+    secure: false
+    same-site: Lax
+
+cors:
+  allowed-origins:
+    - http://localhost:5173

@@ -1,10 +1,12 @@
 package com.ktb.lookddak.domain.auth.controller;
 
+import com.ktb.lookddak.domain.auth.dto.LoginTokens;
 import com.ktb.lookddak.domain.auth.dto.SignUpResponse;
 import com.ktb.lookddak.domain.auth.service.AuthService;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import com.ktb.lookddak.global.exception.GlobalExceptionHandler;
+import com.ktb.lookddak.global.security.cookie.AuthCookieManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -27,11 +30,14 @@ class AuthControllerTest {
     @Mock
     private AuthService authService;
 
+    @Mock
+    private AuthCookieManager authCookieManager;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        AuthController authController = new AuthController(authService);
+        AuthController authController = new AuthController(authService, authCookieManager);
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(authController)
@@ -108,5 +114,76 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.code").value("EMAIL_ALREADY_EXISTS"))
                 .andExpect(jsonPath("$.data").isEmpty())
                 .andExpect(jsonPath("$.message").value("중복된 이메일입니다."));
+    }
+
+    @Test
+    @DisplayName("로그인에 성공하면 인증 쿠키와 200 OK를 반환한다")
+    void login() throws Exception {
+        LoginTokens tokens = new LoginTokens("access-token", "refresh-token");
+        given(authService.login(any())).willReturn(tokens);
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "member@lookddak.com",
+                                  "password": "Test1234!"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data").isEmpty())
+                .andExpect(jsonPath("$.message")
+                        .value("요청이 성공적으로 처리되었습니다."));
+
+        verify(authCookieManager).addAuthCookies(any(), any());
+    }
+
+    @Test
+    @DisplayName("로그인 정보가 올바르지 않으면 401 Unauthorized를 반환한다")
+    void rejectInvalidLogin() throws Exception {
+        given(authService.login(any()))
+                .willThrow(new BusinessException(ErrorCode.INVALID_CREDENTIALS));
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "member@lookddak.com",
+                                  "password": "wrong-password"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"))
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    @DisplayName("Refresh Token이 유효하면 토큰을 재발급한다")
+    void refresh() throws Exception {
+        LoginTokens tokens = new LoginTokens("new-access-token", "new-refresh-token");
+        given(authCookieManager.resolveRefreshToken(any())).willReturn("refresh-token");
+        given(authService.refresh("refresh-token")).willReturn(tokens);
+
+        mockMvc.perform(post("/api/v1/auth/refresh"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data").isEmpty());
+
+        verify(authCookieManager).addAuthCookies(any(), any());
+    }
+
+    @Test
+    @DisplayName("로그아웃하면 Refresh Token을 폐기하고 인증 쿠키를 삭제한다")
+    void logout() throws Exception {
+        given(authCookieManager.resolveRefreshToken(any())).willReturn("refresh-token");
+
+        mockMvc.perform(post("/api/v1/auth/logout"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data").isEmpty());
+
+        verify(authService).logout("refresh-token");
+        verify(authCookieManager).clearAuthCookies(any());
     }
 }
