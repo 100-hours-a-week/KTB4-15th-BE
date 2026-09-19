@@ -1,6 +1,7 @@
 package com.ktb.lookddak.domain.auth.service;
 
 import com.ktb.lookddak.domain.auth.dto.LoginRequest;
+import com.ktb.lookddak.domain.auth.dto.LoginResult;
 import com.ktb.lookddak.domain.auth.dto.LoginTokens;
 import com.ktb.lookddak.domain.auth.dto.SignUpRequest;
 import com.ktb.lookddak.domain.auth.dto.SignUpResponse;
@@ -8,6 +9,7 @@ import com.ktb.lookddak.domain.auth.entity.RefreshToken;
 import com.ktb.lookddak.domain.auth.repository.RefreshTokenRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
+import com.ktb.lookddak.domain.member.repository.MemberProfileRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import com.ktb.lookddak.global.security.jwt.JwtTokenProvider;
@@ -35,6 +37,7 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final MemberProfileRepository memberProfileRepository;
 
     @Transactional
     public SignUpResponse signUp(SignUpRequest request) {
@@ -50,7 +53,7 @@ public class AuthService {
     }
 
     @Transactional
-    public LoginTokens login(LoginRequest request) {
+    public LoginResult login(LoginRequest request) {
         try {
             // 이메일과 비밀번호를 검증하고 인증된 회원 정보를 가져온다.
             Authentication authentication = authenticationManager.authenticate(
@@ -76,7 +79,13 @@ public class AuthService {
                     refreshTokenClaims.getExpiresAt()
             ));
 
-            return new LoginTokens(accessToken, refreshToken);
+            boolean profileCompleted = memberProfileRepository
+                    .existsByMemberId(principal.getMemberId());
+
+            return new LoginResult(
+                    new LoginTokens(accessToken, refreshToken),
+                    profileCompleted
+            );
         } catch (AuthenticationException exception) {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }

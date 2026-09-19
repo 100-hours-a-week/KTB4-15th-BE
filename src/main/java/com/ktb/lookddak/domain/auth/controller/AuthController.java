@@ -1,6 +1,8 @@
 package com.ktb.lookddak.domain.auth.controller;
 
 import com.ktb.lookddak.domain.auth.dto.LoginRequest;
+import com.ktb.lookddak.domain.auth.dto.LoginResponse;
+import com.ktb.lookddak.domain.auth.dto.LoginResult;
 import com.ktb.lookddak.domain.auth.dto.LoginTokens;
 import com.ktb.lookddak.domain.auth.dto.SignUpRequest;
 import com.ktb.lookddak.domain.auth.dto.SignUpResponse;
@@ -38,16 +40,18 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<Void>> login(
+    public ResponseEntity<ApiResponse<LoginResponse>> login(
             @Valid @RequestBody LoginRequest request,
             HttpServletResponse response
     ) {
-        LoginTokens tokens = authService.login(request);
-        authCookieManager.addAuthCookies(response, tokens);
+        LoginResult result = authService.login(request);
+        authCookieManager.addAuthCookies(response, result.getTokens());
+
+        LoginResponse loginResponse = new LoginResponse(result.isProfileCompleted());
 
         return ResponseEntity
                 .status(SuccessCode.OK.getStatus())
-                .body(ApiResponse.success(SuccessCode.OK, null));
+                .body(ApiResponse.success(SuccessCode.OK, loginResponse));
     }
 
     @PostMapping("/refresh")

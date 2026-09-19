@@ -50,4 +50,8 @@ public class Member extends BaseEntity {
     public static Member create(String email, String passwordHash) {
         return new Member(email, passwordHash);
     }
+
+    public void updatePriceAlertEnabled(boolean priceAlertEnabled) {
+        this.priceAlertEnabled = priceAlertEnabled;
+    }
 }

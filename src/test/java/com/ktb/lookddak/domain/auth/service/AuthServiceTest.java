@@ -1,6 +1,7 @@
 package com.ktb.lookddak.domain.auth.service;
 
 import com.ktb.lookddak.domain.auth.dto.LoginRequest;
+import com.ktb.lookddak.domain.auth.dto.LoginResult;
 import com.ktb.lookddak.domain.auth.dto.LoginTokens;
 import com.ktb.lookddak.domain.auth.dto.SignUpRequest;
 import com.ktb.lookddak.domain.auth.dto.SignUpResponse;
@@ -8,6 +9,7 @@ import com.ktb.lookddak.domain.auth.entity.RefreshToken;
 import com.ktb.lookddak.domain.auth.repository.RefreshTokenRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
+import com.ktb.lookddak.domain.member.repository.MemberProfileRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import com.ktb.lookddak.global.security.jwt.JwtTokenProvider;
@@ -55,6 +57,9 @@ class AuthServiceTest {
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
 
+    @Mock
+    private MemberProfileRepository memberProfileRepository;
+
     private PasswordEncoder passwordEncoder;
     private AuthService authService;
 
@@ -66,7 +71,8 @@ class AuthServiceTest {
                 passwordEncoder,
                 authenticationManager,
                 jwtTokenProvider,
-                refreshTokenRepository
+                refreshTokenRepository,
+                memberProfileRepository
         );
     }
 
@@ -125,11 +131,13 @@ class AuthServiceTest {
         given(jwtTokenProvider.getRefreshTokenClaims("refresh-token"))
                 .willReturn(new RefreshTokenClaims(1L, "refresh-token-id", expiresAt));
         given(memberRepository.getReferenceById(1L)).willReturn(member);
+        given(memberProfileRepository.existsByMemberId(1L)).willReturn(true);
 
-        LoginTokens tokens = authService.login(request);
+        LoginResult result = authService.login(request);
 
-        assertThat(tokens.getAccessToken()).isEqualTo("access-token");
-        assertThat(tokens.getRefreshToken()).isEqualTo("refresh-token");
+        assertThat(result.getTokens().getAccessToken()).isEqualTo("access-token");
+        assertThat(result.getTokens().getRefreshToken()).isEqualTo("refresh-token");
+        assertThat(result.isProfileCompleted()).isTrue();
 
         ArgumentCaptor<RefreshToken> refreshTokenCaptor =
                 ArgumentCaptor.forClass(RefreshToken.class);
