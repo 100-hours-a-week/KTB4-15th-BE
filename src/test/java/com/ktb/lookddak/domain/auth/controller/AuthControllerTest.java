@@ -1,5 +1,6 @@
 package com.ktb.lookddak.domain.auth.controller;
 
+import com.ktb.lookddak.domain.auth.dto.LoginResult;
 import com.ktb.lookddak.domain.auth.dto.LoginTokens;
 import com.ktb.lookddak.domain.auth.dto.SignUpResponse;
 import com.ktb.lookddak.domain.auth.service.AuthService;
@@ -120,7 +121,7 @@ class AuthControllerTest {
     @DisplayName("로그인에 성공하면 인증 쿠키와 200 OK를 반환한다")
     void login() throws Exception {
         LoginTokens tokens = new LoginTokens("access-token", "refresh-token");
-        given(authService.login(any())).willReturn(tokens);
+        given(authService.login(any())).willReturn(new LoginResult(tokens, true));
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -132,7 +133,7 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"))
-                .andExpect(jsonPath("$.data").isEmpty())
+                .andExpect(jsonPath("$.data.profileCompleted").value(true))
                 .andExpect(jsonPath("$.message")
                         .value("요청이 성공적으로 처리되었습니다."));
 
