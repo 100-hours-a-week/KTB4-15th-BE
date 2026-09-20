@@ -28,6 +28,11 @@ public enum ErrorCode {
     MEMBER_PROFILE_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 기본정보가 등록되어 있습니다."),
     INVALID_FULL_BODY_IMAGE(HttpStatus.BAD_REQUEST, "사용할 수 없는 전신사진 검증 정보입니다."),
 
+    // Chat errors
+    CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "채팅방을 찾을 수 없습니다."),
+    CHAT_ROOM_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 채팅방에 접근할 권한이 없습니다."),
+    AI_RESPONSE_GENERATING(HttpStatus.CONFLICT, "AI 응답을 생성 중입니다."),
+
     // Server errors
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");
 
