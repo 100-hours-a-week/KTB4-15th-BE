@@ -34,6 +34,14 @@ public enum ErrorCode {
     CHAT_ROOM_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 채팅방에 접근할 권한이 없습니다."),
     AI_RESPONSE_GENERATING(HttpStatus.CONFLICT, "AI 응답을 생성 중입니다."),
 
+    // Product errors
+    PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."),
+
+    // Wishlist errors
+    WISHLIST_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 찜한 상품입니다."),
+    WISHLIST_NOT_FOUND(HttpStatus.NOT_FOUND, "찜 정보를 찾을 수 없습니다."),
+    WISHLIST_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 찜에 접근할 권한이 없습니다."),
+
     // Server errors
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");
 
