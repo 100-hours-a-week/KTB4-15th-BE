@@ -4,6 +4,7 @@ import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomListResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateResponse;
 import com.ktb.lookddak.domain.chat.entity.ChatGenerationStatus;
@@ -25,17 +26,21 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class ChatServiceTest {
@@ -326,6 +331,143 @@ class ChatServiceTest {
 
         assertThat(chatRoom.isDeleted()).isFalse();
         verify(chatRoomRepository, never()).delete(any(ChatRoom.class));
+    }
+
+    @Test
+    @DisplayName("첫 페이지에 다음 데이터가 있으면 nextCursor와 hasNext를 반환한다")
+    void getFirstChatRoomPage() {
+        Member member = createMember(1L);
+        ChatRoom firstRoom = createChatRoom(
+                30L,
+                member,
+                LocalDateTime.of(2026, 9, 21, 15, 0)
+        );
+        ChatRoom secondRoom = createChatRoom(
+                20L,
+                member,
+                LocalDateTime.of(2026, 9, 21, 14, 0)
+        );
+        ChatRoom nextPageRoom = createChatRoom(
+                10L,
+                member,
+                LocalDateTime.of(2026, 9, 21, 13, 0)
+        );
+        given(chatRoomRepository.findFirstPage(eq(1L), any(Pageable.class)))
+                .willReturn(List.of(firstRoom, secondRoom, nextPageRoom));
+
+        ChatRoomListResponse response = chatService.getChatRooms(1L, null, 2);
+
+        assertThat(response.getItems())
+                .extracting(item -> item.getChatRoomId())
+                .containsExactly(30L, 20L);
+        assertThat(response.getNextCursor()).isEqualTo(20L);
+        assertThat(response.isHasNext()).isTrue();
+
+        ArgumentCaptor<Pageable> pageableCaptor =
+                ArgumentCaptor.forClass(Pageable.class);
+        verify(chatRoomRepository).findFirstPage(eq(1L), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("마지막 페이지는 null Cursor와 hasNext false를 반환한다")
+    void getLastChatRoomPage() {
+        Member member = createMember(1L);
+        ChatRoom chatRoom = createChatRoom(
+                10L,
+                member,
+                LocalDateTime.of(2026, 9, 21, 13, 0)
+        );
+        given(chatRoomRepository.findFirstPage(eq(1L), any(Pageable.class)))
+                .willReturn(List.of(chatRoom));
+
+        ChatRoomListResponse response = chatService.getChatRooms(1L, null, 2);
+
+        assertThat(response.getItems()).hasSize(1);
+        assertThat(response.getNextCursor()).isNull();
+        assertThat(response.isHasNext()).isFalse();
+    }
+
+    @Test
+    @DisplayName("채팅방이 없으면 기본 크기로 빈 목록을 조회한다")
+    void getEmptyChatRoomPageWithDefaultSize() {
+        given(chatRoomRepository.findFirstPage(eq(1L), any(Pageable.class)))
+                .willReturn(List.of());
+
+        ChatRoomListResponse response = chatService.getChatRooms(1L, null, null);
+
+        assertThat(response.getItems()).isEmpty();
+        assertThat(response.getNextCursor()).isNull();
+        assertThat(response.isHasNext()).isFalse();
+
+        ArgumentCaptor<Pageable> pageableCaptor =
+                ArgumentCaptor.forClass(Pageable.class);
+        verify(chatRoomRepository).findFirstPage(eq(1L), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(21);
+    }
+
+    @Test
+    @DisplayName("유효한 Cursor 채팅방을 기준으로 다음 페이지를 조회한다")
+    void getNextChatRoomPage() {
+        Member member = createMember(1L);
+        LocalDateTime cursorTime = LocalDateTime.of(2026, 9, 21, 14, 0);
+        ChatRoom cursorRoom = createChatRoom(25L, member, cursorTime);
+        ChatRoom nextRoom = createChatRoom(
+                18L,
+                member,
+                cursorTime.minusHours(1)
+        );
+        given(chatRoomRepository.findActiveCursor(1L, 25L))
+                .willReturn(Optional.of(cursorRoom));
+        given(chatRoomRepository.findNextPage(
+                eq(1L),
+                eq(cursorTime),
+                eq(25L),
+                any(Pageable.class)
+        )).willReturn(List.of(nextRoom));
+
+        ChatRoomListResponse response = chatService.getChatRooms(1L, 25L, 20);
+
+        assertThat(response.getItems())
+                .extracting(item -> item.getChatRoomId())
+                .containsExactly(18L);
+        assertThat(response.getNextCursor()).isNull();
+        assertThat(response.isHasNext()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Cursor나 조회 크기가 범위를 벗어나면 목록 조회를 거부한다")
+    void rejectInvalidPaginationRange() {
+        assertPaginationError(() -> chatService.getChatRooms(1L, 0L, 20));
+        assertPaginationError(() -> chatService.getChatRooms(1L, -1L, 20));
+        assertPaginationError(() -> chatService.getChatRooms(1L, null, 0));
+        assertPaginationError(() -> chatService.getChatRooms(1L, null, 101));
+
+        verifyNoInteractions(chatRoomRepository);
+    }
+
+    @Test
+    @DisplayName("회원의 활성 채팅방이 아닌 Cursor는 목록 조회에 사용할 수 없다")
+    void rejectInvalidCursor() {
+        given(chatRoomRepository.findActiveCursor(1L, 25L))
+                .willReturn(Optional.empty());
+
+        assertPaginationError(() -> chatService.getChatRooms(1L, 25L, 20));
+
+        verify(chatRoomRepository, never()).findNextPage(
+                any(),
+                any(),
+                any(),
+                any()
+        );
+    }
+
+    private void assertPaginationError(org.assertj.core.api.ThrowableAssert.ThrowingCallable callable) {
+        assertThatThrownBy(callable)
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.INVALID_PAGINATION_PARAMETER)
+                );
     }
 
     private Member createMember(Long memberId) {
