@@ -2,8 +2,13 @@ package com.ktb.lookddak.domain.chat.controller;
 
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomListItemResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomListResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateResponse;
+import com.ktb.lookddak.domain.chat.entity.ChatRoom;
+import com.ktb.lookddak.domain.chat.entity.ChatSourceType;
 import com.ktb.lookddak.domain.chat.service.ChatService;
+import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import com.ktb.lookddak.global.exception.GlobalExceptionHandler;
@@ -21,7 +26,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -31,6 +38,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -68,6 +76,82 @@ class ChatControllerTest {
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    @DisplayName("Query Parameter가 없으면 기본 크기로 첫 채팅방 목록을 반환한다")
+    void getFirstChatRoomPage() throws Exception {
+        LocalDateTime lastMessageAt = LocalDateTime.of(2026, 9, 21, 15, 0);
+        ChatRoomListItemResponse item = ChatRoomListItemResponse.from(
+                createChatRoom(25L, lastMessageAt)
+        );
+        given(chatService.getChatRooms(1L, null, 20))
+                .willReturn(new ChatRoomListResponse(
+                        List.of(item),
+                        25L,
+                        true
+                ));
+
+        mockMvc.perform(get("/api/v1/chat-rooms"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.items[0].chatRoomId").value(25))
+                .andExpect(jsonPath("$.data.items[0].title")
+                        .value("가을 출근용 니트 추천"))
+                .andExpect(jsonPath("$.data.items[0].lastMessageAt")
+                        .value("2026-09-21T15:00:00"))
+                .andExpect(jsonPath("$.data.nextCursor").value(25))
+                .andExpect(jsonPath("$.data.hasNext").value(true))
+                .andExpect(jsonPath("$.message")
+                        .value("요청이 성공적으로 처리되었습니다."));
+
+        verify(chatService).getChatRooms(1L, null, 20);
+    }
+
+    @Test
+    @DisplayName("Cursor와 조회 크기를 다음 채팅방 목록 조회에 사용한다")
+    void getNextChatRoomPage() throws Exception {
+        given(chatService.getChatRooms(1L, 25L, 10))
+                .willReturn(new ChatRoomListResponse(List.of(), null, false));
+
+        mockMvc.perform(get("/api/v1/chat-rooms")
+                        .queryParam("cursor", "25")
+                        .queryParam("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items").isArray())
+                .andExpect(jsonPath("$.data.items").isEmpty())
+                .andExpect(jsonPath("$.data.nextCursor").isEmpty())
+                .andExpect(jsonPath("$.data.hasNext").value(false));
+
+        verify(chatService).getChatRooms(1L, 25L, 10);
+    }
+
+    @Test
+    @DisplayName("잘못된 Pagination 조건은 400 Bad Request를 반환한다")
+    void rejectInvalidPaginationParameter() throws Exception {
+        given(chatService.getChatRooms(1L, 0L, 20))
+                .willThrow(new BusinessException(
+                        ErrorCode.INVALID_PAGINATION_PARAMETER
+                ));
+
+        mockMvc.perform(get("/api/v1/chat-rooms")
+                        .queryParam("cursor", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code")
+                        .value("INVALID_PAGINATION_PARAMETER"))
+                .andExpect(jsonPath("$.data").isEmpty())
+                .andExpect(jsonPath("$.message")
+                        .value("올바른 조회 조건을 입력해주세요."));
+    }
+
+    @Test
+    @DisplayName("숫자가 아닌 Cursor는 공통 입력값 오류를 반환한다")
+    void rejectNonNumericCursor() throws Exception {
+        mockMvc.perform(get("/api/v1/chat-rooms")
+                        .queryParam("cursor", "invalid"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
+                .andExpect(jsonPath("$.data").isEmpty());
     }
 
     @Test
@@ -279,5 +363,17 @@ class ChatControllerTest {
                           "content": "검은색으로 추천해줘"
                         }
                         """));
+    }
+
+    private ChatRoom createChatRoom(Long chatRoomId, LocalDateTime lastMessageAt) {
+        Member member = Member.create("member@lookddak.com", "encoded-password");
+        ChatRoom chatRoom = ChatRoom.create(
+                member,
+                "가을 출근용 니트 추천",
+                ChatSourceType.GENERAL,
+                lastMessageAt
+        );
+        ReflectionTestUtils.setField(chatRoom, "id", chatRoomId);
+        return chatRoom;
     }
 }

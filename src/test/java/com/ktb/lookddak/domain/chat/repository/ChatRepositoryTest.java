@@ -12,10 +12,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -159,6 +161,134 @@ class ChatRepositoryTest {
                 .isPresent();
     }
 
+    @Test
+    @DisplayName("회원의 활성 채팅방을 마지막 메시지 시각과 ID 내림차순으로 조회한다")
+    void findFirstPage() {
+        Member member = saveMember("list@lookddak.com");
+        Member otherMember = saveMember("other-list@lookddak.com");
+        LocalDateTime sameTime = LocalDateTime.of(2026, 9, 21, 14, 0);
+        ChatRoom olderRoom = saveChatRoom(
+                member,
+                "오래된 채팅방",
+                sameTime.minusHours(1)
+        );
+        ChatRoom sameTimeLowerIdRoom = saveChatRoom(
+                member,
+                "같은 시각 낮은 ID",
+                sameTime
+        );
+        ChatRoom sameTimeHigherIdRoom = saveChatRoom(
+                member,
+                "같은 시각 높은 ID",
+                sameTime
+        );
+        ChatRoom deletedRoom = saveChatRoom(
+                member,
+                "삭제된 채팅방",
+                sameTime.plusHours(1)
+        );
+        deletedRoom.delete(LocalDateTime.now());
+        saveChatRoom(otherMember, "다른 회원 채팅방", sameTime.plusHours(2));
+        chatRoomRepository.flush();
+
+        List<ChatRoom> result = chatRoomRepository.findFirstPage(
+                member.getId(),
+                PageRequest.of(0, 3)
+        );
+
+        assertThat(result).containsExactly(
+                sameTimeHigherIdRoom,
+                sameTimeLowerIdRoom,
+                olderRoom
+        );
+    }
+
+    @Test
+    @DisplayName("첫 페이지는 Pageable에서 지정한 개수만 조회한다")
+    void limitFirstPage() {
+        Member member = saveMember("list-limit@lookddak.com");
+        LocalDateTime now = LocalDateTime.now();
+        saveChatRoom(member, "채팅방 1", now);
+        saveChatRoom(member, "채팅방 2", now.minusMinutes(1));
+        saveChatRoom(member, "채팅방 3", now.minusMinutes(2));
+
+        List<ChatRoom> result = chatRoomRepository.findFirstPage(
+                member.getId(),
+                PageRequest.of(0, 2)
+        );
+
+        assertThat(result).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("현재 회원의 삭제되지 않은 채팅방만 Cursor로 조회한다")
+    void findActiveCursor() {
+        Member member = saveMember("cursor@lookddak.com");
+        Member otherMember = saveMember("other-cursor@lookddak.com");
+        ChatRoom activeRoom = saveChatRoom(
+                member,
+                "활성 채팅방",
+                LocalDateTime.now()
+        );
+        ChatRoom deletedRoom = saveChatRoom(
+                member,
+                "삭제된 채팅방",
+                LocalDateTime.now()
+        );
+        deletedRoom.delete(LocalDateTime.now());
+        ChatRoom otherRoom = saveChatRoom(
+                otherMember,
+                "다른 회원 채팅방",
+                LocalDateTime.now()
+        );
+        chatRoomRepository.flush();
+
+        assertThat(chatRoomRepository.findActiveCursor(
+                member.getId(),
+                activeRoom.getId()
+        )).contains(activeRoom);
+        assertThat(chatRoomRepository.findActiveCursor(
+                member.getId(),
+                deletedRoom.getId()
+        )).isEmpty();
+        assertThat(chatRoomRepository.findActiveCursor(
+                member.getId(),
+                otherRoom.getId()
+        )).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Cursor의 정렬 값보다 뒤에 위치한 채팅방만 조회한다")
+    void findNextPage() {
+        Member member = saveMember("next-page@lookddak.com");
+        LocalDateTime cursorTime = LocalDateTime.of(2026, 9, 21, 14, 0);
+        ChatRoom sameTimeLowerIdRoom = saveChatRoom(
+                member,
+                "같은 시각 낮은 ID",
+                cursorTime
+        );
+        ChatRoom cursorRoom = saveChatRoom(
+                member,
+                "Cursor 채팅방",
+                cursorTime
+        );
+        ChatRoom olderRoom = saveChatRoom(
+                member,
+                "오래된 채팅방",
+                cursorTime.minusHours(1)
+        );
+        saveChatRoom(member, "최신 채팅방", cursorTime.plusHours(1));
+
+        List<ChatRoom> result = chatRoomRepository.findNextPage(
+                member.getId(),
+                cursorRoom.getLastMessageAt(),
+                cursorRoom.getId(),
+                PageRequest.of(0, 10)
+        );
+
+        assertThat(result).containsExactly(sameTimeLowerIdRoom, olderRoom);
+    }
+
     private Member saveMember(String email) {
         return memberRepository.saveAndFlush(
                 Member.create(email, "encoded-password")
@@ -171,6 +301,21 @@ class ChatRepositoryTest {
                 "5만원대 캐주얼 니트 추천해줘",
                 sourceType,
                 LocalDateTime.now()
+        );
+    }
+
+    private ChatRoom saveChatRoom(
+            Member member,
+            String title,
+            LocalDateTime lastMessageAt
+    ) {
+        return chatRoomRepository.saveAndFlush(
+                ChatRoom.create(
+                        member,
+                        title,
+                        ChatSourceType.GENERAL,
+                        lastMessageAt
+                )
         );
     }
 }

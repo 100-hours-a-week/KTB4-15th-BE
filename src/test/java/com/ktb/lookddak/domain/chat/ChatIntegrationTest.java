@@ -26,10 +26,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -169,6 +171,10 @@ class ChatIntegrationTest {
                                 """))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(get("/api/v1/chat-rooms"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }
 
     @Test
@@ -254,6 +260,88 @@ class ChatIntegrationTest {
                 .andExpect(jsonPath("$.code").value("CHAT_ROOM_NOT_FOUND"));
     }
 
+    @Test
+    @DisplayName("인증된 회원의 활성 채팅방을 Cursor 기반으로 조회한다")
+    void getChatRoomsWithCursor() throws Exception {
+        String accessToken = loginAndGetAccessToken();
+        LocalDateTime sameTime = LocalDateTime.of(2026, 9, 21, 14, 0);
+        ChatRoom olderRoom = saveChatRoom(
+                member,
+                "오래된 채팅방",
+                sameTime.minusHours(1)
+        );
+        ChatRoom sameTimeLowerIdRoom = saveChatRoom(
+                member,
+                "같은 시각 낮은 ID",
+                sameTime
+        );
+        ChatRoom sameTimeHigherIdRoom = saveChatRoom(
+                member,
+                "같은 시각 높은 ID",
+                sameTime
+        );
+        ChatRoom deletedRoom = saveChatRoom(
+                member,
+                "삭제된 채팅방",
+                sameTime.plusHours(1)
+        );
+        deletedRoom.delete(LocalDateTime.now());
+
+        Member otherMember = memberRepository.saveAndFlush(Member.create(
+                "other-chat-integration@lookddak.com",
+                passwordEncoder.encode(PASSWORD)
+        ));
+        ChatRoom otherRoom = saveChatRoom(
+                otherMember,
+                "다른 회원 채팅방",
+                sameTime.plusHours(2)
+        );
+        chatRoomRepository.flush();
+        entityManager.clear();
+
+        mockMvc.perform(get("/api/v1/chat-rooms")
+                        .cookie(new Cookie("accessToken", accessToken))
+                        .queryParam("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.items.length()").value(2))
+                .andExpect(jsonPath("$.data.items[0].chatRoomId")
+                        .value(sameTimeHigherIdRoom.getId()))
+                .andExpect(jsonPath("$.data.items[1].chatRoomId")
+                        .value(sameTimeLowerIdRoom.getId()))
+                .andExpect(jsonPath("$.data.nextCursor")
+                        .value(sameTimeLowerIdRoom.getId()))
+                .andExpect(jsonPath("$.data.hasNext").value(true));
+
+        mockMvc.perform(get("/api/v1/chat-rooms")
+                        .cookie(new Cookie("accessToken", accessToken))
+                        .queryParam(
+                                "cursor",
+                                sameTimeLowerIdRoom.getId().toString()
+                        )
+                        .queryParam("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.items[0].chatRoomId")
+                        .value(olderRoom.getId()))
+                .andExpect(jsonPath("$.data.nextCursor").isEmpty())
+                .andExpect(jsonPath("$.data.hasNext").value(false));
+
+        mockMvc.perform(get("/api/v1/chat-rooms")
+                        .cookie(new Cookie("accessToken", accessToken))
+                        .queryParam("cursor", deletedRoom.getId().toString()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code")
+                        .value("INVALID_PAGINATION_PARAMETER"));
+
+        mockMvc.perform(get("/api/v1/chat-rooms")
+                        .cookie(new Cookie("accessToken", accessToken))
+                        .queryParam("cursor", otherRoom.getId().toString()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code")
+                        .value("INVALID_PAGINATION_PARAMETER"));
+    }
+
     private String loginAndGetAccessToken() throws Exception {
         List<String> setCookieHeaders = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -278,5 +366,18 @@ class ChatIntegrationTest {
                 prefix.length(),
                 accessTokenCookie.indexOf(';')
         );
+    }
+
+    private ChatRoom saveChatRoom(
+            Member owner,
+            String title,
+            LocalDateTime lastMessageAt
+    ) {
+        return chatRoomRepository.saveAndFlush(ChatRoom.create(
+                owner,
+                title,
+                ChatSourceType.GENERAL,
+                lastMessageAt
+        ));
     }
 }
