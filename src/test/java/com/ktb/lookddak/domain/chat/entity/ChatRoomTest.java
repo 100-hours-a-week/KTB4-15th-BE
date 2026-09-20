@@ -1,6 +1,7 @@
 package com.ktb.lookddak.domain.chat.entity;
 
 import com.ktb.lookddak.domain.member.entity.Member;
+import jakarta.persistence.Table;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -10,6 +11,19 @@ import java.time.LocalDateTime;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ChatRoomTest {
+
+    @Test
+    @DisplayName("채팅방 목록 조회 조건과 정렬에 맞는 복합 인덱스를 사용한다")
+    void configureListIndex() {
+        Table table = ChatRoom.class.getAnnotation(Table.class);
+
+        assertThat(table.indexes()).anySatisfy(index -> {
+            assertThat(index.name())
+                    .isEqualTo("idx_chat_room_member_deleted_last_message");
+            assertThat(index.columnList())
+                    .isEqualTo("member_id,deleted_at,last_message_at,id");
+        });
+    }
 
     @Test
     @DisplayName("첫 메시지와 출처 유형으로 채팅방을 생성한다")

@@ -10,6 +10,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -21,7 +22,13 @@ import java.time.LocalDateTime;
 
 @Getter
 @Entity
-@Table(name = "chat_room")
+@Table(
+        name = "chat_room",
+        indexes = @Index(
+                name = "idx_chat_room_member_deleted_last_message",
+                columnList = "member_id,deleted_at,last_message_at,id"
+        )
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ChatRoom extends BaseEntity {
 
