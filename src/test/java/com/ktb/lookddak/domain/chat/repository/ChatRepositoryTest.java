@@ -128,18 +128,35 @@ class ChatRepositoryTest {
     }
 
     @Test
-    @DisplayName("메시지 전송을 위해 채팅방을 쓰기 락으로 조회한다")
-    void findChatRoomForUpdate() {
+    @DisplayName("메시지 전송을 위해 활성 채팅방을 쓰기 락으로 조회한다")
+    void findActiveChatRoomForUpdate() {
         Member member = saveMember("lock@lookddak.com");
         ChatRoom savedChatRoom = chatRoomRepository.saveAndFlush(
                 createChatRoom(member, ChatSourceType.GENERAL)
         );
 
         ChatRoom foundChatRoom = chatRoomRepository
-                .findByIdForUpdate(savedChatRoom.getId())
+                .findActiveByIdForUpdate(savedChatRoom.getId())
                 .orElseThrow();
 
         assertThat(foundChatRoom).isSameAs(savedChatRoom);
+    }
+
+    @Test
+    @DisplayName("삭제된 채팅방은 활성 채팅방으로 조회하지 않는다")
+    void doesNotFindDeletedChatRoomForUpdate() {
+        Member member = saveMember("deleted-room@lookddak.com");
+        ChatRoom savedChatRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        savedChatRoom.delete(LocalDateTime.now());
+        chatRoomRepository.flush();
+
+        assertThat(chatRoomRepository
+                .findActiveByIdForUpdate(savedChatRoom.getId()))
+                .isEmpty();
+        assertThat(chatRoomRepository.findById(savedChatRoom.getId()))
+                .isPresent();
     }
 
     private Member saveMember(String email) {

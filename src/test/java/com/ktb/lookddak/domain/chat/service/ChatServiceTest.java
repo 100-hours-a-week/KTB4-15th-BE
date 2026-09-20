@@ -4,6 +4,8 @@ import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateRequest;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateResponse;
 import com.ktb.lookddak.domain.chat.entity.ChatGenerationStatus;
 import com.ktb.lookddak.domain.chat.entity.ChatMessage;
 import com.ktb.lookddak.domain.chat.entity.ChatMessageType;
@@ -131,7 +133,7 @@ class ChatServiceTest {
         LocalDateTime initialLastMessageAt = LocalDateTime.now().minusMinutes(10);
         ChatRoom chatRoom = createChatRoom(10L, member, initialLastMessageAt);
         ChatMessageCreateRequest request = new ChatMessageCreateRequest("검은색으로 추천해줘");
-        given(chatRoomRepository.findByIdForUpdate(10L))
+        given(chatRoomRepository.findActiveByIdForUpdate(10L))
                 .willReturn(Optional.of(chatRoom));
         given(chatMessageRepository
                 .existsByChatRoomIdAndSenderTypeAndGenerationStatus(
@@ -167,7 +169,7 @@ class ChatServiceTest {
     @DisplayName("채팅방이 없으면 메시지를 전송할 수 없다")
     void rejectMissingChatRoom() {
         ChatMessageCreateRequest request = new ChatMessageCreateRequest("검은색으로 추천해줘");
-        given(chatRoomRepository.findByIdForUpdate(10L))
+        given(chatRoomRepository.findActiveByIdForUpdate(10L))
                 .willReturn(Optional.empty());
 
         assertThatThrownBy(() -> chatService.createMessage(1L, 10L, request))
@@ -185,7 +187,7 @@ class ChatServiceTest {
         Member owner = createMember(2L);
         ChatRoom chatRoom = createChatRoom(10L, owner, LocalDateTime.now());
         ChatMessageCreateRequest request = new ChatMessageCreateRequest("검은색으로 추천해줘");
-        given(chatRoomRepository.findByIdForUpdate(10L))
+        given(chatRoomRepository.findActiveByIdForUpdate(10L))
                 .willReturn(Optional.of(chatRoom));
 
         assertThatThrownBy(() -> chatService.createMessage(1L, 10L, request))
@@ -209,7 +211,7 @@ class ChatServiceTest {
         Member member = createMember(1L);
         ChatRoom chatRoom = createChatRoom(10L, member, LocalDateTime.now());
         ChatMessageCreateRequest request = new ChatMessageCreateRequest("검은색으로 추천해줘");
-        given(chatRoomRepository.findByIdForUpdate(10L))
+        given(chatRoomRepository.findActiveByIdForUpdate(10L))
                 .willReturn(Optional.of(chatRoom));
         given(chatMessageRepository
                 .existsByChatRoomIdAndSenderTypeAndGenerationStatus(
@@ -226,6 +228,104 @@ class ChatServiceTest {
                 );
 
         verify(chatMessageRepository, never()).save(any(ChatMessage.class));
+    }
+
+    @Test
+    @DisplayName("소유한 채팅방의 제목을 수정한다")
+    void updateTitle() {
+        Member member = createMember(1L);
+        ChatRoom chatRoom = createChatRoom(10L, member, LocalDateTime.now());
+        ChatRoomTitleUpdateRequest request =
+                new ChatRoomTitleUpdateRequest("  가을 출근용 니트 추천  ");
+        given(chatRoomRepository.findActiveByIdForUpdate(10L))
+                .willReturn(Optional.of(chatRoom));
+
+        ChatRoomTitleUpdateResponse response =
+                chatService.updateTitle(1L, 10L, request);
+
+        assertThat(response.getChatRoomId()).isEqualTo(10L);
+        assertThat(response.getTitle()).isEqualTo("가을 출근용 니트 추천");
+        assertThat(chatRoom.getTitle()).isEqualTo("가을 출근용 니트 추천");
+    }
+
+    @Test
+    @DisplayName("존재하지 않거나 삭제된 채팅방의 제목은 수정할 수 없다")
+    void rejectTitleUpdateForMissingChatRoom() {
+        ChatRoomTitleUpdateRequest request =
+                new ChatRoomTitleUpdateRequest("가을 출근용 니트 추천");
+        given(chatRoomRepository.findActiveByIdForUpdate(10L))
+                .willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> chatService.updateTitle(1L, 10L, request))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.CHAT_ROOM_NOT_FOUND)
+                );
+    }
+
+    @Test
+    @DisplayName("다른 회원의 채팅방 제목은 수정할 수 없다")
+    void rejectOtherMembersTitleUpdate() {
+        Member owner = createMember(2L);
+        ChatRoom chatRoom = createChatRoom(10L, owner, LocalDateTime.now());
+        ChatRoomTitleUpdateRequest request =
+                new ChatRoomTitleUpdateRequest("가을 출근용 니트 추천");
+        given(chatRoomRepository.findActiveByIdForUpdate(10L))
+                .willReturn(Optional.of(chatRoom));
+
+        assertThatThrownBy(() -> chatService.updateTitle(1L, 10L, request))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.CHAT_ROOM_ACCESS_DENIED)
+                );
+    }
+
+    @Test
+    @DisplayName("소유한 채팅방을 소프트 삭제한다")
+    void deleteChatRoom() {
+        Member member = createMember(1L);
+        ChatRoom chatRoom = createChatRoom(10L, member, LocalDateTime.now());
+        given(chatRoomRepository.findActiveByIdForUpdate(10L))
+                .willReturn(Optional.of(chatRoom));
+
+        chatService.deleteChatRoom(1L, 10L);
+
+        assertThat(chatRoom.isDeleted()).isTrue();
+        assertThat(chatRoom.getDeletedAt()).isNotNull();
+        verify(chatRoomRepository, never()).delete(any(ChatRoom.class));
+    }
+
+    @Test
+    @DisplayName("존재하지 않거나 이미 삭제된 채팅방은 삭제할 수 없다")
+    void rejectMissingChatRoomDeletion() {
+        given(chatRoomRepository.findActiveByIdForUpdate(10L))
+                .willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> chatService.deleteChatRoom(1L, 10L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.CHAT_ROOM_NOT_FOUND)
+                );
+
+        verify(chatRoomRepository, never()).delete(any(ChatRoom.class));
+    }
+
+    @Test
+    @DisplayName("다른 회원의 채팅방은 삭제할 수 없다")
+    void rejectOtherMembersChatRoomDeletion() {
+        Member owner = createMember(2L);
+        ChatRoom chatRoom = createChatRoom(10L, owner, LocalDateTime.now());
+        given(chatRoomRepository.findActiveByIdForUpdate(10L))
+                .willReturn(Optional.of(chatRoom));
+
+        assertThatThrownBy(() -> chatService.deleteChatRoom(1L, 10L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.CHAT_ROOM_ACCESS_DENIED)
+                );
+
+        assertThat(chatRoom.isDeleted()).isFalse();
+        verify(chatRoomRepository, never()).delete(any(ChatRoom.class));
     }
 
     private Member createMember(Long memberId) {

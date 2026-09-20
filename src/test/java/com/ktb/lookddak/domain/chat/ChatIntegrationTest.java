@@ -29,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -167,6 +169,89 @@ class ChatIntegrationTest {
                                 """))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("인증된 회원이 채팅방 제목을 수정하고 소프트 삭제한다")
+    void updateAndDeleteChatRoom() throws Exception {
+        String accessToken = loginAndGetAccessToken();
+        MvcResult createRoomResult = mockMvc.perform(post("/api/v1/chat-rooms")
+                        .cookie(new Cookie("accessToken", accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content": "가을에 입을 니트를 추천해줘",
+                                  "sourceType": "GENERAL"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String responseBody = createRoomResult.getResponse().getContentAsString();
+        Long chatRoomId = ((Number) JsonPath.read(
+                responseBody,
+                "$.data.chatRoomId"
+        )).longValue();
+        Long messageId = ((Number) JsonPath.read(
+                responseBody,
+                "$.data.messageId"
+        )).longValue();
+
+        mockMvc.perform(patch("/api/v1/chat-rooms/{chatRoomId}", chatRoomId)
+                        .cookie(new Cookie("accessToken", accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "  가을 출근용 니트 추천  "
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.chatRoomId").value(chatRoomId))
+                .andExpect(jsonPath("$.data.title")
+                        .value("가을 출근용 니트 추천"));
+
+        mockMvc.perform(delete("/api/v1/chat-rooms/{chatRoomId}", chatRoomId)
+                        .cookie(new Cookie("accessToken", accessToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data").isEmpty());
+
+        entityManager.flush();
+        entityManager.clear();
+
+        ChatRoom deletedChatRoom = chatRoomRepository
+                .findById(chatRoomId)
+                .orElseThrow();
+        assertThat(deletedChatRoom.getTitle())
+                .isEqualTo("가을 출근용 니트 추천");
+        assertThat(deletedChatRoom.isDeleted()).isTrue();
+        assertThat(deletedChatRoom.getDeletedAt()).isNotNull();
+        assertThat(chatMessageRepository.findById(messageId)).isPresent();
+        assertThat(chatRoomRepository.findActiveByIdForUpdate(chatRoomId))
+                .isEmpty();
+
+        mockMvc.perform(patch("/api/v1/chat-rooms/{chatRoomId}", chatRoomId)
+                        .cookie(new Cookie("accessToken", accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "다시 수정할 제목"
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CHAT_ROOM_NOT_FOUND"));
+
+        mockMvc.perform(post("/api/v1/chat-rooms/{chatRoomId}/messages", chatRoomId)
+                        .cookie(new Cookie("accessToken", accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "content": "삭제된 방에 메시지 전송"
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CHAT_ROOM_NOT_FOUND"));
     }
 
     private String loginAndGetAccessToken() throws Exception {

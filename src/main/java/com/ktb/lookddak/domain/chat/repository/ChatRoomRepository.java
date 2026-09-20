@@ -12,6 +12,13 @@ import java.util.Optional;
 public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select chatRoom from ChatRoom chatRoom where chatRoom.id = :chatRoomId")
-    Optional<ChatRoom> findByIdForUpdate(@Param("chatRoomId") Long chatRoomId);
+    @Query("""
+            select chatRoom
+            from ChatRoom chatRoom
+            where chatRoom.id = :chatRoomId
+              and chatRoom.deletedAt is null
+            """)
+    Optional<ChatRoom> findActiveByIdForUpdate(
+            @Param("chatRoomId") Long chatRoomId
+    );
 }
