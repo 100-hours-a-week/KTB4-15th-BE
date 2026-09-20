@@ -4,6 +4,8 @@ import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateRequest;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateResponse;
 import com.ktb.lookddak.domain.chat.entity.ChatGenerationStatus;
 import com.ktb.lookddak.domain.chat.entity.ChatMessage;
 import com.ktb.lookddak.domain.chat.entity.ChatRoom;
@@ -64,14 +66,7 @@ public class ChatService {
             Long chatRoomId,
             ChatMessageCreateRequest request
     ) {
-        ChatRoom chatRoom = chatRoomRepository.findByIdForUpdate(chatRoomId)
-                .orElseThrow(() ->
-                        new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND)
-                );
-
-        if (!chatRoom.isOwnedBy(memberId)) {
-            throw new BusinessException(ErrorCode.CHAT_ROOM_ACCESS_DENIED);
-        }
+        ChatRoom chatRoom = getOwnedActiveChatRoom(memberId, chatRoomId);
 
         boolean isGenerating = chatMessageRepository
                 .existsByChatRoomIdAndSenderTypeAndGenerationStatus(
@@ -97,5 +92,41 @@ public class ChatService {
                 savedMessage.getId(),
                 savedMessage.getContent()
         );
+    }
+
+    @Transactional
+    public ChatRoomTitleUpdateResponse updateTitle(
+            Long memberId,
+            Long chatRoomId,
+            ChatRoomTitleUpdateRequest request
+    ) {
+        ChatRoom chatRoom = getOwnedActiveChatRoom(memberId, chatRoomId);
+
+        chatRoom.updateTitle(request.getTitle());
+
+        return new ChatRoomTitleUpdateResponse(
+                chatRoom.getId(),
+                chatRoom.getTitle()
+        );
+    }
+
+    @Transactional
+    public void deleteChatRoom(Long memberId, Long chatRoomId) {
+        ChatRoom chatRoom = getOwnedActiveChatRoom(memberId, chatRoomId);
+
+        chatRoom.delete(LocalDateTime.now());
+    }
+
+    private ChatRoom getOwnedActiveChatRoom(Long memberId, Long chatRoomId) {
+        ChatRoom chatRoom = chatRoomRepository.findActiveByIdForUpdate(chatRoomId)
+                .orElseThrow(() ->
+                        new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND)
+                );
+
+        if (!chatRoom.isOwnedBy(memberId)) {
+            throw new BusinessException(ErrorCode.CHAT_ROOM_ACCESS_DENIED);
+        }
+
+        return chatRoom;
     }
 }

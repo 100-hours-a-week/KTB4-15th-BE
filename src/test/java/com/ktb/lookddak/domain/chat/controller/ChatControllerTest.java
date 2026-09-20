@@ -2,6 +2,7 @@ package com.ktb.lookddak.domain.chat.controller;
 
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateResponse;
 import com.ktb.lookddak.domain.chat.service.ChatService;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
@@ -29,6 +30,8 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -179,6 +182,92 @@ class ChatControllerTest {
         performCreateMessage()
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("AI_RESPONSE_GENERATING"));
+    }
+
+    @Test
+    @DisplayName("채팅방 제목을 수정하면 200 OK를 반환한다")
+    void updateTitle() throws Exception {
+        given(chatService.updateTitle(any(), any(), any()))
+                .willReturn(new ChatRoomTitleUpdateResponse(
+                        10L,
+                        "가을 출근용 니트 추천"
+                ));
+
+        mockMvc.perform(patch("/api/v1/chat-rooms/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "가을 출근용 니트 추천"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.chatRoomId").value(10))
+                .andExpect(jsonPath("$.data.title")
+                        .value("가을 출근용 니트 추천"))
+                .andExpect(jsonPath("$.message")
+                        .value("요청이 성공적으로 처리되었습니다."));
+
+        verify(chatService).updateTitle(eq(1L), eq(10L), any());
+    }
+
+    @Test
+    @DisplayName("채팅방 제목이 공백이면 400 Bad Request를 반환한다")
+    void rejectBlankTitle() throws Exception {
+        mockMvc.perform(patch("/api/v1/chat-rooms/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "   "
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    @DisplayName("채팅방을 삭제하면 200 OK를 반환한다")
+    void deleteChatRoom() throws Exception {
+        mockMvc.perform(delete("/api/v1/chat-rooms/10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data").isEmpty())
+                .andExpect(jsonPath("$.message")
+                        .value("요청이 성공적으로 처리되었습니다."));
+
+        verify(chatService).deleteChatRoom(1L, 10L);
+    }
+
+    @Test
+    @DisplayName("없는 채팅방을 수정하면 404 Not Found를 반환한다")
+    void rejectMissingChatRoomTitleUpdate() throws Exception {
+        given(chatService.updateTitle(any(), any(), any()))
+                .willThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+
+        mockMvc.perform(patch("/api/v1/chat-rooms/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "가을 출근용 니트 추천"
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CHAT_ROOM_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("다른 회원의 채팅방을 삭제하면 403 Forbidden을 반환한다")
+    void rejectOtherMembersChatRoomDeletion() throws Exception {
+        org.mockito.Mockito.doThrow(
+                        new BusinessException(ErrorCode.CHAT_ROOM_ACCESS_DENIED)
+                )
+                .when(chatService)
+                .deleteChatRoom(1L, 10L);
+
+        mockMvc.perform(delete("/api/v1/chat-rooms/10"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("CHAT_ROOM_ACCESS_DENIED"));
     }
 
     private org.springframework.test.web.servlet.ResultActions performCreateMessage()

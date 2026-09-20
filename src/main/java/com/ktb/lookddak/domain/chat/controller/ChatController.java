@@ -4,6 +4,8 @@ import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateRequest;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateResponse;
 import com.ktb.lookddak.domain.chat.service.ChatService;
 import com.ktb.lookddak.global.response.ApiResponse;
 import com.ktb.lookddak.global.response.SuccessCode;
@@ -14,6 +16,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -58,5 +62,34 @@ public class ChatController {
         return ResponseEntity
                 .status(SuccessCode.CREATED.getStatus())
                 .body(ApiResponse.success(SuccessCode.CREATED, response));
+    }
+
+    @PatchMapping("/{chatRoomId}")
+    public ResponseEntity<ApiResponse<ChatRoomTitleUpdateResponse>> updateTitle(
+            @AuthenticationPrincipal MemberPrincipal principal,
+            @Positive @PathVariable Long chatRoomId,
+            @Valid @RequestBody ChatRoomTitleUpdateRequest request
+    ) {
+        ChatRoomTitleUpdateResponse response = chatService.updateTitle(
+                principal.getMemberId(),
+                chatRoomId,
+                request
+        );
+
+        return ResponseEntity
+                .status(SuccessCode.OK.getStatus())
+                .body(ApiResponse.success(SuccessCode.OK, response));
+    }
+
+    @DeleteMapping("/{chatRoomId}")
+    public ResponseEntity<ApiResponse<Void>> deleteChatRoom(
+            @AuthenticationPrincipal MemberPrincipal principal,
+            @Positive @PathVariable Long chatRoomId
+    ) {
+        chatService.deleteChatRoom(principal.getMemberId(), chatRoomId);
+
+        return ResponseEntity
+                .status(SuccessCode.OK.getStatus())
+                .body(ApiResponse.success(SuccessCode.OK, null));
     }
 }

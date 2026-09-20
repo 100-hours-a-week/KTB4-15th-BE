@@ -45,6 +45,9 @@ public class ChatRoom extends BaseEntity {
     @Column(name = "last_message_at", nullable = false)
     private LocalDateTime lastMessageAt;
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     private ChatRoom(
             Member member,
             String title,
@@ -77,6 +80,18 @@ public class ChatRoom extends BaseEntity {
 
     public void updateLastMessageAt(LocalDateTime lastMessageAt) {
         this.lastMessageAt = lastMessageAt;
+    }
+
+    public void updateTitle(String title) {
+        this.title = title.trim();
+    }
+
+    public void delete(LocalDateTime deletedAt) {
+        this.deletedAt = deletedAt;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
     }
 
     private static String createTitle(String content) {

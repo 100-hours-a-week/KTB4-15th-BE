@@ -28,6 +28,8 @@ class ChatRoomTest {
         assertThat(chatRoom.getTitle()).isEqualTo("5만원대 캐주얼 니트 추천해줘");
         assertThat(chatRoom.getSourceType()).isEqualTo(ChatSourceType.WISHLIST);
         assertThat(chatRoom.getLastMessageAt()).isEqualTo(lastMessageAt);
+        assertThat(chatRoom.getDeletedAt()).isNull();
+        assertThat(chatRoom.isDeleted()).isFalse();
     }
 
     @Test
@@ -77,5 +79,39 @@ class ChatRoomTest {
         chatRoom.updateLastMessageAt(updatedTime);
 
         assertThat(chatRoom.getLastMessageAt()).isEqualTo(updatedTime);
+    }
+
+    @Test
+    @DisplayName("채팅방 제목의 양 끝 공백을 제거해 변경한다")
+    void updateTitle() {
+        Member member = Member.create("member@lookddak.com", "encoded-password");
+        ChatRoom chatRoom = ChatRoom.create(
+                member,
+                "기존 제목",
+                ChatSourceType.GENERAL,
+                LocalDateTime.now()
+        );
+
+        chatRoom.updateTitle("  가을 출근용 니트 추천  ");
+
+        assertThat(chatRoom.getTitle()).isEqualTo("가을 출근용 니트 추천");
+    }
+
+    @Test
+    @DisplayName("채팅방을 삭제하면 삭제 시각을 기록한다")
+    void deleteChatRoom() {
+        Member member = Member.create("member@lookddak.com", "encoded-password");
+        ChatRoom chatRoom = ChatRoom.create(
+                member,
+                "새로운 대화",
+                ChatSourceType.GENERAL,
+                LocalDateTime.now()
+        );
+        LocalDateTime deletedAt = LocalDateTime.of(2026, 9, 20, 18, 30);
+
+        chatRoom.delete(deletedAt);
+
+        assertThat(chatRoom.getDeletedAt()).isEqualTo(deletedAt);
+        assertThat(chatRoom.isDeleted()).isTrue();
     }
 }
