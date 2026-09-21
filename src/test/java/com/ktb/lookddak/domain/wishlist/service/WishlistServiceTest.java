@@ -6,6 +6,7 @@ import com.ktb.lookddak.domain.product.entity.Product;
 import com.ktb.lookddak.domain.product.repository.ProductRepository;
 import com.ktb.lookddak.domain.wishlist.dto.WishlistCreateRequest;
 import com.ktb.lookddak.domain.wishlist.dto.WishlistCreateResponse;
+import com.ktb.lookddak.domain.wishlist.dto.WishlistCountResponse;
 import com.ktb.lookddak.domain.wishlist.entity.Wishlist;
 import com.ktb.lookddak.domain.wishlist.repository.WishlistRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
@@ -50,6 +51,28 @@ class WishlistServiceTest {
                 productRepository,
                 wishlistRepository
         );
+    }
+
+    @Test
+    @DisplayName("현재 회원의 찜 개수를 조회한다")
+    void getWishlistCount() {
+        given(wishlistRepository.countByMemberId(1L)).willReturn(3L);
+
+        WishlistCountResponse response = wishlistService.getWishlistCount(1L);
+
+        assertThat(response.getCount()).isEqualTo(3L);
+        verify(wishlistRepository).countByMemberId(1L);
+        verify(memberRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("찜이 없으면 개수로 0을 반환한다")
+    void getEmptyWishlistCount() {
+        given(wishlistRepository.countByMemberId(1L)).willReturn(0L);
+
+        WishlistCountResponse response = wishlistService.getWishlistCount(1L);
+
+        assertThat(response.getCount()).isZero();
     }
 
     @Test

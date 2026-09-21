@@ -13,6 +13,8 @@ public interface WishlistRepository extends JpaRepository<Wishlist, Long> {
 
     boolean existsByMemberIdAndProductId(Long memberId, Long productId);
 
+    long countByMemberId(Long memberId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select w from Wishlist w where w.id = :wishlistId")
     Optional<Wishlist> findByIdForUpdate(@Param("wishlistId") Long wishlistId);

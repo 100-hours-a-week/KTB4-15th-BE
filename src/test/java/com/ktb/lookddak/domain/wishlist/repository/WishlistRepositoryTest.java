@@ -55,6 +55,23 @@ class WishlistRepositoryTest {
     }
 
     @Test
+    @DisplayName("현재 회원의 찜만 집계한다")
+    void countByMember() {
+        Member otherMember = memberRepository.save(Member.create(
+                "other-wishlist@lookddak.com",
+                "encoded-password"
+        ));
+        Product secondProduct = productRepository.save(Product.create(59_000));
+        wishlistRepository.save(Wishlist.create(member, product));
+        wishlistRepository.save(Wishlist.create(member, secondProduct));
+        wishlistRepository.saveAndFlush(Wishlist.create(otherMember, product));
+
+        long count = wishlistRepository.countByMemberId(member.getId());
+
+        assertThat(count).isEqualTo(2L);
+    }
+
+    @Test
     @DisplayName("한 회원이 같은 상품을 중복으로 찜할 수 없다")
     void enforceUniqueMemberAndProduct() {
         wishlistRepository.saveAndFlush(Wishlist.create(member, product));

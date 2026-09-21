@@ -6,6 +6,7 @@ import com.ktb.lookddak.domain.product.entity.Product;
 import com.ktb.lookddak.domain.product.repository.ProductRepository;
 import com.ktb.lookddak.domain.wishlist.dto.WishlistCreateRequest;
 import com.ktb.lookddak.domain.wishlist.dto.WishlistCreateResponse;
+import com.ktb.lookddak.domain.wishlist.dto.WishlistCountResponse;
 import com.ktb.lookddak.domain.wishlist.entity.Wishlist;
 import com.ktb.lookddak.domain.wishlist.repository.WishlistRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
@@ -23,6 +24,12 @@ public class WishlistService {
     private final MemberRepository memberRepository;
     private final ProductRepository productRepository;
     private final WishlistRepository wishlistRepository;
+
+    public WishlistCountResponse getWishlistCount(Long memberId) {
+        long count = wishlistRepository.countByMemberId(memberId);
+
+        return new WishlistCountResponse(count);
+    }
 
     @Transactional
     public WishlistCreateResponse createWishlist(
