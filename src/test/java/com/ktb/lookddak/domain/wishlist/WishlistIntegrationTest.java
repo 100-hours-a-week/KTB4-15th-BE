@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -85,6 +86,12 @@ class WishlistIntegrationTest {
                 .extracting("wishedPrice")
                 .isEqualTo(49_000);
 
+        mockMvc.perform(get("/api/v1/wishlists/count")
+                        .cookie(new Cookie("accessToken", accessToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.count").value(1));
+
         mockMvc.perform(post("/api/v1/wishlists")
                         .cookie(new Cookie("accessToken", accessToken))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -101,6 +108,11 @@ class WishlistIntegrationTest {
                 .andExpect(jsonPath("$.data").isEmpty());
 
         assertThat(wishlistRepository.findById(wishlistId)).isEmpty();
+
+        mockMvc.perform(get("/api/v1/wishlists/count")
+                        .cookie(new Cookie("accessToken", accessToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.count").value(0));
     }
 
     @Test
@@ -111,6 +123,10 @@ class WishlistIntegrationTest {
                         .content("""
                                 {"productId": %d}
                                 """.formatted(product.getId())))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(get("/api/v1/wishlists/count"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }

@@ -1,6 +1,7 @@
 package com.ktb.lookddak.domain.wishlist.controller;
 
 import com.ktb.lookddak.domain.wishlist.dto.WishlistCreateResponse;
+import com.ktb.lookddak.domain.wishlist.dto.WishlistCountResponse;
 import com.ktb.lookddak.domain.wishlist.service.WishlistService;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
@@ -28,6 +29,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -65,6 +67,22 @@ class WishlistControllerTest {
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    @DisplayName("현재 회원의 찜 개수를 반환한다")
+    void getWishlistCount() throws Exception {
+        given(wishlistService.getWishlistCount(1L))
+                .willReturn(new WishlistCountResponse(3L));
+
+        mockMvc.perform(get("/api/v1/wishlists/count"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.count").value(3))
+                .andExpect(jsonPath("$.message")
+                        .value("요청이 성공적으로 처리되었습니다."));
+
+        verify(wishlistService).getWishlistCount(1L);
     }
 
     @Test
