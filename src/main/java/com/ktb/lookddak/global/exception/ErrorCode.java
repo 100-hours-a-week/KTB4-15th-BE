@@ -42,6 +42,12 @@ public enum ErrorCode {
     WISHLIST_NOT_FOUND(HttpStatus.NOT_FOUND, "찜 정보를 찾을 수 없습니다."),
     WISHLIST_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 찜에 접근할 권한이 없습니다."),
 
+    // Fitting candidate errors
+    FITTING_CANDIDATE_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 피팅 후보에 추가된 상품입니다."),
+    FITTING_CANDIDATE_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "피팅 후보 상품은 최대 1,000개까지 추가할 수 있습니다."),
+    FITTING_CANDIDATE_NOT_FOUND(HttpStatus.NOT_FOUND, "피팅 후보를 찾을 수 없습니다."),
+    FITTING_CANDIDATE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 피팅 후보에 접근할 권한이 없습니다."),
+
     // Server errors
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");
 
