@@ -2,6 +2,7 @@ package com.ktb.lookddak.domain.fitting.entity;
 
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.product.entity.Product;
+import com.ktb.lookddak.domain.product.entity.ProductItemType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -15,7 +16,14 @@ class FittingCandidateTest {
     void createFittingCandidate() {
         Member member = Member.create("member@lookddak.com", "encoded");
         ReflectionTestUtils.setField(member, "id", 1L);
-        Product product = Product.create(49_000);
+        Product product = Product.create(
+                "테스트 상품",
+                "https://image.lookddak.com/test.jpg",
+                49_000,
+                "네이비",
+                ProductItemType.TOP,
+                "https://shop.lookddak.com/test"
+        );
 
         FittingCandidate candidate = FittingCandidate.create(member, product);
 

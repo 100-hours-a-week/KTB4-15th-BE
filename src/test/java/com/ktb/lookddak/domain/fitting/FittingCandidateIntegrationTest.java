@@ -5,6 +5,7 @@ import com.ktb.lookddak.domain.fitting.repository.FittingCandidateRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
 import com.ktb.lookddak.domain.product.entity.Product;
+import com.ktb.lookddak.domain.product.entity.ProductItemType;
 import com.ktb.lookddak.domain.product.repository.ProductRepository;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,7 +58,14 @@ class FittingCandidateIntegrationTest {
                 EMAIL,
                 passwordEncoder.encode(PASSWORD)
         ));
-        product = productRepository.saveAndFlush(Product.create(49_000));
+        product = productRepository.saveAndFlush(Product.create(
+                "에센셜 램스울 크루넥",
+                "https://image.lookddak.com/products/1.jpg",
+                49_000,
+                "네이비",
+                ProductItemType.TOP,
+                "https://shop.lookddak.com/products/1"
+        ));
     }
 
     @Test

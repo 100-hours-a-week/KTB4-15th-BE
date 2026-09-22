@@ -3,6 +3,7 @@ package com.ktb.lookddak.domain.wishlist.repository;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
 import com.ktb.lookddak.domain.product.entity.Product;
+import com.ktb.lookddak.domain.product.entity.ProductItemType;
 import com.ktb.lookddak.domain.product.repository.ProductRepository;
 import com.ktb.lookddak.domain.wishlist.entity.Wishlist;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,7 +39,7 @@ class WishlistRepositoryTest {
                 "wishlist-repository@lookddak.com",
                 "encoded-password"
         ));
-        product = productRepository.save(Product.create(49_000));
+        product = productRepository.save(createProduct("상품 1", 49_000));
     }
 
     @Test
@@ -61,7 +62,9 @@ class WishlistRepositoryTest {
                 "other-wishlist@lookddak.com",
                 "encoded-password"
         ));
-        Product secondProduct = productRepository.save(Product.create(59_000));
+        Product secondProduct = productRepository.save(
+                createProduct("상품 2", 59_000)
+        );
         wishlistRepository.save(Wishlist.create(member, product));
         wishlistRepository.save(Wishlist.create(member, secondProduct));
         wishlistRepository.saveAndFlush(Wishlist.create(otherMember, product));
@@ -92,5 +95,16 @@ class WishlistRepositoryTest {
         wishlistRepository.flush();
 
         assertThat(wishlistRepository.findById(wishlist.getId())).isEmpty();
+    }
+
+    private Product createProduct(String name, Integer currentPrice) {
+        return Product.create(
+                name,
+                "https://image.lookddak.com/test.jpg",
+                currentPrice,
+                "네이비",
+                ProductItemType.TOP,
+                "https://shop.lookddak.com/test"
+        );
     }
 }

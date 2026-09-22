@@ -3,6 +3,7 @@ package com.ktb.lookddak.domain.wishlist.service;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
 import com.ktb.lookddak.domain.product.entity.Product;
+import com.ktb.lookddak.domain.product.entity.ProductItemType;
 import com.ktb.lookddak.domain.product.repository.ProductRepository;
 import com.ktb.lookddak.domain.wishlist.dto.WishlistCreateRequest;
 import com.ktb.lookddak.domain.wishlist.dto.WishlistCreateResponse;
@@ -199,7 +200,14 @@ class WishlistServiceTest {
     }
 
     private Product createProduct(Long id, Integer currentPrice) {
-        Product product = Product.create(currentPrice);
+        Product product = Product.create(
+                "테스트 상품",
+                "https://image.lookddak.com/test.jpg",
+                currentPrice,
+                "네이비",
+                ProductItemType.TOP,
+                "https://shop.lookddak.com/test"
+        );
         ReflectionTestUtils.setField(product, "id", id);
         return product;
     }
