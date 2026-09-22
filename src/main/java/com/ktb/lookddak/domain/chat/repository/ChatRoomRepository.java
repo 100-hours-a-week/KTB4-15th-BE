@@ -14,6 +14,16 @@ import java.util.Optional;
 
 public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
 
+    @Query("""
+            select chatRoom
+            from ChatRoom chatRoom
+            where chatRoom.id = :chatRoomId
+              and chatRoom.deletedAt is null
+            """)
+    Optional<ChatRoom> findActiveById(
+            @Param("chatRoomId") Long chatRoomId
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select chatRoom

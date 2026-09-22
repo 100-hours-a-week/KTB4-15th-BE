@@ -25,10 +25,16 @@ import java.time.LocalDateTime;
 @Entity
 @Table(
         name = "chat_message",
-        indexes = @Index(
-                name = "idx_chat_message_generation",
-                columnList = "chat_room_id,sender_type,generation_status"
-        )
+        indexes = {
+                @Index(
+                        name = "idx_chat_message_generation",
+                        columnList = "chat_room_id,sender_type,generation_status"
+                ),
+                @Index(
+                        name = "idx_chat_message_room_id",
+                        columnList = "chat_room_id,id"
+                )
+        }
 )
 @EntityListeners(AuditingEntityListener.class)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
