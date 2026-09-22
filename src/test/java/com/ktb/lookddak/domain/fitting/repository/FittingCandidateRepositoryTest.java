@@ -14,6 +14,9 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import java.util.List;
+import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -64,6 +67,39 @@ class FittingCandidateRepositoryTest {
     }
 
     @Test
+    @DisplayName("상품 ID 목록 중 현재 회원이 피팅 후보로 선택한 상품 ID만 조회한다")
+    void findFittingCandidateProductIds() {
+        Member otherMember = memberRepository.save(Member.create(
+                "other-bulk-fitting@lookddak.com",
+                "encoded-password"
+        ));
+        Product otherMembersProduct = productRepository.save(
+                createProduct("다른 회원 후보 상품", 59_000)
+        );
+        Product notSelectedProduct = productRepository.save(
+                createProduct("선택하지 않은 상품", 69_000)
+        );
+        fittingCandidateRepository.save(
+                FittingCandidate.create(member, product)
+        );
+        fittingCandidateRepository.saveAndFlush(
+                FittingCandidate.create(otherMember, otherMembersProduct)
+        );
+
+        Set<Long> productIds = fittingCandidateRepository
+                .findProductIdsByMemberIdAndProductIdIn(
+                        member.getId(),
+                        List.of(
+                                product.getId(),
+                                otherMembersProduct.getId(),
+                                notSelectedProduct.getId()
+                        )
+                );
+
+        assertThat(productIds).containsExactly(product.getId());
+    }
+
+    @Test
     @DisplayName("한 회원은 동일 상품을 중복으로 추가할 수 없다")
     void enforceUniqueMemberAndProduct() {
         fittingCandidateRepository.saveAndFlush(
@@ -88,5 +124,16 @@ class FittingCandidateRepositoryTest {
         assertThat(fittingCandidateRepository.findById(candidate.getId()))
                 .isEmpty();
         assertThat(productRepository.findById(product.getId())).isPresent();
+    }
+
+    private Product createProduct(String name, Integer currentPrice) {
+        return Product.create(
+                name,
+                "https://image.lookddak.com/test.jpg",
+                currentPrice,
+                "네이비",
+                ProductItemType.TOP,
+                "https://shop.lookddak.com/test"
+        );
     }
 }

@@ -14,6 +14,9 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import java.util.List;
+import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -72,6 +75,37 @@ class WishlistRepositoryTest {
         long count = wishlistRepository.countByMemberId(member.getId());
 
         assertThat(count).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("상품 ID 목록 중 현재 회원이 찜한 상품 ID만 조회한다")
+    void findWishlistedProductIds() {
+        Member otherMember = memberRepository.save(Member.create(
+                "other-bulk-wishlist@lookddak.com",
+                "encoded-password"
+        ));
+        Product otherMembersProduct = productRepository.save(
+                createProduct("다른 회원 찜 상품", 59_000)
+        );
+        Product notWishlistedProduct = productRepository.save(
+                createProduct("찜하지 않은 상품", 69_000)
+        );
+        wishlistRepository.save(Wishlist.create(member, product));
+        wishlistRepository.saveAndFlush(
+                Wishlist.create(otherMember, otherMembersProduct)
+        );
+
+        Set<Long> productIds = wishlistRepository
+                .findProductIdsByMemberIdAndProductIdIn(
+                        member.getId(),
+                        List.of(
+                                product.getId(),
+                                otherMembersProduct.getId(),
+                                notWishlistedProduct.getId()
+                        )
+                );
+
+        assertThat(productIds).containsExactly(product.getId());
     }
 
     @Test
