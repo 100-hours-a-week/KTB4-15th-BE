@@ -41,7 +41,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -181,9 +180,10 @@ public class ChatService {
                 ? chatRooms.subList(0, pageSize)
                 : chatRooms;
 
-        List<ChatRoomListItemResponse> items = responseRooms.stream()
-                .map(ChatRoomListItemResponse::from)
-                .toList();
+        List<ChatRoomListItemResponse> items = new ArrayList<>();
+        for (ChatRoom responseRoom : responseRooms) {
+            items.add(ChatRoomListItemResponse.from(responseRoom));
+        }
 
         Long nextCursor = hasNext
                 ? responseRooms.get(responseRooms.size() - 1).getId()
@@ -204,6 +204,7 @@ public class ChatService {
         ChatRoom chatRoom = getOwnedActiveChatRoomForRead(memberId, chatRoomId);
         validateMessageCursor(chatRoomId, cursor);
 
+        // 요청 개수보다 한 건 더 조회해 다음 페이지 존재 여부를 판단한다.
         PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
         List<ChatMessage> fetchedMessages = cursor == null
                 ? chatMessageRepository.findFirstPage(chatRoomId, pageRequest)
@@ -217,10 +218,13 @@ public class ChatService {
         List<ChatMessage> pageMessages = hasNext
                 ? fetchedMessages.subList(0, pageSize)
                 : fetchedMessages;
+
+        // 현재 페이지에서 가장 오래된 메시지 ID를 다음 조회의 커서로 사용한다.
         Long nextCursor = hasNext && !pageMessages.isEmpty()
                 ? pageMessages.get(pageMessages.size() - 1).getId()
                 : null;
 
+        // 현재 페이지에 포함된 추천 정보만 일괄 조회해 메시지별로 연결한다.
         Map<Long, RecommendationResponse> recommendationResponses =
                 createRecommendationResponses(memberId, pageMessages);
         List<ChatMessageDetailResponse> messageResponses =
@@ -238,13 +242,19 @@ public class ChatService {
             Long memberId,
             List<ChatMessage> messages
     ) {
-        List<Long> recommendationMessageIds = messages.stream()
-                .filter(message -> message.getSenderType() == ChatSenderType.AI)
-                .filter(message ->
-                        message.getMessageType() == ChatMessageType.RECOMMENDATION
-                )
-                .map(ChatMessage::getId)
-                .toList();
+        // 일반 대화에는 추천 데이터가 없으므로 AI 추천 메시지만 선별한다.
+        List<Long> recommendationMessageIds = new ArrayList<>();
+        for (ChatMessage message : messages) {
+            boolean isAiMessage =
+                    message.getSenderType() == ChatSenderType.AI;
+            boolean isRecommendationType =
+                    message.getMessageType()
+                            == ChatMessageType.RECOMMENDATION;
+
+            if (isAiMessage && isRecommendationType) {
+                recommendationMessageIds.add(message.getId());
+            }
+        }
 
         if (recommendationMessageIds.isEmpty()) {
             return Map.of();
@@ -256,9 +266,12 @@ public class ChatService {
             return Map.of();
         }
 
-        List<Long> recommendationIds = recommendations.stream()
-                .map(Recommendation::getId)
-                .toList();
+        // 추천 상품을 IN 쿼리 한 번으로 조회하기 위해 추천 ID를 모은다.
+        List<Long> recommendationIds = new ArrayList<>();
+        for (Recommendation recommendation : recommendations) {
+            recommendationIds.add(recommendation.getId());
+        }
+
         List<RecommendationProduct> recommendationProducts =
                 recommendationProductRepository
                         .findAllWithProductByRecommendationIdIn(
@@ -266,17 +279,28 @@ public class ChatService {
                         );
 
         Map<Long, List<RecommendationProduct>> productsByRecommendationId =
-                recommendationProducts.stream()
-                        .collect(Collectors.groupingBy(
-                                product -> product.getRecommendation().getId(),
-                                LinkedHashMap::new,
-                                Collectors.toList()
-                        ));
+                new LinkedHashMap<>();
+        Set<Long> productIds = new LinkedHashSet<>();
 
-        Set<Long> productIds = recommendationProducts.stream()
-                .map(product -> product.getProduct().getId())
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+        // Repository의 상품 ID 오름차순을 유지해 추천별 상품 목록을 만든다.
+        // 동시에 찜·피팅 상태 조회에 사용할 상품 ID도 중복 없이 모은다.
+        for (RecommendationProduct recommendationProduct
+                : recommendationProducts) {
+            Long recommendationId = recommendationProduct
+                    .getRecommendation()
+                    .getId();
 
+            // 해당 추천의 상품 목록이 없으면 생성한 뒤 현재 상품을 추가한다.
+            productsByRecommendationId
+                    .computeIfAbsent(
+                            recommendationId,
+                            key -> new ArrayList<>()
+                    )
+                    .add(recommendationProduct);
+            productIds.add(recommendationProduct.getProduct().getId());
+        }
+
+        // 상품마다 조회하지 않고 찜·피팅 상태를 각각 한 번의 쿼리로 가져온다.
         Set<Long> wishlistedProductIds = productIds.isEmpty()
                 ? Set.of()
                 : wishlistRepository.findProductIdsByMemberIdAndProductIdIn(
@@ -292,27 +316,37 @@ public class ChatService {
                                 productIds
                         );
 
-        return recommendations.stream().collect(Collectors.toMap(
-                recommendation -> recommendation.getMessage().getId(),
-                recommendation -> RecommendationResponse.from(
-                        recommendation,
-                        productsByRecommendationId
-                                .getOrDefault(recommendation.getId(), List.of())
-                                .stream()
-                                .map(product -> RecommendedProductResponse.from(
-                                        product.getProduct(),
-                                        wishlistedProductIds.contains(
-                                                product.getProduct().getId()
-                                        ),
-                                        fittingCandidateProductIds.contains(
-                                                product.getProduct().getId()
-                                        )
-                                ))
-                                .toList()
-                ),
-                (existing, replacement) -> existing,
-                LinkedHashMap::new
-        ));
+        Map<Long, RecommendationResponse> responses = new LinkedHashMap<>();
+
+        // 메시지 ID를 Key로 사용하면 메시지 응답을 만들 때 추천 정보를 바로 찾을 수 있다.
+        for (Recommendation recommendation : recommendations) {
+            List<RecommendationProduct> products =
+                    productsByRecommendationId.getOrDefault(
+                            recommendation.getId(),
+                            List.of()
+                    );
+            List<RecommendedProductResponse> productResponses =
+                    new ArrayList<>();
+
+            for (RecommendationProduct recommendationProduct : products) {
+                Long productId = recommendationProduct.getProduct().getId();
+                productResponses.add(RecommendedProductResponse.from(
+                        recommendationProduct.getProduct(),
+                        wishlistedProductIds.contains(productId),
+                        fittingCandidateProductIds.contains(productId)
+                ));
+            }
+
+            responses.put(
+                    recommendation.getMessage().getId(),
+                    RecommendationResponse.from(
+                            recommendation,
+                            productResponses
+                    )
+            );
+        }
+
+        return responses;
     }
 
     private List<ChatMessageDetailResponse> createMessageResponses(
@@ -321,6 +355,7 @@ public class ChatService {
     ) {
         List<ChatMessageDetailResponse> responses = new ArrayList<>();
 
+        // DB에서는 최신순으로 조회하지만 화면에는 오래된 메시지부터 보여준다.
         for (int index = pageMessages.size() - 1; index >= 0; index--) {
             ChatMessage message = pageMessages.get(index);
             responses.add(ChatMessageDetailResponse.from(
