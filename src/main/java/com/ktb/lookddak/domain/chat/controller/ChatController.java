@@ -2,6 +2,7 @@ package com.ktb.lookddak.domain.chat.controller;
 
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatGenerationStatusResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomDetailResponse;
@@ -66,6 +67,25 @@ public class ChatController {
                 cursor,
                 size
         );
+
+        return ResponseEntity
+                .status(SuccessCode.OK.getStatus())
+                .body(ApiResponse.success(SuccessCode.OK, response));
+    }
+
+    @GetMapping("/{chatRoomId}/messages/{messageId}/status")
+    public ResponseEntity<ApiResponse<ChatGenerationStatusResponse>>
+            getGenerationStatus(
+                    @AuthenticationPrincipal MemberPrincipal principal,
+                    @Positive @PathVariable Long chatRoomId,
+                    @Positive @PathVariable Long messageId
+            ) {
+        ChatGenerationStatusResponse response =
+                chatService.getGenerationStatus(
+                        principal.getMemberId(),
+                        chatRoomId,
+                        messageId
+                );
 
         return ResponseEntity
                 .status(SuccessCode.OK.getStatus())

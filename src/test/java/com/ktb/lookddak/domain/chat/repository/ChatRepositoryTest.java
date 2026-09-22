@@ -244,6 +244,89 @@ class ChatRepositoryTest {
     }
 
     @Test
+    @DisplayName("메시지 ID와 채팅방 ID가 모두 일치하는 메시지를 조회한다")
+    void findMessageInChatRoom() {
+        Member member = saveMember("status-message@lookddak.com");
+        ChatRoom chatRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        ChatRoom otherRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        ChatMessage message = saveMessage(chatRoom, "상태를 조회할 메시지");
+        ChatMessage otherMessage = saveMessage(
+                otherRoom,
+                "다른 채팅방 메시지"
+        );
+
+        assertThat(chatMessageRepository.findByIdAndChatRoomId(
+                message.getId(),
+                chatRoom.getId()
+        )).contains(message);
+        assertThat(chatMessageRepository.findByIdAndChatRoomId(
+                otherMessage.getId(),
+                chatRoom.getId()
+        )).isEmpty();
+    }
+
+    @Test
+    @DisplayName("같은 채팅방에서 대상 메시지 바로 다음 메시지를 조회한다")
+    void findNextMessageInChatRoom() {
+        Member member = saveMember("next-message@lookddak.com");
+        ChatRoom chatRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        ChatRoom otherRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        ChatMessage targetMessage = saveMessage(
+                chatRoom,
+                "상태를 조회할 메시지"
+        );
+        chatMessageRepository.saveAndFlush(
+                ChatMessage.createAiText(otherRoom, "다른 채팅방 AI 응답")
+        );
+        ChatMessage nextMessage = saveMessage(
+                chatRoom,
+                "바로 다음 사용자 메시지"
+        );
+        chatMessageRepository.saveAndFlush(
+                ChatMessage.createAiText(chatRoom, "더 나중의 AI 응답")
+        );
+
+        assertThat(chatMessageRepository
+                .findFirstByChatRoomIdAndIdGreaterThanOrderByIdAsc(
+                        chatRoom.getId(),
+                        targetMessage.getId()
+                )).contains(nextMessage);
+    }
+
+    @Test
+    @DisplayName("같은 채팅방에 이후 메시지가 없으면 빈 결과를 반환한다")
+    void doesNotFindNextMessageInChatRoom() {
+        Member member = saveMember("no-next-message@lookddak.com");
+        ChatRoom chatRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        ChatRoom otherRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        ChatMessage targetMessage = saveMessage(
+                chatRoom,
+                "마지막 메시지"
+        );
+        chatMessageRepository.saveAndFlush(
+                ChatMessage.createAiText(otherRoom, "다른 채팅방 메시지")
+        );
+
+        assertThat(chatMessageRepository
+                .findFirstByChatRoomIdAndIdGreaterThanOrderByIdAsc(
+                        chatRoom.getId(),
+                        targetMessage.getId()
+                )).isEmpty();
+    }
+
+    @Test
     @DisplayName("회원의 활성 채팅방을 마지막 메시지 시각과 ID 내림차순으로 조회한다")
     void findFirstPage() {
         Member member = saveMember("list@lookddak.com");

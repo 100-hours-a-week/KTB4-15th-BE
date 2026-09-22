@@ -32,6 +32,7 @@ public enum ErrorCode {
     // Chat errors
     CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "채팅방을 찾을 수 없습니다."),
     CHAT_ROOM_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 채팅방에 접근할 권한이 없습니다."),
+    CHAT_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "채팅 메시지를 찾을 수 없습니다."),
     AI_RESPONSE_GENERATING(HttpStatus.CONFLICT, "AI 응답을 생성 중입니다."),
 
     // Product errors
