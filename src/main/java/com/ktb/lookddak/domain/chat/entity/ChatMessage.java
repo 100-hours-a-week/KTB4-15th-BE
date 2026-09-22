@@ -84,4 +84,46 @@ public class ChatMessage {
                 content
         );
     }
+
+    public static ChatMessage createAiText(ChatRoom chatRoom, String content) {
+        return new ChatMessage(
+                chatRoom,
+                ChatSenderType.AI,
+                ChatMessageType.TEXT,
+                null,
+                content
+        );
+    }
+
+    public static ChatMessage createAiRecommendation(
+            ChatRoom chatRoom,
+            String content
+    ) {
+        return new ChatMessage(
+                chatRoom,
+                ChatSenderType.AI,
+                ChatMessageType.RECOMMENDATION,
+                null,
+                content
+        );
+    }
+
+    public void completeGeneration() {
+        updateGenerationStatus(ChatGenerationStatus.COMPLETED);
+    }
+
+    public void failGeneration() {
+        updateGenerationStatus(ChatGenerationStatus.FAILED);
+    }
+
+    private void updateGenerationStatus(ChatGenerationStatus status) {
+        if (senderType != ChatSenderType.USER
+                || generationStatus != ChatGenerationStatus.GENERATING) {
+            throw new IllegalStateException(
+                    "생성 중인 사용자 메시지만 생성 상태를 변경할 수 있습니다."
+            );
+        }
+
+        generationStatus = status;
+    }
 }

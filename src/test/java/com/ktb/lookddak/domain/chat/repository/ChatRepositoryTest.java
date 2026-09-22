@@ -13,7 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -112,11 +111,7 @@ class ChatRepositoryTest {
                 createChatRoom(member, ChatSourceType.GENERAL)
         );
         ChatMessage message = ChatMessage.createUserText(chatRoom, "옷을 추천해줘");
-        ReflectionTestUtils.setField(
-                message,
-                "generationStatus",
-                ChatGenerationStatus.COMPLETED
-        );
+        message.completeGeneration();
         chatMessageRepository.saveAndFlush(message);
 
         boolean exists = chatMessageRepository

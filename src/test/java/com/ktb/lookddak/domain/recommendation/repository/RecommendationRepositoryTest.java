@@ -73,8 +73,8 @@ class RecommendationRepositoryTest {
     @Test
     @DisplayName("메시지 ID 목록에 연결된 추천을 일괄 조회한다")
     void findAllByMessageIdIn() {
-        ChatMessage firstMessage = saveMessage("첫 번째 추천 요청");
-        ChatMessage secondMessage = saveMessage("두 번째 추천 요청");
+        ChatMessage firstMessage = saveRecommendationMessage("첫 번째 추천 응답");
+        ChatMessage secondMessage = saveRecommendationMessage("두 번째 추천 응답");
         Recommendation firstRecommendation = recommendationRepository.save(
                 Recommendation.create(member, firstMessage)
         );
@@ -95,7 +95,7 @@ class RecommendationRepositoryTest {
     @Test
     @DisplayName("한 메시지에는 추천을 하나만 연결할 수 있다")
     void enforceUniqueMessage() {
-        ChatMessage message = saveMessage("추천 요청");
+        ChatMessage message = saveRecommendationMessage("추천 응답");
         recommendationRepository.saveAndFlush(
                 Recommendation.create(member, message)
         );
@@ -108,7 +108,7 @@ class RecommendationRepositoryTest {
     @Test
     @DisplayName("추천 상품과 Product를 관계 PK 오름차순으로 일괄 조회한다")
     void findAllProductsInRecommendationOrder() {
-        ChatMessage message = saveMessage("추천 요청");
+        ChatMessage message = saveRecommendationMessage("추천 응답");
         Recommendation recommendation = recommendationRepository.saveAndFlush(
                 Recommendation.create(member, message)
         );
@@ -154,7 +154,7 @@ class RecommendationRepositoryTest {
     @Test
     @DisplayName("같은 추천에 동일 상품을 중복 연결할 수 없다")
     void enforceUniqueRecommendationAndProduct() {
-        ChatMessage message = saveMessage("추천 요청");
+        ChatMessage message = saveRecommendationMessage("추천 응답");
         Recommendation recommendation = recommendationRepository.saveAndFlush(
                 Recommendation.create(member, message)
         );
@@ -170,9 +170,9 @@ class RecommendationRepositoryTest {
         ).isInstanceOf(DataIntegrityViolationException.class);
     }
 
-    private ChatMessage saveMessage(String content) {
+    private ChatMessage saveRecommendationMessage(String content) {
         return chatMessageRepository.saveAndFlush(
-                ChatMessage.createUserText(chatRoom, content)
+                ChatMessage.createAiRecommendation(chatRoom, content)
         );
     }
 
