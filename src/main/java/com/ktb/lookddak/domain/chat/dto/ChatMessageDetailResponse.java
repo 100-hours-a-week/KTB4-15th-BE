@@ -1,5 +1,6 @@
 package com.ktb.lookddak.domain.chat.dto;
 
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.ktb.lookddak.domain.chat.entity.ChatGenerationStatus;
 import com.ktb.lookddak.domain.chat.entity.ChatMessage;
 import com.ktb.lookddak.domain.chat.entity.ChatSenderType;
@@ -8,6 +9,14 @@ import lombok.Getter;
 import java.time.LocalDateTime;
 
 @Getter
+@JsonPropertyOrder({
+        "messageId",
+        "senderType",
+        "content",
+        "generationStatus",
+        "recommendation",
+        "createdAt"
+})
 public class ChatMessageDetailResponse {
 
     private final Long messageId;

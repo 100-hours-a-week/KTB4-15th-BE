@@ -1,11 +1,23 @@
 package com.ktb.lookddak.domain.chat.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.ktb.lookddak.domain.product.entity.Product;
 import com.ktb.lookddak.domain.product.entity.ProductItemType;
 import lombok.Getter;
 
 @Getter
+@JsonPropertyOrder({
+        "productId",
+        "productName",
+        "productImageUrl",
+        "currentPrice",
+        "color",
+        "itemType",
+        "purchaseUrl",
+        "isWishlisted",
+        "isFittingCandidate"
+})
 public class RecommendedProductResponse {
 
     private final Long productId;

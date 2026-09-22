@@ -11,6 +11,9 @@ import com.ktb.lookddak.domain.recommendation.entity.Recommendation;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+import tools.jackson.databind.MapperFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -105,6 +108,76 @@ class ChatRoomDetailResponseTest {
         assertThat(response.getMessages()).containsExactly(messageResponse);
         assertThat(response.getNextCursor()).isEqualTo(105L);
         assertThat(response.isHasNext()).isTrue();
+    }
+
+    @Test
+    @DisplayName("채팅방 상세 응답을 API 명세의 필드 순서로 직렬화한다")
+    void serializeChatRoomDetailResponseInSpecifiedOrder() throws Exception {
+        ChatRoom chatRoom = createChatRoom(123L);
+        ChatMessage message = ChatMessage.createAiRecommendation(
+                chatRoom,
+                "출근할 때 입기 좋은 니트를 추천해드릴게요."
+        );
+        ReflectionTestUtils.setField(message, "id", 102L);
+        Recommendation recommendation = Recommendation.create(
+                chatRoom.getMember(),
+                message
+        );
+        ReflectionTestUtils.setField(recommendation, "id", 15L);
+        RecommendationResponse recommendationResponse =
+                RecommendationResponse.from(
+                        recommendation,
+                        List.of(RecommendedProductResponse.from(
+                                createProduct(201L),
+                                true,
+                                false
+                        ))
+                );
+        ChatMessageDetailResponse messageResponse =
+                ChatMessageDetailResponse.from(
+                        message,
+                        recommendationResponse
+                );
+        ChatRoomDetailResponse response = ChatRoomDetailResponse.from(
+                chatRoom,
+                List.of(messageResponse),
+                80L,
+                true
+        );
+        ObjectMapper objectMapper = JsonMapper.builder()
+                .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+                .build();
+
+        String json = objectMapper.writeValueAsString(response);
+
+        assertThat(json).containsSubsequence(
+                "\"chatRoomId\"",
+                "\"title\"",
+                "\"messages\"",
+                "\"nextCursor\"",
+                "\"hasNext\""
+        );
+        assertThat(json).containsSubsequence(
+                "\"messageId\"",
+                "\"senderType\"",
+                "\"content\"",
+                "\"generationStatus\"",
+                "\"recommendation\"",
+                "\"createdAt\""
+        );
+        assertThat(json).containsSubsequence(
+                "\"recommendationId\"",
+                "\"products\"",
+                "\"productId\"",
+                "\"productName\"",
+                "\"productImageUrl\"",
+                "\"currentPrice\"",
+                "\"color\"",
+                "\"itemType\"",
+                "\"purchaseUrl\"",
+                "\"isWishlisted\"",
+                "\"isFittingCandidate\""
+        );
     }
 
     private ChatRoom createChatRoom(Long id) {

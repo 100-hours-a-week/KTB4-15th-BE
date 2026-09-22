@@ -1,11 +1,13 @@
 package com.ktb.lookddak.domain.chat.dto;
 
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.ktb.lookddak.domain.recommendation.entity.Recommendation;
 import lombok.Getter;
 
 import java.util.List;
 
 @Getter
+@JsonPropertyOrder({"recommendationId", "products"})
 public class RecommendationResponse {
 
     private final Long recommendationId;

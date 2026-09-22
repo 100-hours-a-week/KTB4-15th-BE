@@ -1,11 +1,19 @@
 package com.ktb.lookddak.domain.chat.dto;
 
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.ktb.lookddak.domain.chat.entity.ChatRoom;
 import lombok.Getter;
 
 import java.util.List;
 
 @Getter
+@JsonPropertyOrder({
+        "chatRoomId",
+        "title",
+        "messages",
+        "nextCursor",
+        "hasNext"
+})
 public class ChatRoomDetailResponse {
 
     private final Long chatRoomId;
