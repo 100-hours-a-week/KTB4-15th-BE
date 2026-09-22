@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
 
@@ -19,6 +20,16 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     );
 
     boolean existsByIdAndChatRoomId(Long messageId, Long chatRoomId);
+
+    Optional<ChatMessage> findByIdAndChatRoomId(
+            Long messageId,
+            Long chatRoomId
+    );
+
+    Optional<ChatMessage> findFirstByChatRoomIdAndIdGreaterThanOrderByIdAsc(
+            Long chatRoomId,
+            Long messageId
+    );
 
     @Query("""
             select message
