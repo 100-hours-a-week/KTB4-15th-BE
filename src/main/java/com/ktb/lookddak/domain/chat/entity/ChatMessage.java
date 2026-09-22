@@ -25,10 +25,16 @@ import java.time.LocalDateTime;
 @Entity
 @Table(
         name = "chat_message",
-        indexes = @Index(
-                name = "idx_chat_message_generation",
-                columnList = "chat_room_id,sender_type,generation_status"
-        )
+        indexes = {
+                @Index(
+                        name = "idx_chat_message_generation",
+                        columnList = "chat_room_id,sender_type,generation_status"
+                ),
+                @Index(
+                        name = "idx_chat_message_room_id",
+                        columnList = "chat_room_id,id"
+                )
+        }
 )
 @EntityListeners(AuditingEntityListener.class)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -83,5 +89,47 @@ public class ChatMessage {
                 ChatGenerationStatus.GENERATING,
                 content
         );
+    }
+
+    public static ChatMessage createAiText(ChatRoom chatRoom, String content) {
+        return new ChatMessage(
+                chatRoom,
+                ChatSenderType.AI,
+                ChatMessageType.TEXT,
+                null,
+                content
+        );
+    }
+
+    public static ChatMessage createAiRecommendation(
+            ChatRoom chatRoom,
+            String content
+    ) {
+        return new ChatMessage(
+                chatRoom,
+                ChatSenderType.AI,
+                ChatMessageType.RECOMMENDATION,
+                null,
+                content
+        );
+    }
+
+    public void completeGeneration() {
+        updateGenerationStatus(ChatGenerationStatus.COMPLETED);
+    }
+
+    public void failGeneration() {
+        updateGenerationStatus(ChatGenerationStatus.FAILED);
+    }
+
+    private void updateGenerationStatus(ChatGenerationStatus status) {
+        if (senderType != ChatSenderType.USER
+                || generationStatus != ChatGenerationStatus.GENERATING) {
+            throw new IllegalStateException(
+                    "생성 중인 사용자 메시지만 생성 상태를 변경할 수 있습니다."
+            );
+        }
+
+        generationStatus = status;
     }
 }

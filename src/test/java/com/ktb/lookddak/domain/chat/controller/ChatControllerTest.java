@@ -1,14 +1,22 @@
 package com.ktb.lookddak.domain.chat.controller;
 
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatMessageDetailResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomDetailResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomListItemResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomListResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateResponse;
+import com.ktb.lookddak.domain.chat.dto.RecommendationResponse;
+import com.ktb.lookddak.domain.chat.dto.RecommendedProductResponse;
+import com.ktb.lookddak.domain.chat.entity.ChatMessage;
 import com.ktb.lookddak.domain.chat.entity.ChatRoom;
 import com.ktb.lookddak.domain.chat.entity.ChatSourceType;
 import com.ktb.lookddak.domain.chat.service.ChatService;
 import com.ktb.lookddak.domain.member.entity.Member;
+import com.ktb.lookddak.domain.product.entity.Product;
+import com.ktb.lookddak.domain.product.entity.ProductItemType;
+import com.ktb.lookddak.domain.recommendation.entity.Recommendation;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import com.ktb.lookddak.global.exception.GlobalExceptionHandler;
@@ -152,6 +160,114 @@ class ChatControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
                 .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    @DisplayName("특정 채팅방의 메시지와 추천 상품을 반환한다")
+    void getChatRoomDetail() throws Exception {
+        ChatRoom chatRoom = createChatRoom(
+                123L,
+                LocalDateTime.of(2026, 9, 8, 12, 30)
+        );
+        ChatMessage message = ChatMessage.createAiRecommendation(
+                chatRoom,
+                "출근할 때 입기 좋은 니트를 추천해드릴게요."
+        );
+        ReflectionTestUtils.setField(message, "id", 102L);
+        ReflectionTestUtils.setField(
+                message,
+                "createdAt",
+                LocalDateTime.of(2026, 9, 8, 12, 30, 3)
+        );
+        Recommendation recommendation = Recommendation.create(
+                chatRoom.getMember(),
+                message
+        );
+        ReflectionTestUtils.setField(recommendation, "id", 15L);
+        Product product = createProduct(201L);
+        RecommendationResponse recommendationResponse =
+                RecommendationResponse.from(
+                        recommendation,
+                        List.of(RecommendedProductResponse.from(
+                                product,
+                                true,
+                                false
+                        ))
+                );
+        ChatRoomDetailResponse response = ChatRoomDetailResponse.from(
+                chatRoom,
+                List.of(ChatMessageDetailResponse.from(
+                        message,
+                        recommendationResponse
+                )),
+                102L,
+                true
+        );
+        given(chatService.getChatRoomDetail(1L, 123L, null, 20))
+                .willReturn(response);
+
+        mockMvc.perform(get("/api/v1/chat-rooms/123"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.chatRoomId").value(123))
+                .andExpect(jsonPath("$.data.title")
+                        .value("가을 출근용 니트 추천"))
+                .andExpect(jsonPath("$.data.messages[0].messageId").value(102))
+                .andExpect(jsonPath("$.data.messages[0].senderType").value("AI"))
+                .andExpect(jsonPath("$.data.messages[0].generationStatus")
+                        .isEmpty())
+                .andExpect(jsonPath("$.data.messages[0].recommendation.recommendationId")
+                        .value(15))
+                .andExpect(jsonPath("$.data.messages[0].recommendation.products[0].productId")
+                        .value(201))
+                .andExpect(jsonPath("$.data.messages[0].recommendation.products[0].isWishlisted")
+                        .value(true))
+                .andExpect(jsonPath("$.data.messages[0].recommendation.products[0].isFittingCandidate")
+                        .value(false))
+                .andExpect(jsonPath("$.data.nextCursor").value(102))
+                .andExpect(jsonPath("$.data.hasNext").value(true))
+                .andExpect(jsonPath("$.message")
+                        .value("요청이 성공적으로 처리되었습니다."));
+
+        verify(chatService).getChatRoomDetail(1L, 123L, null, 20);
+    }
+
+    @Test
+    @DisplayName("Cursor와 조회 크기로 특정 채팅방의 이전 메시지를 조회한다")
+    void getPreviousChatRoomDetailPage() throws Exception {
+        ChatRoom chatRoom = createChatRoom(123L, LocalDateTime.now());
+        given(chatService.getChatRoomDetail(1L, 123L, 101L, 10))
+                .willReturn(ChatRoomDetailResponse.from(
+                        chatRoom,
+                        List.of(),
+                        null,
+                        false
+                ));
+
+        mockMvc.perform(get("/api/v1/chat-rooms/123")
+                        .queryParam("cursor", "101")
+                        .queryParam("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.messages").isEmpty())
+                .andExpect(jsonPath("$.data.nextCursor").isEmpty())
+                .andExpect(jsonPath("$.data.hasNext").value(false));
+
+        verify(chatService).getChatRoomDetail(1L, 123L, 101L, 10);
+    }
+
+    @Test
+    @DisplayName("상세 조회 Cursor가 유효하지 않으면 400 Bad Request를 반환한다")
+    void rejectInvalidDetailCursor() throws Exception {
+        given(chatService.getChatRoomDetail(1L, 123L, 999L, 20))
+                .willThrow(new BusinessException(
+                        ErrorCode.INVALID_PAGINATION_PARAMETER
+                ));
+
+        mockMvc.perform(get("/api/v1/chat-rooms/123")
+                        .queryParam("cursor", "999"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code")
+                        .value("INVALID_PAGINATION_PARAMETER"));
     }
 
     @Test
@@ -375,5 +491,18 @@ class ChatControllerTest {
         );
         ReflectionTestUtils.setField(chatRoom, "id", chatRoomId);
         return chatRoom;
+    }
+
+    private Product createProduct(Long productId) {
+        Product product = Product.create(
+                "에센셜 램스울 크루넥",
+                "https://image.lookddak.com/products/201.jpg",
+                59_000,
+                "네이비",
+                ProductItemType.TOP,
+                "https://shop.lookddak.com/products/201"
+        );
+        ReflectionTestUtils.setField(product, "id", productId);
+        return product;
     }
 }

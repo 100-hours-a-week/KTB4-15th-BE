@@ -2,20 +2,31 @@ package com.ktb.lookddak.domain.chat.service;
 
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatMessageDetailResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomDetailResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomListItemResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomListResponse;
+import com.ktb.lookddak.domain.chat.dto.RecommendationResponse;
+import com.ktb.lookddak.domain.chat.dto.RecommendedProductResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateResponse;
 import com.ktb.lookddak.domain.chat.entity.ChatGenerationStatus;
 import com.ktb.lookddak.domain.chat.entity.ChatMessage;
+import com.ktb.lookddak.domain.chat.entity.ChatMessageType;
 import com.ktb.lookddak.domain.chat.entity.ChatRoom;
 import com.ktb.lookddak.domain.chat.entity.ChatSenderType;
 import com.ktb.lookddak.domain.chat.repository.ChatMessageRepository;
 import com.ktb.lookddak.domain.chat.repository.ChatRoomRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
+import com.ktb.lookddak.domain.fitting.repository.FittingCandidateRepository;
+import com.ktb.lookddak.domain.recommendation.entity.Recommendation;
+import com.ktb.lookddak.domain.recommendation.entity.RecommendationProduct;
+import com.ktb.lookddak.domain.recommendation.repository.RecommendationProductRepository;
+import com.ktb.lookddak.domain.recommendation.repository.RecommendationRepository;
+import com.ktb.lookddak.domain.wishlist.repository.WishlistRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +35,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -38,6 +54,10 @@ public class ChatService {
     private final MemberRepository memberRepository;
     private final ChatRoomRepository chatRoomRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final RecommendationRepository recommendationRepository;
+    private final RecommendationProductRepository recommendationProductRepository;
+    private final WishlistRepository wishlistRepository;
+    private final FittingCandidateRepository fittingCandidateRepository;
 
     @Transactional
     public ChatRoomCreateResponse createChatRoom(
@@ -160,15 +180,198 @@ public class ChatService {
                 ? chatRooms.subList(0, pageSize)
                 : chatRooms;
 
-        List<ChatRoomListItemResponse> items = responseRooms.stream()
-                .map(ChatRoomListItemResponse::from)
-                .toList();
+        List<ChatRoomListItemResponse> items = new ArrayList<>();
+        for (ChatRoom responseRoom : responseRooms) {
+            items.add(ChatRoomListItemResponse.from(responseRoom));
+        }
 
         Long nextCursor = hasNext
                 ? responseRooms.get(responseRooms.size() - 1).getId()
                 : null;
 
         return new ChatRoomListResponse(items, nextCursor, hasNext);
+    }
+
+    public ChatRoomDetailResponse getChatRoomDetail(
+            Long memberId,
+            Long chatRoomId,
+            Long cursor,
+            Integer size
+    ) {
+        int pageSize = size == null ? DEFAULT_PAGE_SIZE : size;
+        validatePagination(cursor, pageSize);
+
+        ChatRoom chatRoom = getOwnedActiveChatRoomForRead(memberId, chatRoomId);
+        validateMessageCursor(chatRoomId, cursor);
+
+        // 요청 개수보다 한 건 더 조회해 다음 페이지 존재 여부를 판단한다.
+        PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
+        List<ChatMessage> fetchedMessages = cursor == null
+                ? chatMessageRepository.findFirstPage(chatRoomId, pageRequest)
+                : chatMessageRepository.findPreviousPage(
+                        chatRoomId,
+                        cursor,
+                        pageRequest
+                );
+
+        boolean hasNext = fetchedMessages.size() > pageSize;
+        List<ChatMessage> pageMessages = hasNext
+                ? fetchedMessages.subList(0, pageSize)
+                : fetchedMessages;
+
+        // 현재 페이지에서 가장 오래된 메시지 ID를 다음 조회의 커서로 사용한다.
+        Long nextCursor = hasNext && !pageMessages.isEmpty()
+                ? pageMessages.get(pageMessages.size() - 1).getId()
+                : null;
+
+        // 현재 페이지에 포함된 추천 정보만 일괄 조회해 메시지별로 연결한다.
+        Map<Long, RecommendationResponse> recommendationResponses =
+                createRecommendationResponses(memberId, pageMessages);
+        List<ChatMessageDetailResponse> messageResponses =
+                createMessageResponses(pageMessages, recommendationResponses);
+
+        return ChatRoomDetailResponse.from(
+                chatRoom,
+                messageResponses,
+                nextCursor,
+                hasNext
+        );
+    }
+
+    private Map<Long, RecommendationResponse> createRecommendationResponses(
+            Long memberId,
+            List<ChatMessage> messages
+    ) {
+        // 일반 대화에는 추천 데이터가 없으므로 AI 추천 메시지만 선별한다.
+        List<Long> recommendationMessageIds = new ArrayList<>();
+        for (ChatMessage message : messages) {
+            boolean isAiMessage =
+                    message.getSenderType() == ChatSenderType.AI;
+            boolean isRecommendationType =
+                    message.getMessageType()
+                            == ChatMessageType.RECOMMENDATION;
+
+            if (isAiMessage && isRecommendationType) {
+                recommendationMessageIds.add(message.getId());
+            }
+        }
+
+        if (recommendationMessageIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Recommendation> recommendations = recommendationRepository
+                .findAllByMessageIdIn(recommendationMessageIds);
+        if (recommendations.isEmpty()) {
+            return Map.of();
+        }
+
+        // 추천 상품을 IN 쿼리 한 번으로 조회하기 위해 추천 ID를 모은다.
+        List<Long> recommendationIds = new ArrayList<>();
+        for (Recommendation recommendation : recommendations) {
+            recommendationIds.add(recommendation.getId());
+        }
+
+        List<RecommendationProduct> recommendationProducts =
+                recommendationProductRepository
+                        .findAllWithProductByRecommendationIdIn(
+                                recommendationIds
+                        );
+
+        Map<Long, List<RecommendationProduct>> productsByRecommendationId =
+                new LinkedHashMap<>();
+        Set<Long> productIds = new LinkedHashSet<>();
+
+        // Repository의 상품 ID 오름차순을 유지해 추천별 상품 목록을 만든다.
+        // 동시에 찜·피팅 상태 조회에 사용할 상품 ID도 중복 없이 모은다.
+        for (RecommendationProduct recommendationProduct
+                : recommendationProducts) {
+            Long recommendationId = recommendationProduct
+                    .getRecommendation()
+                    .getId();
+
+            // 해당 추천의 상품 목록이 없으면 생성한 뒤 현재 상품을 추가한다.
+            productsByRecommendationId
+                    .computeIfAbsent(
+                            recommendationId,
+                            key -> new ArrayList<>()
+                    )
+                    .add(recommendationProduct);
+            productIds.add(recommendationProduct.getProduct().getId());
+        }
+
+        // 상품마다 조회하지 않고 찜·피팅 상태를 각각 한 번의 쿼리로 가져온다.
+        Set<Long> wishlistedProductIds = productIds.isEmpty()
+                ? Set.of()
+                : wishlistRepository.findProductIdsByMemberIdAndProductIdIn(
+                        memberId,
+                        productIds
+                );
+
+        Set<Long> fittingCandidateProductIds = productIds.isEmpty()
+                ? Set.of()
+                : fittingCandidateRepository
+                        .findProductIdsByMemberIdAndProductIdIn(
+                                memberId,
+                                productIds
+                        );
+
+        Map<Long, RecommendationResponse> responses = new LinkedHashMap<>();
+
+        // 메시지 ID를 Key로 사용하면 메시지 응답을 만들 때 추천 정보를 바로 찾을 수 있다.
+        for (Recommendation recommendation : recommendations) {
+            List<RecommendationProduct> products =
+                    productsByRecommendationId.getOrDefault(
+                            recommendation.getId(),
+                            List.of()
+                    );
+            List<RecommendedProductResponse> productResponses =
+                    new ArrayList<>();
+
+            for (RecommendationProduct recommendationProduct : products) {
+                Long productId = recommendationProduct.getProduct().getId();
+                productResponses.add(RecommendedProductResponse.from(
+                        recommendationProduct.getProduct(),
+                        wishlistedProductIds.contains(productId),
+                        fittingCandidateProductIds.contains(productId)
+                ));
+            }
+
+            responses.put(
+                    recommendation.getMessage().getId(),
+                    RecommendationResponse.from(
+                            recommendation,
+                            productResponses
+                    )
+            );
+        }
+
+        return responses;
+    }
+
+    private List<ChatMessageDetailResponse> createMessageResponses(
+            List<ChatMessage> pageMessages,
+            Map<Long, RecommendationResponse> recommendationResponses
+    ) {
+        List<ChatMessageDetailResponse> responses = new ArrayList<>();
+
+        // DB에서는 최신순으로 조회하지만 화면에는 오래된 메시지부터 보여준다.
+        for (int index = pageMessages.size() - 1; index >= 0; index--) {
+            ChatMessage message = pageMessages.get(index);
+            responses.add(ChatMessageDetailResponse.from(
+                    message,
+                    recommendationResponses.get(message.getId())
+            ));
+        }
+
+        return responses;
+    }
+
+    private void validateMessageCursor(Long chatRoomId, Long cursor) {
+        if (cursor != null && !chatMessageRepository
+                .existsByIdAndChatRoomId(cursor, chatRoomId)) {
+            throw new BusinessException(ErrorCode.INVALID_PAGINATION_PARAMETER);
+        }
     }
 
     private void validatePagination(Long cursor, int size) {
@@ -181,6 +384,22 @@ public class ChatService {
 
     private ChatRoom getOwnedActiveChatRoom(Long memberId, Long chatRoomId) {
         ChatRoom chatRoom = chatRoomRepository.findActiveByIdForUpdate(chatRoomId)
+                .orElseThrow(() ->
+                        new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND)
+                );
+
+        if (!chatRoom.isOwnedBy(memberId)) {
+            throw new BusinessException(ErrorCode.CHAT_ROOM_ACCESS_DENIED);
+        }
+
+        return chatRoom;
+    }
+
+    private ChatRoom getOwnedActiveChatRoomForRead(
+            Long memberId,
+            Long chatRoomId
+    ) {
+        ChatRoom chatRoom = chatRoomRepository.findActiveById(chatRoomId)
                 .orElseThrow(() ->
                         new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND)
                 );

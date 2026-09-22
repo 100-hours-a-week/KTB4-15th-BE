@@ -3,6 +3,7 @@ package com.ktb.lookddak.domain.wishlist.repository;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
 import com.ktb.lookddak.domain.product.entity.Product;
+import com.ktb.lookddak.domain.product.entity.ProductItemType;
 import com.ktb.lookddak.domain.product.repository.ProductRepository;
 import com.ktb.lookddak.domain.wishlist.entity.Wishlist;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,6 +13,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
+
+import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -38,7 +42,7 @@ class WishlistRepositoryTest {
                 "wishlist-repository@lookddak.com",
                 "encoded-password"
         ));
-        product = productRepository.save(Product.create(49_000));
+        product = productRepository.save(createProduct("상품 1", 49_000));
     }
 
     @Test
@@ -61,7 +65,9 @@ class WishlistRepositoryTest {
                 "other-wishlist@lookddak.com",
                 "encoded-password"
         ));
-        Product secondProduct = productRepository.save(Product.create(59_000));
+        Product secondProduct = productRepository.save(
+                createProduct("상품 2", 59_000)
+        );
         wishlistRepository.save(Wishlist.create(member, product));
         wishlistRepository.save(Wishlist.create(member, secondProduct));
         wishlistRepository.saveAndFlush(Wishlist.create(otherMember, product));
@@ -69,6 +75,37 @@ class WishlistRepositoryTest {
         long count = wishlistRepository.countByMemberId(member.getId());
 
         assertThat(count).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("상품 ID 목록 중 현재 회원이 찜한 상품 ID만 조회한다")
+    void findWishlistedProductIds() {
+        Member otherMember = memberRepository.save(Member.create(
+                "other-bulk-wishlist@lookddak.com",
+                "encoded-password"
+        ));
+        Product otherMembersProduct = productRepository.save(
+                createProduct("다른 회원 찜 상품", 59_000)
+        );
+        Product notWishlistedProduct = productRepository.save(
+                createProduct("찜하지 않은 상품", 69_000)
+        );
+        wishlistRepository.save(Wishlist.create(member, product));
+        wishlistRepository.saveAndFlush(
+                Wishlist.create(otherMember, otherMembersProduct)
+        );
+
+        Set<Long> productIds = wishlistRepository
+                .findProductIdsByMemberIdAndProductIdIn(
+                        member.getId(),
+                        List.of(
+                                product.getId(),
+                                otherMembersProduct.getId(),
+                                notWishlistedProduct.getId()
+                        )
+                );
+
+        assertThat(productIds).containsExactly(product.getId());
     }
 
     @Test
@@ -92,5 +129,16 @@ class WishlistRepositoryTest {
         wishlistRepository.flush();
 
         assertThat(wishlistRepository.findById(wishlist.getId())).isEmpty();
+    }
+
+    private Product createProduct(String name, Integer currentPrice) {
+        return Product.create(
+                name,
+                "https://image.lookddak.com/test.jpg",
+                currentPrice,
+                "네이비",
+                ProductItemType.TOP,
+                "https://shop.lookddak.com/test"
+        );
     }
 }
