@@ -3,6 +3,7 @@ package com.ktb.lookddak.domain.chat.service;
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatMessageDetailResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatGenerationStatusResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomDetailResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
@@ -235,6 +236,81 @@ public class ChatService {
                 messageResponses,
                 nextCursor,
                 hasNext
+        );
+    }
+
+    public ChatGenerationStatusResponse getGenerationStatus(
+            Long memberId,
+            Long chatRoomId,
+            Long messageId
+    ) {
+        getOwnedActiveChatRoomForRead(memberId, chatRoomId);
+
+        ChatMessage userMessage = chatMessageRepository
+                .findByIdAndChatRoomId(messageId, chatRoomId)
+                .orElseThrow(() ->
+                        new BusinessException(ErrorCode.CHAT_MESSAGE_NOT_FOUND)
+                );
+
+        if (userMessage.getSenderType() != ChatSenderType.USER) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        ChatGenerationStatus generationStatus =
+                userMessage.getGenerationStatus();
+        if (generationStatus == null) {
+            throw new IllegalStateException(
+                    "USER 메시지의 생성 상태가 존재하지 않습니다."
+            );
+        }
+
+        // 생성 중이거나 실패한 경우에는 AI 응답 관련 데이터를 조회하지 않는다.
+        if (generationStatus != ChatGenerationStatus.COMPLETED) {
+            return new ChatGenerationStatusResponse(generationStatus, null);
+        }
+
+        ChatMessage aiMessage = chatMessageRepository
+                .findFirstByChatRoomIdAndIdGreaterThanOrderByIdAsc(
+                        chatRoomId,
+                        messageId
+                )
+                .orElseThrow(() ->
+                        new IllegalStateException(
+                                "완료된 USER 메시지의 AI 응답이 없습니다."
+                        )
+                );
+
+        // 완료된 USER 메시지 바로 다음에는 최종 AI 메시지가 있어야 한다.
+        if (aiMessage.getSenderType() != ChatSenderType.AI) {
+            throw new IllegalStateException(
+                    "완료된 USER 메시지 다음 메시지가 AI 응답이 아닙니다."
+            );
+        }
+
+        Map<Long, RecommendationResponse> recommendationResponses =
+                createRecommendationResponses(
+                        memberId,
+                        List.of(aiMessage)
+                );
+        RecommendationResponse recommendationResponse =
+                recommendationResponses.get(aiMessage.getId());
+
+        if (aiMessage.getMessageType() == ChatMessageType.RECOMMENDATION
+                && recommendationResponse == null) {
+            throw new IllegalStateException(
+                    "추천 AI 메시지의 추천 데이터가 없습니다."
+            );
+        }
+
+        ChatMessageDetailResponse messageResponse =
+                ChatMessageDetailResponse.from(
+                        aiMessage,
+                        recommendationResponse
+                );
+
+        return new ChatGenerationStatusResponse(
+                generationStatus,
+                messageResponse
         );
     }
 
