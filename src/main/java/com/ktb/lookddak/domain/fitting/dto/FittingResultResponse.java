@@ -1,4 +1,4 @@
-성package com.ktb.lookddak.domain.fitting.dto;
+package com.ktb.lookddak.domain.fitting.dto;
 
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.ktb.lookddak.domain.fitting.entity.FittingTempResult;
