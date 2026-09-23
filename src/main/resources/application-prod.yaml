@@ -6,7 +6,12 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
-      ddl-auto: validate
+      # 임시 조치: RDS가 아직 빈 상태(테이블 없음)라 validate는 시작 시점에
+      # "missing table" 에러로 실패한다. 별도 마이그레이션 도구(Flyway/Liquibase)를
+      # 도입하기 전까지 update로 최초 스키마를 자동 생성하게 하고, 이후 실제
+      # 마이그레이션 정책이 정해지면 validate로 되돌릴 것.
+      # ddl-auto: validate
+      ddl-auto: update
     properties:
       hibernate:
         format_sql: false
