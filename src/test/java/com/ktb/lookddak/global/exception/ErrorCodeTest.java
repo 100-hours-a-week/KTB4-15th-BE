@@ -20,4 +20,17 @@ class ErrorCodeTest {
         assertThat(response.getData()).isNull();
         assertThat(response.getMessage()).isEqualTo("올바른 조회 조건을 입력해주세요.");
     }
+
+    @Test
+    @DisplayName("회원 기본정보가 없으면 404 오류 응답으로 변환된다")
+    void memberProfileNotFound() {
+        ErrorCode errorCode = ErrorCode.MEMBER_PROFILE_NOT_FOUND;
+        ApiResponse<Void> response = ApiResponse.failure(errorCode);
+
+        assertThat(errorCode.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getCode()).isEqualTo("MEMBER_PROFILE_NOT_FOUND");
+        assertThat(response.getData()).isNull();
+        assertThat(response.getMessage())
+                .isEqualTo("회원 기본정보를 찾을 수 없습니다.");
+    }
 }

@@ -1,6 +1,9 @@
 package com.ktb.lookddak.domain.member.controller;
 
 import com.ktb.lookddak.domain.member.dto.MemberProfileCreateResponse;
+import com.ktb.lookddak.domain.member.dto.MemberProfileGetResponse;
+import com.ktb.lookddak.domain.member.entity.Member;
+import com.ktb.lookddak.domain.member.entity.MemberProfile;
 import com.ktb.lookddak.domain.member.service.MemberProfileService;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
@@ -20,6 +23,7 @@ import org.springframework.security.web.method.annotation.AuthenticationPrincipa
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -28,6 +32,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -88,6 +93,49 @@ class MemberProfileControllerTest {
                         .value("리소스가 성공적으로 생성되었습니다."));
 
         verify(memberProfileService).createProfile(eq(1L), any());
+    }
+
+    @Test
+    @DisplayName("인증된 회원의 기본정보를 조회하면 200 OK를 반환한다")
+    void getProfile() throws Exception {
+        given(memberProfileService.getProfile(1L))
+                .willReturn(MemberProfileGetResponse.from(
+                        createMemberProfile()
+                ));
+
+        mockMvc.perform(get("/api/v1/members/me/profile"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.email")
+                        .value("member@lookddak.com"))
+                .andExpect(jsonPath("$.data.name").value("John Doe"))
+                .andExpect(jsonPath("$.data.age").value(29))
+                .andExpect(jsonPath("$.data.height").value(175.5))
+                .andExpect(jsonPath("$.data.weight").value(70.3))
+                .andExpect(jsonPath("$.data.fullBodyImageKey")
+                        .value("full-body/validation/1/test.png"))
+                .andExpect(jsonPath("$.data.priceAlertEnabled").value(true))
+                .andExpect(jsonPath("$.message")
+                        .value("요청이 성공적으로 처리되었습니다."));
+
+        verify(memberProfileService).getProfile(1L);
+    }
+
+    @Test
+    @DisplayName("회원 기본정보가 없으면 404 Not Found를 반환한다")
+    void rejectMissingProfile() throws Exception {
+        given(memberProfileService.getProfile(1L))
+                .willThrow(new BusinessException(
+                        ErrorCode.MEMBER_PROFILE_NOT_FOUND
+                ));
+
+        mockMvc.perform(get("/api/v1/members/me/profile"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code")
+                        .value("MEMBER_PROFILE_NOT_FOUND"))
+                .andExpect(jsonPath("$.data").isEmpty())
+                .andExpect(jsonPath("$.message")
+                        .value("회원 기본정보를 찾을 수 없습니다."));
     }
 
     @Test
@@ -155,5 +203,22 @@ class MemberProfileControllerTest {
                   "priceAlertEnabled": true
                 }
                 """;
+    }
+
+    private MemberProfile createMemberProfile() {
+        Member member = Member.create(
+                "member@lookddak.com",
+                "encoded-password"
+        );
+        member.updatePriceAlertEnabled(true);
+
+        return MemberProfile.create(
+                member,
+                "John Doe",
+                29,
+                new BigDecimal("175.5"),
+                new BigDecimal("70.3"),
+                "full-body/validation/1/test.png"
+        );
     }
 }

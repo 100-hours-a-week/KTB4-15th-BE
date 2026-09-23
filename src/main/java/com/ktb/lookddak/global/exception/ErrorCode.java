@@ -27,6 +27,7 @@ public enum ErrorCode {
 
     // Member profile errors
     MEMBER_PROFILE_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 기본정보가 등록되어 있습니다."),
+    MEMBER_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "회원 기본정보를 찾을 수 없습니다."),
     INVALID_FULL_BODY_IMAGE(HttpStatus.BAD_REQUEST, "사용할 수 없는 전신사진 검증 정보입니다."),
 
     // Chat errors

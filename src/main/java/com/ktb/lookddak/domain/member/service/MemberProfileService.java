@@ -4,6 +4,7 @@ import com.ktb.lookddak.domain.image.entity.FullBodyImageValidation;
 import com.ktb.lookddak.domain.image.repository.FullBodyImageValidationRepository;
 import com.ktb.lookddak.domain.member.dto.MemberProfileCreateRequest;
 import com.ktb.lookddak.domain.member.dto.MemberProfileCreateResponse;
+import com.ktb.lookddak.domain.member.dto.MemberProfileGetResponse;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.entity.MemberProfile;
 import com.ktb.lookddak.domain.member.repository.MemberProfileRepository;
@@ -61,5 +62,15 @@ public class MemberProfileService {
                 savedProfile.getId(),
                 savedProfile.getFullBodyImageKey()
         );
+    }
+
+    public MemberProfileGetResponse getProfile(Long memberId) {
+        MemberProfile profile = memberProfileRepository
+                .findActiveByMemberIdWithMember(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.MEMBER_PROFILE_NOT_FOUND
+                ));
+
+        return MemberProfileGetResponse.from(profile);
     }
 }
