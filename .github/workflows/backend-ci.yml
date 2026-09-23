@@ -1,0 +1,31 @@
+name: Lookddack BE CI
+
+on:
+  pull_request:
+    branches: [ "develop", "main" ]
+
+concurrency:
+  group: be-ci-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-build:
+    name: Backend CI Pipeline (Docker)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Test in Docker
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: builder
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

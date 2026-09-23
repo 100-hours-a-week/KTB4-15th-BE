@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: lookddak
+  datasource:
+    url: jdbc:h2:mem:lookddak;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop
+
+jwt:
+  secret: dGVzdC1qd3Qtc2VjcmV0LWtleS1tdXN0LWJlLWF0LWxlYXN0LTMyLWJ5dGVz
+  access-token-expiration: 30m
+  refresh-token-expiration: 14d
+
+auth:
+  cookie:
+    secure: false
+    same-site: Lax
+
+cors:
+  allowed-origins:
+    - http://localhost:5173
