@@ -4,6 +4,7 @@ import com.ktb.lookddak.domain.image.entity.FullBodyImageValidation;
 import com.ktb.lookddak.domain.image.repository.FullBodyImageValidationRepository;
 import com.ktb.lookddak.domain.member.dto.MemberProfileCreateRequest;
 import com.ktb.lookddak.domain.member.dto.MemberProfileCreateResponse;
+import com.ktb.lookddak.domain.member.dto.MemberProfileGetResponse;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.entity.MemberProfile;
 import com.ktb.lookddak.domain.member.repository.MemberProfileRepository;
@@ -143,6 +144,41 @@ class MemberProfileServiceTest {
         assertInvalidFullBodyImage();
     }
 
+    @Test
+    @DisplayName("회원 기본정보와 가격 알림 설정을 조회한다")
+    void getProfile() {
+        Member member = createMember(1L, "member@lookddak.com");
+        member.updatePriceAlertEnabled(true);
+        MemberProfile profile = createProfile(member);
+        given(memberProfileRepository.findActiveByMemberIdWithMember(1L))
+                .willReturn(Optional.of(profile));
+
+        MemberProfileGetResponse response = memberProfileService.getProfile(1L);
+
+        assertThat(response.getEmail()).isEqualTo("member@lookddak.com");
+        assertThat(response.getName()).isEqualTo("John Doe");
+        assertThat(response.getAge()).isEqualTo(29);
+        assertThat(response.getHeight()).isEqualByComparingTo("175.5");
+        assertThat(response.getWeight()).isEqualByComparingTo("70.3");
+        assertThat(response.getFullBodyImageKey())
+                .isEqualTo("full-body/validation/1/test.png");
+        assertThat(response.isPriceAlertEnabled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("회원 기본정보가 없으면 조회를 거부한다")
+    void rejectMissingProfile() {
+        given(memberProfileRepository.findActiveByMemberIdWithMember(1L))
+                .willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> memberProfileService.getProfile(1L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(
+                                ErrorCode.MEMBER_PROFILE_NOT_FOUND
+                        )
+                );
+    }
+
     private void assertInvalidFullBodyImage() {
         assertThatThrownBy(() ->
                 memberProfileService.createProfile(1L, createRequest(15L))
@@ -169,6 +205,17 @@ class MemberProfileServiceTest {
                 new BigDecimal("70.3"),
                 validationId,
                 true
+        );
+    }
+
+    private MemberProfile createProfile(Member member) {
+        return MemberProfile.create(
+                member,
+                "John Doe",
+                29,
+                new BigDecimal("175.5"),
+                new BigDecimal("70.3"),
+                "full-body/validation/1/test.png"
         );
     }
 }
