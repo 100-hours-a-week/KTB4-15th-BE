@@ -13,7 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -112,11 +111,7 @@ class ChatRepositoryTest {
                 createChatRoom(member, ChatSourceType.GENERAL)
         );
         ChatMessage message = ChatMessage.createUserText(chatRoom, "옷을 추천해줘");
-        ReflectionTestUtils.setField(
-                message,
-                "generationStatus",
-                ChatGenerationStatus.COMPLETED
-        );
+        message.completeGeneration();
         chatMessageRepository.saveAndFlush(message);
 
         boolean exists = chatMessageRepository
@@ -159,6 +154,176 @@ class ChatRepositoryTest {
                 .isEmpty();
         assertThat(chatRoomRepository.findById(savedChatRoom.getId()))
                 .isPresent();
+    }
+
+    @Test
+    @DisplayName("조회 시 삭제되지 않은 채팅방만 락 없이 조회한다")
+    void findActiveChatRoom() {
+        Member member = saveMember("detail-room@lookddak.com");
+        ChatRoom activeRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        ChatRoom deletedRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        deletedRoom.delete(LocalDateTime.now());
+        chatRoomRepository.flush();
+
+        assertThat(chatRoomRepository.findActiveById(activeRoom.getId()))
+                .contains(activeRoom);
+        assertThat(chatRoomRepository.findActiveById(deletedRoom.getId()))
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("채팅방의 최근 메시지를 ID 내림차순으로 제한하여 조회한다")
+    void findFirstMessagePage() {
+        Member member = saveMember("message-first-page@lookddak.com");
+        ChatRoom chatRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        ChatRoom otherRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        ChatMessage oldestMessage = saveMessage(chatRoom, "메시지 1");
+        ChatMessage middleMessage = saveMessage(chatRoom, "메시지 2");
+        ChatMessage newestMessage = saveMessage(chatRoom, "메시지 3");
+        saveMessage(otherRoom, "다른 채팅방 메시지");
+
+        List<ChatMessage> messages = chatMessageRepository.findFirstPage(
+                chatRoom.getId(),
+                PageRequest.of(0, 2)
+        );
+
+        assertThat(messages).containsExactly(newestMessage, middleMessage);
+        assertThat(messages).doesNotContain(oldestMessage);
+    }
+
+    @Test
+    @DisplayName("Cursor보다 ID가 작은 과거 메시지만 내림차순으로 조회한다")
+    void findPreviousMessagePage() {
+        Member member = saveMember("message-previous-page@lookddak.com");
+        ChatRoom chatRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        ChatMessage oldestMessage = saveMessage(chatRoom, "메시지 1");
+        ChatMessage previousMessage = saveMessage(chatRoom, "메시지 2");
+        ChatMessage cursorMessage = saveMessage(chatRoom, "메시지 3");
+        saveMessage(chatRoom, "메시지 4");
+
+        List<ChatMessage> messages = chatMessageRepository.findPreviousPage(
+                chatRoom.getId(),
+                cursorMessage.getId(),
+                PageRequest.of(0, 2)
+        );
+
+        assertThat(messages).containsExactly(previousMessage, oldestMessage);
+    }
+
+    @Test
+    @DisplayName("Cursor 메시지가 현재 채팅방에 속하는지 확인한다")
+    void existsCursorMessageInChatRoom() {
+        Member member = saveMember("message-cursor@lookddak.com");
+        ChatRoom chatRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        ChatRoom otherRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        ChatMessage message = saveMessage(chatRoom, "현재 채팅방 메시지");
+        ChatMessage otherMessage = saveMessage(otherRoom, "다른 채팅방 메시지");
+
+        assertThat(chatMessageRepository.existsByIdAndChatRoomId(
+                message.getId(),
+                chatRoom.getId()
+        )).isTrue();
+        assertThat(chatMessageRepository.existsByIdAndChatRoomId(
+                otherMessage.getId(),
+                chatRoom.getId()
+        )).isFalse();
+    }
+
+    @Test
+    @DisplayName("메시지 ID와 채팅방 ID가 모두 일치하는 메시지를 조회한다")
+    void findMessageInChatRoom() {
+        Member member = saveMember("status-message@lookddak.com");
+        ChatRoom chatRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        ChatRoom otherRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        ChatMessage message = saveMessage(chatRoom, "상태를 조회할 메시지");
+        ChatMessage otherMessage = saveMessage(
+                otherRoom,
+                "다른 채팅방 메시지"
+        );
+
+        assertThat(chatMessageRepository.findByIdAndChatRoomId(
+                message.getId(),
+                chatRoom.getId()
+        )).contains(message);
+        assertThat(chatMessageRepository.findByIdAndChatRoomId(
+                otherMessage.getId(),
+                chatRoom.getId()
+        )).isEmpty();
+    }
+
+    @Test
+    @DisplayName("같은 채팅방에서 대상 메시지 바로 다음 메시지를 조회한다")
+    void findNextMessageInChatRoom() {
+        Member member = saveMember("next-message@lookddak.com");
+        ChatRoom chatRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        ChatRoom otherRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        ChatMessage targetMessage = saveMessage(
+                chatRoom,
+                "상태를 조회할 메시지"
+        );
+        chatMessageRepository.saveAndFlush(
+                ChatMessage.createAiText(otherRoom, "다른 채팅방 AI 응답")
+        );
+        ChatMessage nextMessage = saveMessage(
+                chatRoom,
+                "바로 다음 사용자 메시지"
+        );
+        chatMessageRepository.saveAndFlush(
+                ChatMessage.createAiText(chatRoom, "더 나중의 AI 응답")
+        );
+
+        assertThat(chatMessageRepository
+                .findFirstByChatRoomIdAndIdGreaterThanOrderByIdAsc(
+                        chatRoom.getId(),
+                        targetMessage.getId()
+                )).contains(nextMessage);
+    }
+
+    @Test
+    @DisplayName("같은 채팅방에 이후 메시지가 없으면 빈 결과를 반환한다")
+    void doesNotFindNextMessageInChatRoom() {
+        Member member = saveMember("no-next-message@lookddak.com");
+        ChatRoom chatRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        ChatRoom otherRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        ChatMessage targetMessage = saveMessage(
+                chatRoom,
+                "마지막 메시지"
+        );
+        chatMessageRepository.saveAndFlush(
+                ChatMessage.createAiText(otherRoom, "다른 채팅방 메시지")
+        );
+
+        assertThat(chatMessageRepository
+                .findFirstByChatRoomIdAndIdGreaterThanOrderByIdAsc(
+                        chatRoom.getId(),
+                        targetMessage.getId()
+                )).isEmpty();
     }
 
     @Test
@@ -316,6 +481,12 @@ class ChatRepositoryTest {
                         ChatSourceType.GENERAL,
                         lastMessageAt
                 )
+        );
+    }
+
+    private ChatMessage saveMessage(ChatRoom chatRoom, String content) {
+        return chatMessageRepository.saveAndFlush(
+                ChatMessage.createUserText(chatRoom, content)
         );
     }
 }

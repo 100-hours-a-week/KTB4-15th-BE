@@ -15,8 +15,12 @@ import com.ktb.lookddak.domain.chat.entity.ChatSenderType;
 import com.ktb.lookddak.domain.chat.entity.ChatSourceType;
 import com.ktb.lookddak.domain.chat.repository.ChatMessageRepository;
 import com.ktb.lookddak.domain.chat.repository.ChatRoomRepository;
+import com.ktb.lookddak.domain.fitting.repository.FittingCandidateRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
+import com.ktb.lookddak.domain.recommendation.repository.RecommendationProductRepository;
+import com.ktb.lookddak.domain.recommendation.repository.RecommendationRepository;
+import com.ktb.lookddak.domain.wishlist.repository.WishlistRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +58,18 @@ class ChatServiceTest {
     @Mock
     private ChatMessageRepository chatMessageRepository;
 
+    @Mock
+    private RecommendationRepository recommendationRepository;
+
+    @Mock
+    private RecommendationProductRepository recommendationProductRepository;
+
+    @Mock
+    private WishlistRepository wishlistRepository;
+
+    @Mock
+    private FittingCandidateRepository fittingCandidateRepository;
+
     private ChatService chatService;
 
     @BeforeEach
@@ -61,7 +77,11 @@ class ChatServiceTest {
         chatService = new ChatService(
                 memberRepository,
                 chatRoomRepository,
-                chatMessageRepository
+                chatMessageRepository,
+                recommendationRepository,
+                recommendationProductRepository,
+                wishlistRepository,
+                fittingCandidateRepository
         );
     }
 
