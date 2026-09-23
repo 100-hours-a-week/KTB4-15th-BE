@@ -2,12 +2,17 @@ package com.ktb.lookddak.domain.fitting.service;
 
 import com.ktb.lookddak.domain.fitting.dto.FittingJobCreateRequest;
 import com.ktb.lookddak.domain.fitting.dto.FittingJobCreateResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingJobStatusResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingResultProductResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingResultResponse;
 import com.ktb.lookddak.domain.fitting.entity.FittingJob;
 import com.ktb.lookddak.domain.fitting.entity.FittingJobProduct;
 import com.ktb.lookddak.domain.fitting.entity.FittingJobStatus;
+import com.ktb.lookddak.domain.fitting.entity.FittingTempResult;
 import com.ktb.lookddak.domain.fitting.repository.FittingCandidateRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingJobProductRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingJobRepository;
+import com.ktb.lookddak.domain.fitting.repository.FittingTempResultRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
 import com.ktb.lookddak.domain.product.entity.Product;
@@ -36,6 +41,7 @@ public class FittingJobService {
     private final FittingCandidateRepository fittingCandidateRepository;
     private final FittingJobRepository fittingJobRepository;
     private final FittingJobProductRepository fittingJobProductRepository;
+    private final FittingTempResultRepository fittingTempResultRepository;
 
     @Transactional
     public FittingJobCreateResponse createFittingJob(
@@ -78,6 +84,56 @@ public class FittingJobService {
         fittingJobProductRepository.saveAll(jobProducts);
 
         return FittingJobCreateResponse.from(fittingJob);
+    }
+
+    public FittingJobStatusResponse getFittingJobStatus(
+            Long memberId,
+            Long fittingJobId
+    ) {
+        FittingJob fittingJob = fittingJobRepository
+                .findByIdWithMember(fittingJobId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.FITTING_JOB_NOT_FOUND
+                ));
+
+        if (!fittingJob.isOwnedBy(memberId)) {
+            throw new BusinessException(
+                    ErrorCode.FITTING_JOB_ACCESS_DENIED
+            );
+        }
+
+        // 생성 중이거나 실패한 작업에는 결과 데이터가 존재하지 않는다.
+        if (fittingJob.getStatus() != FittingJobStatus.COMPLETED) {
+            return FittingJobStatusResponse.from(fittingJob, null);
+        }
+
+        FittingTempResult tempResult = fittingTempResultRepository
+                .findByFittingJobId(fittingJobId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "완료된 가상피팅 작업의 결과가 존재하지 않습니다."
+                ));
+        List<FittingJobProduct> jobProducts = fittingJobProductRepository
+                .findAllByFittingJobIdWithProduct(fittingJobId);
+
+        if (jobProducts.isEmpty()) {
+            throw new IllegalStateException(
+                    "완료된 가상피팅 작업의 상품이 존재하지 않습니다."
+            );
+        }
+
+        List<FittingResultProductResponse> productResponses =
+                new ArrayList<>();
+        for (FittingJobProduct jobProduct : jobProducts) {
+            productResponses.add(FittingResultProductResponse.from(
+                    jobProduct.getProduct()
+            ));
+        }
+
+        FittingResultResponse resultResponse = FittingResultResponse.from(
+                tempResult,
+                productResponses
+        );
+        return FittingJobStatusResponse.from(fittingJob, resultResponse);
     }
 
     private LinkedHashMap<Long, ProductItemType> createRequestedProducts(

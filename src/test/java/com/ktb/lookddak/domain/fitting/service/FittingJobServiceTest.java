@@ -8,6 +8,7 @@ import com.ktb.lookddak.domain.fitting.entity.FittingJobStatus;
 import com.ktb.lookddak.domain.fitting.repository.FittingCandidateRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingJobProductRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingJobRepository;
+import com.ktb.lookddak.domain.fitting.repository.FittingTempResultRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
 import com.ktb.lookddak.domain.product.entity.Product;
@@ -54,6 +55,9 @@ class FittingJobServiceTest {
     @Mock
     private FittingJobProductRepository fittingJobProductRepository;
 
+    @Mock
+    private FittingTempResultRepository fittingTempResultRepository;
+
     private FittingJobService fittingJobService;
 
     @BeforeEach
@@ -63,7 +67,8 @@ class FittingJobServiceTest {
                 productRepository,
                 fittingCandidateRepository,
                 fittingJobRepository,
-                fittingJobProductRepository
+                fittingJobProductRepository,
+                fittingTempResultRepository
         );
     }
 
