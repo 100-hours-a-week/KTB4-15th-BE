@@ -2,6 +2,7 @@ package com.ktb.lookddak.domain.fitting.service;
 
 import com.ktb.lookddak.domain.fitting.dto.FittingCandidateCreateRequest;
 import com.ktb.lookddak.domain.fitting.dto.FittingCandidateCreateResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingCandidateListResponse;
 import com.ktb.lookddak.domain.fitting.entity.FittingCandidate;
 import com.ktb.lookddak.domain.fitting.repository.FittingCandidateRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
@@ -18,16 +19,21 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class FittingCandidateServiceTest {
@@ -212,6 +218,158 @@ class FittingCandidateServiceTest {
         );
     }
 
+    @Test
+    @DisplayName("전체 첫 페이지에 다음 데이터가 있으면 size개와 Cursor를 반환한다")
+    void getFirstPageWithNextPage() {
+        Member member = createMember(1L);
+        FittingCandidate first = createCandidate(30L, member);
+        FittingCandidate second = createCandidate(29L, member);
+        FittingCandidate nextPageCandidate = createCandidate(28L, member);
+        given(fittingCandidateRepository.findFirstPage(
+                eq(1L),
+                any(Pageable.class)
+        )).willReturn(List.of(first, second, nextPageCandidate));
+
+        FittingCandidateListResponse response = fittingCandidateService
+                .getFittingCandidates(1L, null, null, 2);
+
+        assertThat(response.getItems())
+                .extracting(item -> item.getFittingCandidateId())
+                .containsExactly(30L, 29L);
+        assertThat(response.getNextCursor()).isEqualTo(29L);
+        assertThat(response.isHasNext()).isTrue();
+        verify(fittingCandidateRepository).findFirstPage(
+                eq(1L),
+                argThat(pageable -> pageable.getPageSize() == 3)
+        );
+    }
+
+    @Test
+    @DisplayName("전체 다음 페이지가 마지막이면 null Cursor를 반환한다")
+    void getLastNextPage() {
+        FittingCandidate candidate = createCandidate(
+                25L,
+                createMember(1L)
+        );
+        given(fittingCandidateRepository.findNextPage(
+                eq(1L),
+                eq(29L),
+                any(Pageable.class)
+        )).willReturn(List.of(candidate));
+
+        FittingCandidateListResponse response = fittingCandidateService
+                .getFittingCandidates(1L, null, 29L, 20);
+
+        assertThat(response.getItems())
+                .extracting(item -> item.getFittingCandidateId())
+                .containsExactly(25L);
+        assertThat(response.getNextCursor()).isNull();
+        assertThat(response.isHasNext()).isFalse();
+    }
+
+    @Test
+    @DisplayName("상품 타입이 있으면 타입별 첫 페이지를 조회한다")
+    void getFirstPageByItemType() {
+        FittingCandidate topCandidate = createCandidate(
+                30L,
+                createMember(1L),
+                ProductItemType.TOP
+        );
+        given(fittingCandidateRepository.findFirstPageByItemType(
+                eq(1L),
+                eq(ProductItemType.TOP),
+                any(Pageable.class)
+        )).willReturn(List.of(topCandidate));
+
+        FittingCandidateListResponse response = fittingCandidateService
+                .getFittingCandidates(
+                        1L,
+                        ProductItemType.TOP,
+                        null,
+                        20
+                );
+
+        assertThat(response.getItems()).hasSize(1);
+        assertThat(response.getItems().get(0).getItemType())
+                .isEqualTo(ProductItemType.TOP);
+    }
+
+    @Test
+    @DisplayName("상품 타입과 Cursor가 있으면 타입별 다음 페이지를 조회한다")
+    void getNextPageByItemType() {
+        FittingCandidate bottomCandidate = createCandidate(
+                25L,
+                createMember(1L),
+                ProductItemType.BOTTOM
+        );
+        given(fittingCandidateRepository.findNextPageByItemType(
+                eq(1L),
+                eq(29L),
+                eq(ProductItemType.BOTTOM),
+                any(Pageable.class)
+        )).willReturn(List.of(bottomCandidate));
+
+        FittingCandidateListResponse response = fittingCandidateService
+                .getFittingCandidates(
+                        1L,
+                        ProductItemType.BOTTOM,
+                        29L,
+                        20
+                );
+
+        assertThat(response.getItems())
+                .extracting(item -> item.getFittingCandidateId())
+                .containsExactly(25L);
+        assertThat(response.getItems().get(0).getItemType())
+                .isEqualTo(ProductItemType.BOTTOM);
+    }
+
+    @Test
+    @DisplayName("size를 생략하면 20개보다 한 건 더 조회한다")
+    void getEmptyPageWithDefaultSize() {
+        given(fittingCandidateRepository.findFirstPage(
+                eq(1L),
+                any(Pageable.class)
+        )).willReturn(List.of());
+
+        FittingCandidateListResponse response = fittingCandidateService
+                .getFittingCandidates(1L, null, null, null);
+
+        assertThat(response.getItems()).isEmpty();
+        assertThat(response.getNextCursor()).isNull();
+        assertThat(response.isHasNext()).isFalse();
+        verify(fittingCandidateRepository).findFirstPage(
+                eq(1L),
+                argThat(pageable -> pageable.getPageSize() == 21)
+        );
+    }
+
+    @Test
+    @DisplayName("Cursor나 조회 크기가 범위를 벗어나면 목록 조회를 거부한다")
+    void rejectInvalidPaginationRange() {
+        assertPaginationError(() -> fittingCandidateService
+                .getFittingCandidates(1L, null, 0L, 20));
+        assertPaginationError(() -> fittingCandidateService
+                .getFittingCandidates(1L, null, -1L, 20));
+        assertPaginationError(() -> fittingCandidateService
+                .getFittingCandidates(1L, null, null, 0));
+        assertPaginationError(() -> fittingCandidateService
+                .getFittingCandidates(1L, null, null, 101));
+
+        verifyNoInteractions(fittingCandidateRepository);
+    }
+
+    private void assertPaginationError(
+            org.assertj.core.api.ThrowableAssert.ThrowingCallable callable
+    ) {
+        assertThatThrownBy(callable)
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(
+                                ErrorCode.INVALID_PAGINATION_PARAMETER
+                        )
+                );
+    }
+
     private Member createMember(Long id) {
         Member member = Member.create("member" + id + "@lookddak.com", "encoded");
         ReflectionTestUtils.setField(member, "id", id);
@@ -219,12 +377,16 @@ class FittingCandidateServiceTest {
     }
 
     private Product createProduct(Long id) {
+        return createProduct(id, ProductItemType.TOP);
+    }
+
+    private Product createProduct(Long id, ProductItemType itemType) {
         Product product = Product.create(
                 "테스트 상품",
                 "https://image.lookddak.com/test.jpg",
                 49_000,
                 "네이비",
-                ProductItemType.TOP,
+                itemType,
                 "https://shop.lookddak.com/test"
         );
         ReflectionTestUtils.setField(product, "id", id);
@@ -232,9 +394,17 @@ class FittingCandidateServiceTest {
     }
 
     private FittingCandidate createCandidate(Long id, Member member) {
+        return createCandidate(id, member, ProductItemType.TOP);
+    }
+
+    private FittingCandidate createCandidate(
+            Long id,
+            Member member,
+            ProductItemType itemType
+    ) {
         FittingCandidate candidate = FittingCandidate.create(
                 member,
-                createProduct(10L)
+                createProduct(10L, itemType)
         );
         ReflectionTestUtils.setField(candidate, "id", id);
         return candidate;
