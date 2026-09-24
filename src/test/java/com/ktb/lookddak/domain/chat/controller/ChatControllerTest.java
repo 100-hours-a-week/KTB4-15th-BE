@@ -360,7 +360,11 @@ class ChatControllerTest {
     @DisplayName("새 대화를 시작하면 201 Created를 반환한다")
     void createChatRoom() throws Exception {
         given(chatService.createChatRoom(any(), any()))
-                .willReturn(new ChatRoomCreateResponse(10L, 100L));
+                .willReturn(new ChatRoomCreateResponse(
+                        10L,
+                        100L,
+                        LocalDateTime.of(2026, 9, 24, 16, 50)
+                ));
 
         mockMvc.perform(post("/api/v1/chat-rooms")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -374,6 +378,8 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.code").value("CREATED"))
                 .andExpect(jsonPath("$.data.chatRoomId").value(10))
                 .andExpect(jsonPath("$.data.messageId").value(100))
+                .andExpect(jsonPath("$.data.createdAt")
+                        .value("2026-09-24T16:50:00"))
                 .andExpect(jsonPath("$.message")
                         .value("리소스가 성공적으로 생성되었습니다."));
 
@@ -387,7 +393,8 @@ class ChatControllerTest {
                 .willReturn(new ChatMessageCreateResponse(
                         10L,
                         101L,
-                        "검은색으로 추천해줘"
+                        "검은색으로 추천해줘",
+                        LocalDateTime.of(2026, 9, 24, 16, 55)
                 ));
 
         mockMvc.perform(post("/api/v1/chat-rooms/10/messages")
@@ -401,7 +408,9 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.code").value("CREATED"))
                 .andExpect(jsonPath("$.data.chatRoomId").value(10))
                 .andExpect(jsonPath("$.data.messageId").value(101))
-                .andExpect(jsonPath("$.data.content").value("검은색으로 추천해줘"));
+                .andExpect(jsonPath("$.data.content").value("검은색으로 추천해줘"))
+                .andExpect(jsonPath("$.data.createdAt")
+                        .value("2026-09-24T16:55:00"));
 
         verify(chatService).createMessage(eq(1L), eq(10L), any());
     }

@@ -85,7 +85,8 @@ public class ChatService {
 
         return new ChatRoomCreateResponse(
                 savedChatRoom.getId(),
-                savedMessage.getId()
+                savedMessage.getId(),
+                savedMessage.getCreatedAt()
         );
     }
 
@@ -119,7 +120,8 @@ public class ChatService {
         return new ChatMessageCreateResponse(
                 chatRoomId,
                 savedMessage.getId(),
-                savedMessage.getContent()
+                savedMessage.getContent(),
+                savedMessage.getCreatedAt()
         );
     }
 

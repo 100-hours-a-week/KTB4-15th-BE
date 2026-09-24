@@ -120,6 +120,7 @@ class ChatIntegrationTest {
                 .andExpect(jsonPath("$.code").value("CREATED"))
                 .andExpect(jsonPath("$.data.chatRoomId").isNumber())
                 .andExpect(jsonPath("$.data.messageId").isNumber())
+                .andExpect(jsonPath("$.data.createdAt").isNotEmpty())
                 .andReturn();
 
         String responseBody = createRoomResult.getResponse().getContentAsString();
@@ -174,7 +175,8 @@ class ChatIntegrationTest {
                 .andExpect(jsonPath("$.code").value("CREATED"))
                 .andExpect(jsonPath("$.data.chatRoomId").value(chatRoomId))
                 .andExpect(jsonPath("$.data.messageId").isNumber())
-                .andExpect(jsonPath("$.data.content").value("검은색으로 추천해줘"));
+                .andExpect(jsonPath("$.data.content").value("검은색으로 추천해줘"))
+                .andExpect(jsonPath("$.data.createdAt").isNotEmpty());
 
         assertThat(chatMessageRepository
                 .existsByChatRoomIdAndSenderTypeAndGenerationStatus(

@@ -89,6 +89,9 @@ class ChatServiceTest {
     @DisplayName("새 채팅방과 첫 사용자 메시지를 생성한다")
     void createChatRoom() {
         Member member = createMember(1L);
+        LocalDateTime createdAt = LocalDateTime.of(
+                2026, 9, 24, 16, 50
+        );
         ChatRoomCreateRequest request = new ChatRoomCreateRequest(
                 "5만원대 캐주얼 니트 추천해줘",
                 ChatSourceType.WISHLIST
@@ -105,6 +108,11 @@ class ChatServiceTest {
                 .willAnswer(invocation -> {
                     ChatMessage message = invocation.getArgument(0);
                     ReflectionTestUtils.setField(message, "id", 100L);
+                    ReflectionTestUtils.setField(
+                            message,
+                            "createdAt",
+                            createdAt
+                    );
                     return message;
                 });
 
@@ -112,6 +120,7 @@ class ChatServiceTest {
 
         assertThat(response.getChatRoomId()).isEqualTo(10L);
         assertThat(response.getMessageId()).isEqualTo(100L);
+        assertThat(response.getCreatedAt()).isEqualTo(createdAt);
 
         ArgumentCaptor<ChatRoom> chatRoomCaptor = ArgumentCaptor.forClass(ChatRoom.class);
         verify(chatRoomRepository).save(chatRoomCaptor.capture());
@@ -155,6 +164,9 @@ class ChatServiceTest {
     @DisplayName("기존 채팅방에 새로운 사용자 메시지를 저장한다")
     void createMessage() {
         Member member = createMember(1L);
+        LocalDateTime createdAt = LocalDateTime.of(
+                2026, 9, 24, 16, 55
+        );
         LocalDateTime initialLastMessageAt = LocalDateTime.now().minusMinutes(10);
         ChatRoom chatRoom = createChatRoom(10L, member, initialLastMessageAt);
         ChatMessageCreateRequest request = new ChatMessageCreateRequest("검은색으로 추천해줘");
@@ -171,6 +183,11 @@ class ChatServiceTest {
                 .willAnswer(invocation -> {
                     ChatMessage message = invocation.getArgument(0);
                     ReflectionTestUtils.setField(message, "id", 101L);
+                    ReflectionTestUtils.setField(
+                            message,
+                            "createdAt",
+                            createdAt
+                    );
                     return message;
                 });
 
@@ -179,6 +196,7 @@ class ChatServiceTest {
         assertThat(response.getChatRoomId()).isEqualTo(10L);
         assertThat(response.getMessageId()).isEqualTo(101L);
         assertThat(response.getContent()).isEqualTo("검은색으로 추천해줘");
+        assertThat(response.getCreatedAt()).isEqualTo(createdAt);
         assertThat(chatRoom.getLastMessageAt()).isAfter(initialLastMessageAt);
 
         ArgumentCaptor<ChatMessage> messageCaptor = ArgumentCaptor.forClass(ChatMessage.class);
