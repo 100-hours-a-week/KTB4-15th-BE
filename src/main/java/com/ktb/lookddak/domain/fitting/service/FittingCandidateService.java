@@ -2,6 +2,8 @@ package com.ktb.lookddak.domain.fitting.service;
 
 import com.ktb.lookddak.domain.fitting.dto.FittingCandidateCreateRequest;
 import com.ktb.lookddak.domain.fitting.dto.FittingCandidateCreateResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingCandidateBulkDeleteRequest;
+import com.ktb.lookddak.domain.fitting.dto.FittingCandidateBulkDeleteResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingCandidateListItemResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingCandidateListResponse;
 import com.ktb.lookddak.domain.fitting.entity.FittingCandidate;
@@ -20,7 +22,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -97,6 +101,37 @@ public class FittingCandidateService {
         }
 
         fittingCandidateRepository.delete(candidate);
+    }
+
+    @Transactional
+    public FittingCandidateBulkDeleteResponse deleteFittingCandidates(
+            Long memberId,
+            FittingCandidateBulkDeleteRequest request
+    ) {
+        // 중복 ID는 한 번만 삭제 대상으로 처리한다.
+        Set<Long> candidateIds = new LinkedHashSet<>(
+                request.getFittingCandidateIds()
+        );
+        List<FittingCandidate> candidates = fittingCandidateRepository
+                .findAllByIdInForUpdate(candidateIds);
+
+        if (candidates.size() != candidateIds.size()) {
+            throw new BusinessException(
+                    ErrorCode.FITTING_CANDIDATE_NOT_FOUND
+            );
+        }
+
+        for (FittingCandidate candidate : candidates) {
+            if (!candidate.isOwnedBy(memberId)) {
+                throw new BusinessException(
+                        ErrorCode.FITTING_CANDIDATE_ACCESS_DENIED
+                );
+            }
+        }
+
+        fittingCandidateRepository.deleteAllInBatch(candidates);
+
+        return new FittingCandidateBulkDeleteResponse(candidates.size());
     }
 
     public FittingCandidateListResponse getFittingCandidates(

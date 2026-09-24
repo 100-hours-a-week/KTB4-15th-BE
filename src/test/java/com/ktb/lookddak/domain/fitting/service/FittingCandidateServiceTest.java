@@ -2,6 +2,8 @@ package com.ktb.lookddak.domain.fitting.service;
 
 import com.ktb.lookddak.domain.fitting.dto.FittingCandidateCreateRequest;
 import com.ktb.lookddak.domain.fitting.dto.FittingCandidateCreateResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingCandidateBulkDeleteRequest;
+import com.ktb.lookddak.domain.fitting.dto.FittingCandidateBulkDeleteResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingCandidateListResponse;
 import com.ktb.lookddak.domain.fitting.entity.FittingCandidate;
 import com.ktb.lookddak.domain.fitting.repository.FittingCandidateRepository;
@@ -24,6 +26,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -216,6 +219,81 @@ class FittingCandidateServiceTest {
                         ErrorCode.FITTING_CANDIDATE_NOT_FOUND
                 )
         );
+    }
+
+    @Test
+    @DisplayName("본인의 피팅 후보 여러 개를 한 번에 하드 삭제한다")
+    void deleteFittingCandidates() {
+        Member member = createMember(1L);
+        FittingCandidate first = createCandidate(25L, member);
+        FittingCandidate second = createCandidate(26L, member);
+        given(fittingCandidateRepository.findAllByIdInForUpdate(
+                Set.of(25L, 26L)
+        )).willReturn(List.of(first, second));
+
+        FittingCandidateBulkDeleteResponse response =
+                fittingCandidateService.deleteFittingCandidates(
+                        1L,
+                        new FittingCandidateBulkDeleteRequest(
+                                List.of(25L, 26L, 25L)
+                        )
+                );
+
+        assertThat(response.getDeletedCount()).isEqualTo(2);
+        verify(fittingCandidateRepository)
+                .deleteAllInBatch(List.of(first, second));
+    }
+
+    @Test
+    @DisplayName("다건 삭제 대상 중 존재하지 않는 피팅 후보가 있으면 삭제하지 않는다")
+    void rejectBulkDeleteWithMissingCandidate() {
+        FittingCandidate candidate = createCandidate(
+                25L,
+                createMember(1L)
+        );
+        given(fittingCandidateRepository.findAllByIdInForUpdate(
+                Set.of(25L, 999L)
+        )).willReturn(List.of(candidate));
+
+        assertThatThrownBy(() ->
+                fittingCandidateService.deleteFittingCandidates(
+                        1L,
+                        new FittingCandidateBulkDeleteRequest(
+                                List.of(25L, 999L)
+                        )
+                )
+        ).isInstanceOfSatisfying(BusinessException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(
+                        ErrorCode.FITTING_CANDIDATE_NOT_FOUND
+                )
+        );
+
+        verify(fittingCandidateRepository, never()).deleteAllInBatch(any());
+    }
+
+    @Test
+    @DisplayName("다건 삭제 대상 중 다른 회원의 피팅 후보가 있으면 삭제하지 않는다")
+    void rejectBulkDeleteWithOtherMembersCandidate() {
+        FittingCandidate mine = createCandidate(25L, createMember(1L));
+        FittingCandidate others = createCandidate(26L, createMember(2L));
+        given(fittingCandidateRepository.findAllByIdInForUpdate(
+                Set.of(25L, 26L)
+        )).willReturn(List.of(mine, others));
+
+        assertThatThrownBy(() ->
+                fittingCandidateService.deleteFittingCandidates(
+                        1L,
+                        new FittingCandidateBulkDeleteRequest(
+                                List.of(25L, 26L)
+                        )
+                )
+        ).isInstanceOfSatisfying(BusinessException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(
+                        ErrorCode.FITTING_CANDIDATE_ACCESS_DENIED
+                )
+        );
+
+        verify(fittingCandidateRepository, never()).deleteAllInBatch(any());
     }
 
     @Test

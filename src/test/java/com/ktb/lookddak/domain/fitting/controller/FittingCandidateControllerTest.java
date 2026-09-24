@@ -1,6 +1,7 @@
 package com.ktb.lookddak.domain.fitting.controller;
 
 import com.ktb.lookddak.domain.fitting.dto.FittingCandidateCreateResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingCandidateBulkDeleteResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingCandidateListItemResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingCandidateListResponse;
 import com.ktb.lookddak.domain.fitting.entity.FittingCandidate;
@@ -247,6 +248,44 @@ class FittingCandidateControllerTest {
                 .andExpect(jsonPath("$.data").isEmpty());
 
         verify(fittingCandidateService).deleteFittingCandidate(1L, 25L);
+    }
+
+    @Test
+    @DisplayName("피팅 후보 여러 개를 삭제하면 삭제 개수와 200 OK를 반환한다")
+    void deleteFittingCandidates() throws Exception {
+        given(fittingCandidateService.deleteFittingCandidates(eq(1L), any()))
+                .willReturn(new FittingCandidateBulkDeleteResponse(3));
+
+        mockMvc.perform(delete("/api/v1/fitting-candidates")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fittingCandidateIds": [21, 22, 23]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.deletedCount").value(3))
+                .andExpect(jsonPath("$.message")
+                        .value("요청이 성공적으로 처리되었습니다."));
+
+        verify(fittingCandidateService)
+                .deleteFittingCandidates(eq(1L), any());
+    }
+
+    @Test
+    @DisplayName("다건 삭제 ID 목록이 비어 있으면 400 Bad Request를 반환한다")
+    void rejectEmptyBulkDeleteRequest() throws Exception {
+        mockMvc.perform(delete("/api/v1/fitting-candidates")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"fittingCandidateIds": []}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code")
+                        .value("INVALID_INPUT_VALUE"));
+
+        verifyNoInteractions(fittingCandidateService);
     }
 
     private FittingCandidate createCandidate(
