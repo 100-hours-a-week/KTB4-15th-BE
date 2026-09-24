@@ -19,6 +19,7 @@ import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.product.entity.Product;
 import com.ktb.lookddak.domain.product.entity.ProductItemType;
 import com.ktb.lookddak.domain.recommendation.entity.Recommendation;
+import com.ktb.lookddak.domain.recommendation.entity.RecommendationProduct;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import com.ktb.lookddak.global.exception.GlobalExceptionHandler;
@@ -191,7 +192,12 @@ class ChatControllerTest {
                 RecommendationResponse.from(
                         recommendation,
                         List.of(RecommendedProductResponse.from(
-                                product,
+                                RecommendationProduct.create(
+                                        recommendation,
+                                        product,
+                                        49_000,
+                                        "추천 당시 이유"
+                                ),
                                 true,
                                 false
                         ))
@@ -222,6 +228,10 @@ class ChatControllerTest {
                         .value(15))
                 .andExpect(jsonPath("$.data.messages[0].recommendation.products[0].productId")
                         .value(201))
+                .andExpect(jsonPath("$.data.messages[0].recommendation.products[0].currentPrice")
+                        .value(49000))
+                .andExpect(jsonPath("$.data.messages[0].recommendation.products[0].recommendedReason")
+                        .value("추천 당시 이유"))
                 .andExpect(jsonPath("$.data.messages[0].recommendation.products[0].isWishlisted")
                         .value(true))
                 .andExpect(jsonPath("$.data.messages[0].recommendation.products[0].isFittingCandidate")

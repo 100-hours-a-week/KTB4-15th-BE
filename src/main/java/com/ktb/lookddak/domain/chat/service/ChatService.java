@@ -409,7 +409,7 @@ public class ChatService {
             for (RecommendationProduct recommendationProduct : products) {
                 Long productId = recommendationProduct.getProduct().getId();
                 productResponses.add(RecommendedProductResponse.from(
-                        recommendationProduct.getProduct(),
+                        recommendationProduct,
                         wishlistedProductIds.contains(productId),
                         fittingCandidateProductIds.contains(productId)
                 ));

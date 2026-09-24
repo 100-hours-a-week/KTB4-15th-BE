@@ -8,6 +8,7 @@ import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.product.entity.Product;
 import com.ktb.lookddak.domain.product.entity.ProductItemType;
 import com.ktb.lookddak.domain.recommendation.entity.Recommendation;
+import com.ktb.lookddak.domain.recommendation.entity.RecommendationProduct;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -20,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class ChatRoomDetailResponseTest {
 
@@ -27,19 +29,32 @@ class ChatRoomDetailResponseTest {
     @DisplayName("Product와 회원별 상태로 추천 상품 응답을 생성한다")
     void createRecommendedProductResponse() {
         Product product = createProduct(201L);
+        RecommendationProduct recommendationProduct =
+                RecommendationProduct.create(
+                        mock(Recommendation.class),
+                        product,
+                        49_000,
+                        "추천 당시 이유"
+                );
 
         RecommendedProductResponse response =
-                RecommendedProductResponse.from(product, true, false);
+                RecommendedProductResponse.from(
+                        recommendationProduct,
+                        true,
+                        false
+                );
 
         assertThat(response.getProductId()).isEqualTo(201L);
         assertThat(response.getProductName()).isEqualTo("에센셜 램스울 크루넥");
         assertThat(response.getProductImageUrl())
                 .isEqualTo("https://image.lookddak.com/products/201.jpg");
-        assertThat(response.getCurrentPrice()).isEqualTo(59_000);
+        assertThat(response.getCurrentPrice()).isEqualTo(49_000);
         assertThat(response.getColor()).isEqualTo("네이비");
         assertThat(response.getItemType()).isEqualTo(ProductItemType.TOP);
         assertThat(response.getPurchaseUrl())
                 .isEqualTo("https://shop.lookddak.com/products/201");
+        assertThat(response.getRecommendedReason())
+                .isEqualTo("추천 당시 이유");
         assertThat(response.isWishlisted()).isTrue();
         assertThat(response.isFittingCandidate()).isFalse();
     }
@@ -64,7 +79,12 @@ class ChatRoomDetailResponseTest {
                 RecommendationResponse.from(
                         recommendation,
                         List.of(RecommendedProductResponse.from(
-                                createProduct(201L),
+                                RecommendationProduct.create(
+                                        recommendation,
+                                        createProduct(201L),
+                                        49_000,
+                                        "추천 당시 이유"
+                                ),
                                 true,
                                 false
                         ))
@@ -128,7 +148,12 @@ class ChatRoomDetailResponseTest {
                 RecommendationResponse.from(
                         recommendation,
                         List.of(RecommendedProductResponse.from(
-                                createProduct(201L),
+                                RecommendationProduct.create(
+                                        recommendation,
+                                        createProduct(201L),
+                                        49_000,
+                                        "추천 당시 이유"
+                                ),
                                 true,
                                 false
                         ))
@@ -175,6 +200,7 @@ class ChatRoomDetailResponseTest {
                 "\"color\"",
                 "\"itemType\"",
                 "\"purchaseUrl\"",
+                "\"recommendedReason\"",
                 "\"isWishlisted\"",
                 "\"isFittingCandidate\""
         );

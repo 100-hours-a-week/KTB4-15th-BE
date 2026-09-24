@@ -122,14 +122,18 @@ class RecommendationRepositoryTest {
                 recommendationProductRepository.saveAndFlush(
                         RecommendationProduct.create(
                                 recommendation,
-                                firstRecommendedProduct
+                                firstRecommendedProduct,
+                                59_000,
+                                "첫 번째 추천 이유"
                         )
                 );
         RecommendationProduct secondRelation =
                 recommendationProductRepository.saveAndFlush(
                         RecommendationProduct.create(
                                 recommendation,
-                                secondRecommendedProduct
+                                secondRecommendedProduct,
+                                69_000,
+                                "두 번째 추천 이유"
                         )
                 );
         entityManager.clear();
@@ -160,12 +164,22 @@ class RecommendationRepositoryTest {
         );
         Product product = productRepository.save(createProduct("추천 상품", 59_000));
         recommendationProductRepository.saveAndFlush(
-                RecommendationProduct.create(recommendation, product)
+                RecommendationProduct.create(
+                        recommendation,
+                        product,
+                        59_000,
+                        "추천 이유"
+                )
         );
 
         assertThatThrownBy(() ->
                 recommendationProductRepository.saveAndFlush(
-                        RecommendationProduct.create(recommendation, product)
+                        RecommendationProduct.create(
+                                recommendation,
+                                product,
+                                59_000,
+                                "추천 이유"
+                        )
                 )
         ).isInstanceOf(DataIntegrityViolationException.class);
     }

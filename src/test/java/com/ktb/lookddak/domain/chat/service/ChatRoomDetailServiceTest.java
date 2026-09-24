@@ -115,9 +115,19 @@ class ChatRoomDetailServiceTest {
         Product firstProduct = createProduct(201L, "첫 번째 추천 상품");
         Product secondProduct = createProduct(202L, "두 번째 추천 상품");
         RecommendationProduct firstRecommendationProduct =
-                RecommendationProduct.create(recommendation, firstProduct);
+                RecommendationProduct.create(
+                        recommendation,
+                        firstProduct,
+                        49_000,
+                        "첫 번째 추천 이유"
+                );
         RecommendationProduct secondRecommendationProduct =
-                RecommendationProduct.create(recommendation, secondProduct);
+                RecommendationProduct.create(
+                        recommendation,
+                        secondProduct,
+                        69_000,
+                        "두 번째 추천 이유"
+                );
 
         given(chatRoomRepository.findActiveById(123L))
                 .willReturn(Optional.of(chatRoom));
