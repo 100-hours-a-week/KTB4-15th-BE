@@ -106,6 +106,34 @@ class FittingCandidateRepositoryTest {
     }
 
     @Test
+    @DisplayName("여러 피팅 후보를 ID 오름차순으로 잠금 조회한다")
+    void findAllByIdInForUpdate() {
+        Member otherMember = memberRepository.save(Member.create(
+                "other-lock-fitting@lookddak.com",
+                "encoded-password"
+        ));
+        FittingCandidate first = saveCandidate(
+                member,
+                product
+        );
+        FittingCandidate second = saveCandidate(
+                otherMember,
+                createProduct("다른 회원 상품", 59_000)
+        );
+        flushAndClear();
+
+        List<FittingCandidate> candidates = fittingCandidateRepository
+                .findAllByIdInForUpdate(List.of(
+                        second.getId(),
+                        first.getId()
+                ));
+
+        assertThat(candidates)
+                .extracting(FittingCandidate::getId)
+                .containsExactly(first.getId(), second.getId());
+    }
+
+    @Test
     @DisplayName("회원의 피팅 후보 첫 페이지를 최신순으로 상품과 함께 조회한다")
     void findFirstPage() {
         FittingCandidate first = saveCandidate(

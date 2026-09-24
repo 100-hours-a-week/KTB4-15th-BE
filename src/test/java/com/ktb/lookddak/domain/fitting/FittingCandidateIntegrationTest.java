@@ -1,6 +1,7 @@
 package com.ktb.lookddak.domain.fitting;
 
 import com.jayway.jsonpath.JsonPath;
+import com.ktb.lookddak.domain.fitting.entity.FittingCandidate;
 import com.ktb.lookddak.domain.fitting.repository.FittingCandidateRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
@@ -20,6 +21,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -51,10 +54,11 @@ class FittingCandidateIntegrationTest {
     private PasswordEncoder passwordEncoder;
 
     private Product product;
+    private Member member;
 
     @BeforeEach
     void setUp() {
-        memberRepository.saveAndFlush(Member.create(
+        member = memberRepository.saveAndFlush(Member.create(
                 EMAIL,
                 passwordEncoder.encode(PASSWORD)
         ));
@@ -111,6 +115,45 @@ class FittingCandidateIntegrationTest {
 
         assertThat(fittingCandidateRepository.findById(candidateId)).isEmpty();
         assertThat(productRepository.findById(product.getId())).isPresent();
+    }
+
+    @Test
+    @DisplayName("인증된 회원이 피팅 후보 여러 개를 한 번에 하드 삭제한다")
+    void bulkDeleteCandidates() throws Exception {
+        Product secondProduct = productRepository.saveAndFlush(Product.create(
+                "와이드 데님 팬츠",
+                "https://image.lookddak.com/products/2.jpg",
+                59_000,
+                "인디고",
+                ProductItemType.BOTTOM,
+                "https://shop.lookddak.com/products/2"
+        ));
+        FittingCandidate first = fittingCandidateRepository.save(
+                FittingCandidate.create(member, product)
+        );
+        FittingCandidate second = fittingCandidateRepository.saveAndFlush(
+                FittingCandidate.create(member, secondProduct)
+        );
+        String accessToken = loginAndGetAccessToken();
+
+        mockMvc.perform(delete("/api/v1/fitting-candidates")
+                        .cookie(new Cookie("accessToken", accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fittingCandidateIds": [%d, %d]
+                                }
+                                """.formatted(first.getId(), second.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.deletedCount").value(2));
+
+        assertThat(fittingCandidateRepository.findAllById(
+                List.of(first.getId(), second.getId())
+        )).isEmpty();
+        assertThat(productRepository.findAllById(
+                List.of(product.getId(), secondProduct.getId())
+        )).hasSize(2);
     }
 
     @Test

@@ -93,4 +93,15 @@ public interface FittingCandidateRepository
     Optional<FittingCandidate> findByIdForUpdate(
             @Param("candidateId") Long candidateId
     );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select candidate
+            from FittingCandidate candidate
+            where candidate.id in :candidateIds
+            order by candidate.id asc
+            """)
+    List<FittingCandidate> findAllByIdInForUpdate(
+            @Param("candidateIds") Collection<Long> candidateIds
+    );
 }
