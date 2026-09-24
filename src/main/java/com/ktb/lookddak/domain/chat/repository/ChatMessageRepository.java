@@ -3,8 +3,10 @@ package com.ktb.lookddak.domain.chat.repository;
 import com.ktb.lookddak.domain.chat.entity.ChatGenerationStatus;
 import com.ktb.lookddak.domain.chat.entity.ChatMessage;
 import com.ktb.lookddak.domain.chat.entity.ChatSenderType;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -24,6 +26,18 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     Optional<ChatMessage> findByIdAndChatRoomId(
             Long messageId,
             Long chatRoomId
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select message
+            from ChatMessage message
+            join fetch message.chatRoom chatRoom
+            join fetch chatRoom.member
+            where message.id = :messageId
+            """)
+    Optional<ChatMessage> findByIdForGenerationUpdate(
+            @Param("messageId") Long messageId
     );
 
     Optional<ChatMessage> findFirstByChatRoomIdAndIdGreaterThanOrderByIdAsc(
