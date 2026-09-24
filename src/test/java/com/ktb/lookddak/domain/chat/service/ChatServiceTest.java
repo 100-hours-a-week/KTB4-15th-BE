@@ -13,6 +13,7 @@ import com.ktb.lookddak.domain.chat.entity.ChatMessageType;
 import com.ktb.lookddak.domain.chat.entity.ChatRoom;
 import com.ktb.lookddak.domain.chat.entity.ChatSenderType;
 import com.ktb.lookddak.domain.chat.entity.ChatSourceType;
+import com.ktb.lookddak.domain.chat.event.ChatGenerationRequestedEvent;
 import com.ktb.lookddak.domain.chat.repository.ChatMessageRepository;
 import com.ktb.lookddak.domain.chat.repository.ChatRoomRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingCandidateRepository;
@@ -31,6 +32,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -70,6 +72,9 @@ class ChatServiceTest {
     @Mock
     private FittingCandidateRepository fittingCandidateRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private ChatService chatService;
 
     @BeforeEach
@@ -81,7 +86,8 @@ class ChatServiceTest {
                 recommendationRepository,
                 recommendationProductRepository,
                 wishlistRepository,
-                fittingCandidateRepository
+                fittingCandidateRepository,
+                eventPublisher
         );
     }
 
@@ -115,6 +121,10 @@ class ChatServiceTest {
                     );
                     return message;
                 });
+        given(wishlistRepository.findRecentProductCodesByMemberId(
+                eq(1L),
+                any(Pageable.class)
+        )).willReturn(List.of("product-10", "product-9"));
 
         ChatRoomCreateResponse response = chatService.createChatRoom(1L, request);
 
@@ -138,6 +148,18 @@ class ChatServiceTest {
         assertThat(savedMessage.getGenerationStatus())
                 .isEqualTo(ChatGenerationStatus.GENERATING);
         assertThat(savedMessage.getContent()).isEqualTo(request.getContent());
+
+        ArgumentCaptor<ChatGenerationRequestedEvent> eventCaptor =
+                ArgumentCaptor.forClass(ChatGenerationRequestedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        ChatGenerationRequestedEvent event = eventCaptor.getValue();
+        assertThat(event.getMemberId()).isEqualTo(1L);
+        assertThat(event.getChatRoomId()).isEqualTo(10L);
+        assertThat(event.getUserMessageId()).isEqualTo(100L);
+        assertThat(event.getContent()).isEqualTo(request.getContent());
+        assertThat(event.getSourceType()).isEqualTo(ChatSourceType.WISHLIST);
+        assertThat(event.getProductIds())
+                .containsExactly("product-10", "product-9");
     }
 
     @Test
@@ -206,6 +228,18 @@ class ChatServiceTest {
         assertThat(savedMessage.getMessageType()).isEqualTo(ChatMessageType.TEXT);
         assertThat(savedMessage.getGenerationStatus())
                 .isEqualTo(ChatGenerationStatus.GENERATING);
+
+        ArgumentCaptor<ChatGenerationRequestedEvent> eventCaptor =
+                ArgumentCaptor.forClass(ChatGenerationRequestedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        ChatGenerationRequestedEvent event = eventCaptor.getValue();
+        assertThat(event.getMemberId()).isEqualTo(1L);
+        assertThat(event.getChatRoomId()).isEqualTo(10L);
+        assertThat(event.getUserMessageId()).isEqualTo(101L);
+        assertThat(event.getContent()).isEqualTo(request.getContent());
+        assertThat(event.getSourceType()).isEqualTo(ChatSourceType.GENERAL);
+        assertThat(event.getProductIds()).isEmpty();
+        verifyNoInteractions(wishlistRepository);
     }
 
     @Test
