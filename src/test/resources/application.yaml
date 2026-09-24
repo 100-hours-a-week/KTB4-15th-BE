@@ -24,3 +24,10 @@ auth:
 cors:
   allowed-origins:
     - http://localhost:5173
+
+ai:
+  server:
+    base-url: http://localhost:8000
+    api-key:
+    connect-timeout: 3s
+    response-timeout: 60s

@@ -19,3 +19,7 @@ cors:
   allowed-origins:
     - http://localhost:3000
     - http://localhost:5173
+
+ai:
+  server:
+    base-url: ${AI_SERVER_URL:http://localhost:8000}
