@@ -31,3 +31,8 @@ ai:
     api-key:
     connect-timeout: 3s
     response-timeout: 60s
+  task:
+    core-pool-size: 2
+    max-pool-size: 4
+    queue-capacity: 20
+    await-termination: 5s
