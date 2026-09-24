@@ -192,6 +192,7 @@ class RecommendationRepositoryTest {
 
     private Product createProduct(String name, Integer currentPrice) {
         return Product.create(
+                "code-" + name,
                 name,
                 "https://image.lookddak.com/test.jpg",
                 currentPrice,

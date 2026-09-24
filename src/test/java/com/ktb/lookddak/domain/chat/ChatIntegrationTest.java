@@ -622,6 +622,7 @@ class ChatIntegrationTest {
             String purchaseUrl
     ) {
         return productRepository.saveAndFlush(Product.create(
+                "code-" + name,
                 name,
                 imageUrl,
                 currentPrice,

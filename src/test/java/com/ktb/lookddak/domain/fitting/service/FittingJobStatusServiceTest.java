@@ -234,6 +234,7 @@ class FittingJobStatusServiceTest {
             String name
     ) {
         Product product = Product.create(
+                "product-" + productId,
                 name,
                 "https://image.lookddak.com/products/" + productId + ".jpg",
                 49_000,

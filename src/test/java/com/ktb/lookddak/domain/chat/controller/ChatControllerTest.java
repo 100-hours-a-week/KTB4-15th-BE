@@ -600,6 +600,7 @@ class ChatControllerTest {
 
     private Product createProduct(Long productId) {
         Product product = Product.create(
+                "product-" + productId,
                 "에센셜 램스울 크루넥",
                 "https://image.lookddak.com/products/201.jpg",
                 59_000,

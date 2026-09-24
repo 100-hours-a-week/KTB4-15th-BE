@@ -407,6 +407,7 @@ class ChatGenerationStatusServiceTest {
 
     private Product createProduct(Long id) {
         Product product = Product.create(
+                "product-" + id,
                 "추천 니트",
                 "https://image.lookddak.com/products/201.jpg",
                 59_000,

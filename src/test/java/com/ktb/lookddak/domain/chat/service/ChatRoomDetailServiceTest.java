@@ -346,6 +346,7 @@ class ChatRoomDetailServiceTest {
 
     private Product createProduct(Long id, String name) {
         Product product = Product.create(
+                "product-" + id,
                 name,
                 "https://image.lookddak.com/products/" + id + ".jpg",
                 59_000,

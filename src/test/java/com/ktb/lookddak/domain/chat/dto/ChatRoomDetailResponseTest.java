@@ -220,6 +220,7 @@ class ChatRoomDetailResponseTest {
 
     private Product createProduct(Long id) {
         Product product = Product.create(
+                "product-" + id,
                 "에센셜 램스울 크루넥",
                 "https://image.lookddak.com/products/201.jpg",
                 59_000,
