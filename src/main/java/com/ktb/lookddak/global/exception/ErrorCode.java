@@ -30,6 +30,11 @@ public enum ErrorCode {
     MEMBER_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "회원 기본정보를 찾을 수 없습니다."),
     INVALID_FULL_BODY_IMAGE(HttpStatus.BAD_REQUEST, "사용할 수 없는 전신사진 검증 정보입니다."),
 
+    // Full body image validation request errors
+    IMAGE_EMPTY(HttpStatus.BAD_REQUEST, "이미지 파일을 첨부해주세요."),
+    IMAGE_FORMAT_UNSUPPORTED(HttpStatus.BAD_REQUEST, "JPG, JPEG 또는 PNG 이미지만 업로드해주세요."),
+    IMAGE_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE, "이미지 크기는 10MB 이하여야 합니다."),
+
     // Chat errors
     CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "채팅방을 찾을 수 없습니다."),
     CHAT_ROOM_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 채팅방에 접근할 권한이 없습니다."),
