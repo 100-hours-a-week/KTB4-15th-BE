@@ -109,6 +109,7 @@ class FittingCandidateControllerTest {
                 null,
                 20
         )).willReturn(new FittingCandidateListResponse(
+                3L,
                 List.of(item),
                 30L,
                 true
@@ -130,6 +131,7 @@ class FittingCandidateControllerTest {
                 .andExpect(jsonPath("$.data.items[0].itemType").value("TOP"))
                 .andExpect(jsonPath("$.data.items[0].saleStatus")
                         .doesNotExist())
+                .andExpect(jsonPath("$.data.totalCount").value(3))
                 .andExpect(jsonPath("$.data.nextCursor").value(30))
                 .andExpect(jsonPath("$.data.hasNext").value(true))
                 .andExpect(jsonPath("$.message")
@@ -152,6 +154,7 @@ class FittingCandidateControllerTest {
                 25L,
                 10
         )).willReturn(new FittingCandidateListResponse(
+                0L,
                 List.of(),
                 null,
                 false
@@ -164,6 +167,7 @@ class FittingCandidateControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items").isArray())
                 .andExpect(jsonPath("$.data.items").isEmpty())
+                .andExpect(jsonPath("$.data.totalCount").value(0))
                 .andExpect(jsonPath("$.data.nextCursor").isEmpty())
                 .andExpect(jsonPath("$.data.hasNext").value(false));
 

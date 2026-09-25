@@ -70,6 +70,16 @@ class FittingCandidateRepositoryTest {
                 .isTrue();
         assertThat(fittingCandidateRepository.countByMemberId(member.getId()))
                 .isEqualTo(1L);
+        assertThat(fittingCandidateRepository
+                .countByMemberIdAndProductItemType(
+                        member.getId(),
+                        ProductItemType.TOP
+                )).isEqualTo(1L);
+        assertThat(fittingCandidateRepository
+                .countByMemberIdAndProductItemType(
+                        member.getId(),
+                        ProductItemType.BOTTOM
+                )).isZero();
     }
 
     @Test

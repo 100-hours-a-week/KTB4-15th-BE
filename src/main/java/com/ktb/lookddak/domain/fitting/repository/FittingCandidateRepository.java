@@ -21,6 +21,11 @@ public interface FittingCandidateRepository
 
     long countByMemberId(Long memberId);
 
+    long countByMemberIdAndProductItemType(
+            Long memberId,
+            ProductItemType itemType
+    );
+
     @Query("""
             select candidate.product.id
             from FittingCandidate candidate

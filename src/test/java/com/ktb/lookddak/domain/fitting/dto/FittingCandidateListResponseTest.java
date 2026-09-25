@@ -46,12 +46,14 @@ class FittingCandidateListResponseTest {
 
         FittingCandidateListResponse response =
                 new FittingCandidateListResponse(
+                        3L,
                         List.of(item),
                         29L,
                         true
                 );
 
         assertThat(response.getItems()).containsExactly(item);
+        assertThat(response.getTotalCount()).isEqualTo(3L);
         assertThat(response.getNextCursor()).isEqualTo(29L);
         assertThat(response.isHasNext()).isTrue();
     }
@@ -61,12 +63,14 @@ class FittingCandidateListResponseTest {
     void createEmptyResponse() {
         FittingCandidateListResponse response =
                 new FittingCandidateListResponse(
+                        0L,
                         List.of(),
                         null,
                         false
                 );
 
         assertThat(response.getItems()).isEmpty();
+        assertThat(response.getTotalCount()).isZero();
         assertThat(response.getNextCursor()).isNull();
         assertThat(response.isHasNext()).isFalse();
     }
@@ -82,7 +86,7 @@ class FittingCandidateListResponseTest {
         items.add(item);
 
         FittingCandidateListResponse response =
-                new FittingCandidateListResponse(items, null, false);
+                new FittingCandidateListResponse(1L, items, null, false);
         items.clear();
 
         assertThat(response.getItems()).containsExactly(item);
@@ -97,6 +101,7 @@ class FittingCandidateListResponseTest {
                 );
         FittingCandidateListResponse response =
                 new FittingCandidateListResponse(
+                        3L,
                         List.of(item),
                         30L,
                         true
@@ -108,6 +113,7 @@ class FittingCandidateListResponseTest {
         String json = objectMapper.writeValueAsString(response);
 
         assertThat(json).containsSubsequence(
+                "\"totalCount\"",
                 "\"items\"",
                 "\"nextCursor\"",
                 "\"hasNext\""

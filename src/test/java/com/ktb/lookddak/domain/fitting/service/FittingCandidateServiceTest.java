@@ -307,6 +307,7 @@ class FittingCandidateServiceTest {
                 eq(1L),
                 any(Pageable.class)
         )).willReturn(List.of(first, second, nextPageCandidate));
+        given(fittingCandidateRepository.countByMemberId(1L)).willReturn(3L);
 
         FittingCandidateListResponse response = fittingCandidateService
                 .getFittingCandidates(1L, null, null, 2);
@@ -314,6 +315,7 @@ class FittingCandidateServiceTest {
         assertThat(response.getItems())
                 .extracting(item -> item.getFittingCandidateId())
                 .containsExactly(30L, 29L);
+        assertThat(response.getTotalCount()).isEqualTo(3L);
         assertThat(response.getNextCursor()).isEqualTo(29L);
         assertThat(response.isHasNext()).isTrue();
         verify(fittingCandidateRepository).findFirstPage(
@@ -358,6 +360,11 @@ class FittingCandidateServiceTest {
                 eq(ProductItemType.TOP),
                 any(Pageable.class)
         )).willReturn(List.of(topCandidate));
+        given(fittingCandidateRepository
+                .countByMemberIdAndProductItemType(
+                        1L,
+                        ProductItemType.TOP
+                )).willReturn(4L);
 
         FittingCandidateListResponse response = fittingCandidateService
                 .getFittingCandidates(
@@ -368,6 +375,7 @@ class FittingCandidateServiceTest {
                 );
 
         assertThat(response.getItems()).hasSize(1);
+        assertThat(response.getTotalCount()).isEqualTo(4L);
         assertThat(response.getItems().get(0).getItemType())
                 .isEqualTo(ProductItemType.TOP);
     }

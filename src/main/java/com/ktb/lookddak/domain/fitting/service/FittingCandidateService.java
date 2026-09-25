@@ -165,7 +165,19 @@ public class FittingCandidateService {
                 ? responseCandidates.get(responseCandidates.size() - 1).getId()
                 : null;
 
-        return new FittingCandidateListResponse(items, nextCursor, hasNext);
+        long totalCount = itemType == null
+                ? fittingCandidateRepository.countByMemberId(memberId)
+                : fittingCandidateRepository.countByMemberIdAndProductItemType(
+                        memberId,
+                        itemType
+                );
+
+        return new FittingCandidateListResponse(
+                totalCount,
+                items,
+                nextCursor,
+                hasNext
+        );
     }
 
     private List<FittingCandidate> findCandidates(
