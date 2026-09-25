@@ -23,3 +23,7 @@ cors:
 ai:
   server:
     base-url: ${AI_SERVER_URL:http://localhost:8000}
+
+aws:
+  s3:
+    bucket: ${AWS_S3_BUCKET:lookddak-local-images}
