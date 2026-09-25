@@ -302,6 +302,7 @@ class FittingCandidateControllerTest {
                 "encoded-password"
         );
         Product product = Product.create(
+                "product-" + productId,
                 "에센셜 램스울 크루넥",
                 "https://image.lookddak.com/products/101.jpg",
                 49_000,

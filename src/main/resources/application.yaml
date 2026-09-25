@@ -18,3 +18,15 @@ auth:
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS}
+
+ai:
+  server:
+    base-url: ${AI_SERVER_URL}
+    api-key: ${AI_INTERNAL_API_KEY:}
+    connect-timeout: 3s
+    response-timeout: 60s
+  task:
+    core-pool-size: 5
+    max-pool-size: 10
+    queue-capacity: 100
+    await-termination: 60s

@@ -183,6 +183,7 @@ class FittingJobRepositoryTest {
             ProductItemType itemType
     ) {
         return Product.create(
+                "code-" + name,
                 name,
                 "https://image.lookddak.com/products/test.jpg",
                 49_000,

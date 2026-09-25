@@ -24,3 +24,15 @@ auth:
 cors:
   allowed-origins:
     - http://localhost:5173
+
+ai:
+  server:
+    base-url: http://localhost:8000
+    api-key:
+    connect-timeout: 3s
+    response-timeout: 60s
+  task:
+    core-pool-size: 2
+    max-pool-size: 4
+    queue-capacity: 20
+    await-termination: 5s

@@ -26,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -63,6 +64,9 @@ class ChatGenerationStatusServiceTest {
     @Mock
     private FittingCandidateRepository fittingCandidateRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private ChatService chatService;
     private Member member;
     private ChatRoom chatRoom;
@@ -76,7 +80,8 @@ class ChatGenerationStatusServiceTest {
                 recommendationRepository,
                 recommendationProductRepository,
                 wishlistRepository,
-                fittingCandidateRepository
+                fittingCandidateRepository,
+                eventPublisher
         );
         member = createMember(1L);
         chatRoom = createChatRoom(123L, member);
@@ -407,6 +412,7 @@ class ChatGenerationStatusServiceTest {
 
     private Product createProduct(Long id) {
         Product product = Product.create(
+                "product-" + id,
                 "추천 니트",
                 "https://image.lookddak.com/products/201.jpg",
                 59_000,

@@ -22,6 +22,9 @@ public class Product {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "product_code", nullable = false, unique = true, length = 50)
+    private String productCode;
+
     @Column(nullable = false, length = 255)
     private String name;
 
@@ -42,6 +45,7 @@ public class Product {
     private String purchaseUrl;
 
     private Product(
+            String productCode,
             String name,
             String imageUrl,
             Integer currentPrice,
@@ -49,6 +53,7 @@ public class Product {
             ProductItemType itemType,
             String purchaseUrl
     ) {
+        this.productCode = productCode;
         this.name = name;
         this.imageUrl = imageUrl;
         this.currentPrice = currentPrice;
@@ -58,6 +63,7 @@ public class Product {
     }
 
     public static Product create(
+            String productCode,
             String name,
             String imageUrl,
             Integer currentPrice,
@@ -66,6 +72,7 @@ public class Product {
             String purchaseUrl
     ) {
         return new Product(
+                productCode,
                 name,
                 imageUrl,
                 currentPrice,

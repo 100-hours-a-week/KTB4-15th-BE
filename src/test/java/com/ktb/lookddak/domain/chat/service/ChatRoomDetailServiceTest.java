@@ -27,6 +27,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -67,6 +68,9 @@ class ChatRoomDetailServiceTest {
     @Mock
     private FittingCandidateRepository fittingCandidateRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private ChatService chatService;
 
     @BeforeEach
@@ -78,7 +82,8 @@ class ChatRoomDetailServiceTest {
                 recommendationRepository,
                 recommendationProductRepository,
                 wishlistRepository,
-                fittingCandidateRepository
+                fittingCandidateRepository,
+                eventPublisher
         );
     }
 
@@ -346,6 +351,7 @@ class ChatRoomDetailServiceTest {
 
     private Product createProduct(Long id, String name) {
         Product product = Product.create(
+                "product-" + id,
                 name,
                 "https://image.lookddak.com/products/" + id + ".jpg",
                 59_000,

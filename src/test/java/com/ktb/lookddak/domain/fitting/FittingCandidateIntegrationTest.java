@@ -63,6 +63,7 @@ class FittingCandidateIntegrationTest {
                 passwordEncoder.encode(PASSWORD)
         ));
         product = productRepository.saveAndFlush(Product.create(
+                "0000001",
                 "에센셜 램스울 크루넥",
                 "https://image.lookddak.com/products/1.jpg",
                 49_000,
@@ -121,6 +122,7 @@ class FittingCandidateIntegrationTest {
     @DisplayName("인증된 회원이 피팅 후보 여러 개를 한 번에 하드 삭제한다")
     void bulkDeleteCandidates() throws Exception {
         Product secondProduct = productRepository.saveAndFlush(Product.create(
+                "0000002",
                 "와이드 데님 팬츠",
                 "https://image.lookddak.com/products/2.jpg",
                 59_000,

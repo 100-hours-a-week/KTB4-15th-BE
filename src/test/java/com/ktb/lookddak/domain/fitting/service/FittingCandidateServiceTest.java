@@ -468,6 +468,7 @@ class FittingCandidateServiceTest {
 
     private Product createProduct(Long id, ProductItemType itemType) {
         Product product = Product.create(
+                "product-" + id,
                 "테스트 상품",
                 "https://image.lookddak.com/test.jpg",
                 49_000,

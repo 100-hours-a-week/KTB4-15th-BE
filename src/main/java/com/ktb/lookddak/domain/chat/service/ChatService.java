@@ -18,6 +18,8 @@ import com.ktb.lookddak.domain.chat.entity.ChatMessage;
 import com.ktb.lookddak.domain.chat.entity.ChatMessageType;
 import com.ktb.lookddak.domain.chat.entity.ChatRoom;
 import com.ktb.lookddak.domain.chat.entity.ChatSenderType;
+import com.ktb.lookddak.domain.chat.entity.ChatSourceType;
+import com.ktb.lookddak.domain.chat.event.ChatGenerationRequestedEvent;
 import com.ktb.lookddak.domain.chat.repository.ChatMessageRepository;
 import com.ktb.lookddak.domain.chat.repository.ChatRoomRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
@@ -31,6 +33,7 @@ import com.ktb.lookddak.domain.wishlist.repository.WishlistRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +54,7 @@ public class ChatService {
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MIN_PAGE_SIZE = 1;
     private static final int MAX_PAGE_SIZE = 100;
+    private static final int AI_WISHLIST_PRODUCT_LIMIT = 10;
 
     private final MemberRepository memberRepository;
     private final ChatRoomRepository chatRoomRepository;
@@ -59,6 +63,7 @@ public class ChatService {
     private final RecommendationProductRepository recommendationProductRepository;
     private final WishlistRepository wishlistRepository;
     private final FittingCandidateRepository fittingCandidateRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public ChatRoomCreateResponse createChatRoom(
@@ -82,6 +87,18 @@ public class ChatService {
                 request.getContent()
         );
         ChatMessage savedMessage = chatMessageRepository.save(message);
+
+        List<String> productIds = getAiProductIds(
+                memberId,
+                request.getSourceType()
+        );
+        publishGenerationRequestedEvent(
+                memberId,
+                savedChatRoom.getId(),
+                savedMessage,
+                request.getSourceType(),
+                productIds
+        );
 
         return new ChatRoomCreateResponse(
                 savedChatRoom.getId(),
@@ -117,12 +134,51 @@ public class ChatService {
 
         chatRoom.updateLastMessageAt(LocalDateTime.now());
 
+        publishGenerationRequestedEvent(
+                memberId,
+                chatRoomId,
+                savedMessage,
+                ChatSourceType.GENERAL,
+                List.of()
+        );
+
         return new ChatMessageCreateResponse(
                 chatRoomId,
                 savedMessage.getId(),
                 savedMessage.getContent(),
                 savedMessage.getCreatedAt()
         );
+    }
+
+    private List<String> getAiProductIds(
+            Long memberId,
+            ChatSourceType sourceType
+    ) {
+        if (sourceType != ChatSourceType.WISHLIST) {
+            return List.of();
+        }
+
+        return wishlistRepository.findRecentProductCodesByMemberId(
+                memberId,
+                PageRequest.of(0, AI_WISHLIST_PRODUCT_LIMIT)
+        );
+    }
+
+    private void publishGenerationRequestedEvent(
+            Long memberId,
+            Long chatRoomId,
+            ChatMessage userMessage,
+            ChatSourceType sourceType,
+            List<String> productIds
+    ) {
+        eventPublisher.publishEvent(new ChatGenerationRequestedEvent(
+                memberId,
+                chatRoomId,
+                userMessage.getId(),
+                userMessage.getContent(),
+                sourceType,
+                productIds
+        ));
     }
 
     @Transactional

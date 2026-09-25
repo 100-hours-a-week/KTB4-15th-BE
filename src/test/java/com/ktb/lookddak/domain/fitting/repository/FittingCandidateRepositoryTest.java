@@ -49,6 +49,7 @@ class FittingCandidateRepositoryTest {
                 "encoded-password"
         ));
         product = productRepository.save(Product.create(
+                "0000001",
                 "에센셜 램스울 크루넥",
                 "https://image.lookddak.com/products/1.jpg",
                 49_000,
@@ -330,6 +331,7 @@ class FittingCandidateRepositoryTest {
             ProductItemType itemType
     ) {
         return Product.create(
+                "code-" + name,
                 name,
                 "https://image.lookddak.com/test.jpg",
                 currentPrice,
