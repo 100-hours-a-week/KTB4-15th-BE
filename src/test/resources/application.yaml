@@ -36,3 +36,9 @@ ai:
     max-pool-size: 4
     queue-capacity: 20
     await-termination: 5s
+
+aws:
+  s3:
+    bucket: lookddak-test-images
+    region: ap-northeast-2
+    presigned-url-expiration: 10m

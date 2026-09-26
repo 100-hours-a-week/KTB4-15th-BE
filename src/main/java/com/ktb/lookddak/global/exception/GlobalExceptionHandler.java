@@ -1,5 +1,6 @@
 package com.ktb.lookddak.global.exception;
 
+import com.ktb.lookddak.domain.image.exception.BodyImageValidationException;
 import com.ktb.lookddak.global.response.ApiResponse;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +13,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @Slf4j
@@ -21,14 +24,41 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException exception) {
         ErrorCode errorCode = exception.getErrorCode();
+
         return createErrorResponse(errorCode);
+    }
+
+    @ExceptionHandler(BodyImageValidationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBodyImageValidation(
+            BodyImageValidationException exception
+    ) {
+        return ResponseEntity
+                .badRequest()
+                .body(ApiResponse.failure(
+                        exception.getCode(),
+                        exception.getMessage()
+                ));
+    }
+
+    @ExceptionHandler(ExternalApiException.class)
+    public ResponseEntity<ApiResponse<Void>> handleExternalApiException(
+            ExternalApiException exception
+    ) {
+        log.error(
+                "External API call failed: {}",
+                exception.getErrorCode(),
+                exception
+        );
+
+        return createErrorResponse(exception.getErrorCode());
     }
 
     @ExceptionHandler({
             MethodArgumentNotValidException.class,
             HandlerMethodValidationException.class,
             ConstraintViolationException.class,
-            MethodArgumentTypeMismatchException.class
+            MethodArgumentTypeMismatchException.class,
+            MissingServletRequestPartException.class
     })
     public ResponseEntity<ApiResponse<Void>> handleInvalidInput(Exception exception) {
         return createErrorResponse(ErrorCode.INVALID_INPUT_VALUE);
@@ -57,6 +87,13 @@ public class GlobalExceptionHandler {
     ) {
 
         return createErrorResponse(ErrorCode.METHOD_NOT_ALLOWED);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSizeExceeded(
+            MaxUploadSizeExceededException exception
+    ) {
+        return createErrorResponse(ErrorCode.IMAGE_TOO_LARGE);
     }
 
     @ExceptionHandler(Exception.class)

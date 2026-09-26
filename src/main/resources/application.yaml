@@ -3,6 +3,10 @@ spring:
     name: lookddak
   profiles:
     default: local
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
   jpa:
     open-in-view: false
 
@@ -30,3 +34,9 @@ ai:
     max-pool-size: 10
     queue-capacity: 100
     await-termination: 60s
+
+aws:
+  s3:
+    bucket: ${AWS_S3_BUCKET}
+    region: ${AWS_REGION:ap-northeast-2}
+    presigned-url-expiration: 10m
