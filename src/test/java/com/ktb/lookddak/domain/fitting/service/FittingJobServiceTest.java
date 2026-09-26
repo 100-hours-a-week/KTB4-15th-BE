@@ -5,12 +5,14 @@ import com.ktb.lookddak.domain.fitting.dto.FittingJobCreateResponse;
 import com.ktb.lookddak.domain.fitting.entity.FittingJob;
 import com.ktb.lookddak.domain.fitting.entity.FittingJobProduct;
 import com.ktb.lookddak.domain.fitting.entity.FittingJobStatus;
+import com.ktb.lookddak.domain.fitting.event.FittingGenerationRequestedEvent;
 import com.ktb.lookddak.domain.fitting.repository.FittingCandidateRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingJobProductRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingJobRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingTempResultRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
+import com.ktb.lookddak.domain.member.repository.MemberProfileRepository;
 import com.ktb.lookddak.domain.product.entity.Product;
 import com.ktb.lookddak.domain.product.entity.ProductItemType;
 import com.ktb.lookddak.domain.product.repository.ProductRepository;
@@ -24,6 +26,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,6 +47,9 @@ class FittingJobServiceTest {
     private MemberRepository memberRepository;
 
     @Mock
+    private MemberProfileRepository memberProfileRepository;
+
+    @Mock
     private ProductRepository productRepository;
 
     @Mock
@@ -58,17 +64,22 @@ class FittingJobServiceTest {
     @Mock
     private FittingTempResultRepository fittingTempResultRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private FittingJobService fittingJobService;
 
     @BeforeEach
     void setUp() {
         fittingJobService = new FittingJobService(
                 memberRepository,
+                memberProfileRepository,
                 productRepository,
                 fittingCandidateRepository,
                 fittingJobRepository,
                 fittingJobProductRepository,
-                fittingTempResultRepository
+                fittingTempResultRepository,
+                eventPublisher
         );
     }
 
@@ -80,6 +91,8 @@ class FittingJobServiceTest {
         Product bottom = createProduct(20L, ProductItemType.BOTTOM);
         given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(member));
+        given(memberProfileRepository.existsByMemberId(1L))
+                .willReturn(true);
         given(fittingJobRepository.existsByMemberIdAndStatus(
                 1L,
                 FittingJobStatus.GENERATING
@@ -118,6 +131,13 @@ class FittingJobServiceTest {
         assertThat(savedProducts)
                 .extracting(jobProduct -> jobProduct.getProduct().getId())
                 .containsExactly(10L, 20L);
+
+        ArgumentCaptor<FittingGenerationRequestedEvent> eventCaptor =
+                ArgumentCaptor.forClass(
+                        FittingGenerationRequestedEvent.class
+                );
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getFittingJobId()).isEqualTo(100L);
     }
 
     @Test
@@ -127,6 +147,8 @@ class FittingJobServiceTest {
         Product top = createProduct(10L, ProductItemType.TOP);
         given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(member));
+        given(memberProfileRepository.existsByMemberId(1L))
+                .willReturn(true);
         given(fittingJobRepository.existsByMemberIdAndStatus(
                 1L,
                 FittingJobStatus.GENERATING
@@ -158,6 +180,8 @@ class FittingJobServiceTest {
     void rejectWhenJobIsGenerating() {
         given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(createMember(1L)));
+        given(memberProfileRepository.existsByMemberId(1L))
+                .willReturn(true);
         given(fittingJobRepository.existsByMemberIdAndStatus(
                 1L,
                 FittingJobStatus.GENERATING
@@ -180,6 +204,8 @@ class FittingJobServiceTest {
     void rejectEmptyProductSelection() {
         given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(createMember(1L)));
+        given(memberProfileRepository.existsByMemberId(1L))
+                .willReturn(true);
         given(fittingJobRepository.existsByMemberIdAndStatus(
                 1L,
                 FittingJobStatus.GENERATING
@@ -274,9 +300,31 @@ class FittingJobServiceTest {
                 .existsByMemberIdAndStatus(any(), any());
     }
 
+    @Test
+    @DisplayName("회원 프로필이 없으면 작업을 생성할 수 없다")
+    void rejectMissingMemberProfile() {
+        given(memberRepository.findActiveByIdForUpdate(1L))
+                .willReturn(Optional.of(createMember(1L)));
+        given(memberProfileRepository.existsByMemberId(1L))
+                .willReturn(false);
+
+        assertBusinessException(
+                () -> fittingJobService.createFittingJob(
+                        1L,
+                        new FittingJobCreateRequest(10L, null)
+                ),
+                ErrorCode.MEMBER_PROFILE_NOT_FOUND
+        );
+
+        verify(fittingJobRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
     private void givenReadyMember() {
         given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(createMember(1L)));
+        given(memberProfileRepository.existsByMemberId(1L))
+                .willReturn(true);
         given(fittingJobRepository.existsByMemberIdAndStatus(
                 1L,
                 FittingJobStatus.GENERATING

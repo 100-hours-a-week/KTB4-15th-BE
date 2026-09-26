@@ -11,6 +11,7 @@ import com.ktb.lookddak.domain.fitting.repository.FittingJobRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingTempResultRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
+import com.ktb.lookddak.domain.member.repository.MemberProfileRepository;
 import com.ktb.lookddak.domain.product.entity.Product;
 import com.ktb.lookddak.domain.product.entity.ProductItemType;
 import com.ktb.lookddak.domain.product.repository.ProductRepository;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -39,6 +41,9 @@ class FittingJobStatusServiceTest {
     private MemberRepository memberRepository;
 
     @Mock
+    private MemberProfileRepository memberProfileRepository;
+
+    @Mock
     private ProductRepository productRepository;
 
     @Mock
@@ -53,17 +58,22 @@ class FittingJobStatusServiceTest {
     @Mock
     private FittingTempResultRepository fittingTempResultRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private FittingJobService fittingJobService;
 
     @BeforeEach
     void setUp() {
         fittingJobService = new FittingJobService(
                 memberRepository,
+                memberProfileRepository,
                 productRepository,
                 fittingCandidateRepository,
                 fittingJobRepository,
                 fittingJobProductRepository,
-                fittingTempResultRepository
+                fittingTempResultRepository,
+                eventPublisher
         );
     }
 
