@@ -22,6 +22,7 @@ import com.ktb.lookddak.domain.product.entity.ProductItemType;
 import com.ktb.lookddak.domain.product.repository.ProductRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
+import com.ktb.lookddak.global.storage.s3.S3PresignedUrlProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.context.ApplicationEventPublisher;
@@ -47,6 +48,7 @@ public class FittingJobService {
     private final FittingJobProductRepository fittingJobProductRepository;
     private final FittingTempResultRepository fittingTempResultRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final S3PresignedUrlProvider presignedUrlProvider;
 
     @Transactional
     public FittingJobCreateResponse createFittingJob(
@@ -145,6 +147,9 @@ public class FittingJobService {
 
         FittingResultResponse resultResponse = FittingResultResponse.from(
                 tempResult,
+                presignedUrlProvider.createGetUrl(
+                        tempResult.getResultImageKey()
+                ),
                 productResponses
         );
         return FittingJobStatusResponse.from(fittingJob, resultResponse);

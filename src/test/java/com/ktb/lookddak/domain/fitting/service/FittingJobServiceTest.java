@@ -18,6 +18,7 @@ import com.ktb.lookddak.domain.product.entity.ProductItemType;
 import com.ktb.lookddak.domain.product.repository.ProductRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
+import com.ktb.lookddak.global.storage.s3.S3PresignedUrlProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -67,6 +68,9 @@ class FittingJobServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private S3PresignedUrlProvider presignedUrlProvider;
+
     private FittingJobService fittingJobService;
 
     @BeforeEach
@@ -79,7 +83,8 @@ class FittingJobServiceTest {
                 fittingJobRepository,
                 fittingJobProductRepository,
                 fittingTempResultRepository,
-                eventPublisher
+                eventPublisher,
+                presignedUrlProvider
         );
     }
 

@@ -34,10 +34,11 @@ public class FittingResultResponse {
 
     public static FittingResultResponse from(
             FittingTempResult result,
+            String resultImageUrl,
             List<FittingResultProductResponse> products
     ) {
         return new FittingResultResponse(
-                result.getResultImageUrl(),
+                resultImageUrl,
                 result.getOutfitName(),
                 result.getAiComment(),
                 products

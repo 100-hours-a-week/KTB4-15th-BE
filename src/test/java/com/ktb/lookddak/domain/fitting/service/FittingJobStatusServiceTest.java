@@ -17,6 +17,7 @@ import com.ktb.lookddak.domain.product.entity.ProductItemType;
 import com.ktb.lookddak.domain.product.repository.ProductRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
+import com.ktb.lookddak.global.storage.s3.S3PresignedUrlProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -61,6 +62,9 @@ class FittingJobStatusServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private S3PresignedUrlProvider presignedUrlProvider;
+
     private FittingJobService fittingJobService;
 
     @BeforeEach
@@ -73,7 +77,8 @@ class FittingJobStatusServiceTest {
                 fittingJobRepository,
                 fittingJobProductRepository,
                 fittingTempResultRepository,
-                eventPublisher
+                eventPublisher,
+                presignedUrlProvider
         );
     }
 
@@ -123,7 +128,7 @@ class FittingJobStatusServiceTest {
         fittingJob.completeGeneration();
         FittingTempResult result = FittingTempResult.create(
                 fittingJob,
-                "https://image.lookddak.com/fittings/result.jpg",
+                "fittings/result.jpg",
                 "가을 출근 니트 룩",
                 "선택한 상하의가 자연스럽게 어우러져 있어요."
         );
@@ -139,6 +144,10 @@ class FittingJobStatusServiceTest {
                         FittingJobProduct.create(fittingJob, top),
                         FittingJobProduct.create(fittingJob, bottom)
                 ));
+        given(presignedUrlProvider.createGetUrl("fittings/result.jpg"))
+                .willReturn(
+                        "https://image.lookddak.com/fittings/result.jpg"
+                );
 
         FittingJobStatusResponse response = fittingJobService
                 .getFittingJobStatus(1L, 100L);
@@ -209,7 +218,7 @@ class FittingJobStatusServiceTest {
         fittingJob.completeGeneration();
         FittingTempResult result = FittingTempResult.create(
                 fittingJob,
-                "https://image.lookddak.com/fittings/result.jpg",
+                "fittings/result.jpg",
                 "가을 출근 니트 룩",
                 "추천 설명"
         );
