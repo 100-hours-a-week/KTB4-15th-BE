@@ -26,4 +26,4 @@ ai:
 
 aws:
   s3:
-    bucket: ${AWS_S3_BUCKET:lookddak-local-images}
+    bucket: ${AWS_S3_BUCKET:lookddak-dev-images-686496667254-ap-northeast-2}
