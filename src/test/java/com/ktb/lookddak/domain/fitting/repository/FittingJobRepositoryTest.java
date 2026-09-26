@@ -160,8 +160,8 @@ class FittingJobRepositoryTest {
                 .orElseThrow();
 
         assertThat(result.getId()).isEqualTo(savedResult.getId());
-        assertThat(result.getResultImageUrl())
-                .isEqualTo("https://image.lookddak.com/fittings/result.jpg");
+        assertThat(result.getResultImageKey())
+                .isEqualTo("fittings/result.jpg");
         assertThat(result.getCreatedAt()).isNotNull();
     }
 
@@ -196,7 +196,7 @@ class FittingJobRepositoryTest {
     private FittingTempResult createTempResult(FittingJob fittingJob) {
         return FittingTempResult.create(
                 fittingJob,
-                "https://image.lookddak.com/fittings/result.jpg",
+                "fittings/result.jpg",
                 "가을 출근 니트 룩",
                 "선택한 상하의 조합이 자연스럽게 어우러져 있어요."
         );

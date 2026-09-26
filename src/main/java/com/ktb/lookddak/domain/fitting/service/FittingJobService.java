@@ -9,19 +9,23 @@ import com.ktb.lookddak.domain.fitting.entity.FittingJob;
 import com.ktb.lookddak.domain.fitting.entity.FittingJobProduct;
 import com.ktb.lookddak.domain.fitting.entity.FittingJobStatus;
 import com.ktb.lookddak.domain.fitting.entity.FittingTempResult;
+import com.ktb.lookddak.domain.fitting.event.FittingGenerationRequestedEvent;
 import com.ktb.lookddak.domain.fitting.repository.FittingCandidateRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingJobProductRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingJobRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingTempResultRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
+import com.ktb.lookddak.domain.member.repository.MemberProfileRepository;
 import com.ktb.lookddak.domain.product.entity.Product;
 import com.ktb.lookddak.domain.product.entity.ProductItemType;
 import com.ktb.lookddak.domain.product.repository.ProductRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
+import com.ktb.lookddak.global.storage.s3.S3PresignedUrlProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
@@ -37,11 +41,14 @@ import java.util.Set;
 public class FittingJobService {
 
     private final MemberRepository memberRepository;
+    private final MemberProfileRepository memberProfileRepository;
     private final ProductRepository productRepository;
     private final FittingCandidateRepository fittingCandidateRepository;
     private final FittingJobRepository fittingJobRepository;
     private final FittingJobProductRepository fittingJobProductRepository;
     private final FittingTempResultRepository fittingTempResultRepository;
+    private final ApplicationEventPublisher eventPublisher;
+    private final S3PresignedUrlProvider presignedUrlProvider;
 
     @Transactional
     public FittingJobCreateResponse createFittingJob(
@@ -53,6 +60,12 @@ public class FittingJobService {
                 .orElseThrow(() ->
                         new BusinessException(ErrorCode.RESOURCE_NOT_FOUND)
                 );
+
+        if (!memberProfileRepository.existsByMemberId(memberId)) {
+            throw new BusinessException(
+                    ErrorCode.MEMBER_PROFILE_NOT_FOUND
+            );
+        }
 
         if (fittingJobRepository.existsByMemberIdAndStatus(
                 memberId,
@@ -82,6 +95,9 @@ public class FittingJobService {
             ));
         }
         fittingJobProductRepository.saveAll(jobProducts);
+        eventPublisher.publishEvent(new FittingGenerationRequestedEvent(
+                fittingJob.getId()
+        ));
 
         return FittingJobCreateResponse.from(fittingJob);
     }
@@ -131,6 +147,9 @@ public class FittingJobService {
 
         FittingResultResponse resultResponse = FittingResultResponse.from(
                 tempResult,
+                presignedUrlProvider.createGetUrl(
+                        tempResult.getResultImageKey()
+                ),
                 productResponses
         );
         return FittingJobStatusResponse.from(fittingJob, resultResponse);

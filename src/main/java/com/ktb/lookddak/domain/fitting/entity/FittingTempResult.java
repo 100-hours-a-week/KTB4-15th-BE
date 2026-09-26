@@ -35,8 +35,8 @@ public class FittingTempResult extends BaseEntity {
     @JoinColumn(name = "fitting_job_id", nullable = false, unique = true)
     private FittingJob fittingJob;
 
-    @Column(name = "result_image_url", nullable = false, length = 2048)
-    private String resultImageUrl;
+    @Column(name = "result_image_key", nullable = false, length = 2048)
+    private String resultImageKey;
 
     @Column(name = "outfit_name", nullable = false, length = 100)
     private String outfitName;
@@ -46,25 +46,25 @@ public class FittingTempResult extends BaseEntity {
 
     private FittingTempResult(
             FittingJob fittingJob,
-            String resultImageUrl,
+            String resultImageKey,
             String outfitName,
             String aiComment
     ) {
         this.fittingJob = fittingJob;
-        this.resultImageUrl = resultImageUrl;
+        this.resultImageKey = resultImageKey;
         this.outfitName = outfitName;
         this.aiComment = aiComment;
     }
 
     public static FittingTempResult create(
             FittingJob fittingJob,
-            String resultImageUrl,
+            String resultImageKey,
             String outfitName,
             String aiComment
     ) {
         return new FittingTempResult(
                 fittingJob,
-                resultImageUrl,
+                resultImageKey,
                 outfitName,
                 aiComment
         );

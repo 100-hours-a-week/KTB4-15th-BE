@@ -70,6 +70,7 @@ class FittingJobResponseTest {
         products.add(productResponse);
         FittingResultResponse resultResponse = FittingResultResponse.from(
                 tempResult,
+                "https://image.lookddak.com/fittings/123.jpg",
                 products
         );
         products.clear();
@@ -102,6 +103,7 @@ class FittingJobResponseTest {
                         "가을 출근 니트 룩",
                         "자연스러운 조합이에요."
                 ),
+                "https://image.lookddak.com/fittings/123.jpg",
                 List.of(FittingResultProductResponse.from(createProduct(1L)))
         );
         FittingJobStatusResponse response =
