@@ -1,5 +1,6 @@
 package com.ktb.lookddak.global.exception;
 
+import com.ktb.lookddak.domain.image.exception.BodyImageValidationException;
 import com.ktb.lookddak.global.response.ApiResponse;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +23,33 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException exception) {
         ErrorCode errorCode = exception.getErrorCode();
+
         return createErrorResponse(errorCode);
+    }
+
+    @ExceptionHandler(BodyImageValidationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBodyImageValidation(
+            BodyImageValidationException exception
+    ) {
+        return ResponseEntity
+                .badRequest()
+                .body(ApiResponse.failure(
+                        exception.getCode(),
+                        exception.getMessage()
+                ));
+    }
+
+    @ExceptionHandler(ExternalApiException.class)
+    public ResponseEntity<ApiResponse<Void>> handleExternalApiException(
+            ExternalApiException exception
+    ) {
+        log.error(
+                "External API call failed: {}",
+                exception.getErrorCode(),
+                exception
+        );
+
+        return createErrorResponse(exception.getErrorCode());
     }
 
     @ExceptionHandler({
