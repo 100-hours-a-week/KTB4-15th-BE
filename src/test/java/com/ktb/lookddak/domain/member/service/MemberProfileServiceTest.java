@@ -11,6 +11,7 @@ import com.ktb.lookddak.domain.member.repository.MemberProfileRepository;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
+import com.ktb.lookddak.global.storage.s3.S3PresignedUrlProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,9 @@ class MemberProfileServiceTest {
     @Mock
     private FullBodyImageValidationRepository validationRepository;
 
+    @Mock
+    private S3PresignedUrlProvider presignedUrlProvider;
+
     private MemberProfileService memberProfileService;
 
     @BeforeEach
@@ -49,7 +53,8 @@ class MemberProfileServiceTest {
         memberProfileService = new MemberProfileService(
                 memberRepository,
                 memberProfileRepository,
-                validationRepository
+                validationRepository,
+                presignedUrlProvider
         );
     }
 
@@ -91,8 +96,6 @@ class MemberProfileServiceTest {
         assertThat(member.isPriceAlertEnabled()).isTrue();
         verify(validationRepository).delete(validation);
         assertThat(response.getProfileId()).isEqualTo(10L);
-        assertThat(response.getFullBodyImageKey())
-                .isEqualTo("full-body/validation/1/test.png");
     }
 
     @Test
@@ -152,6 +155,9 @@ class MemberProfileServiceTest {
         MemberProfile profile = createProfile(member);
         given(memberProfileRepository.findActiveByMemberIdWithMember(1L))
                 .willReturn(Optional.of(profile));
+        given(presignedUrlProvider.createGetUrl(
+                "full-body/validation/1/test.png"
+        )).willReturn("https://presigned.example.com/full-body.png");
 
         MemberProfileGetResponse response = memberProfileService.getProfile(1L);
 
@@ -160,9 +166,12 @@ class MemberProfileServiceTest {
         assertThat(response.getAge()).isEqualTo(29);
         assertThat(response.getHeight()).isEqualByComparingTo("175.5");
         assertThat(response.getWeight()).isEqualByComparingTo("70.3");
-        assertThat(response.getFullBodyImageKey())
-                .isEqualTo("full-body/validation/1/test.png");
+        assertThat(response.getFullBodyImageUrl())
+                .isEqualTo("https://presigned.example.com/full-body.png");
         assertThat(response.isPriceAlertEnabled()).isTrue();
+        verify(presignedUrlProvider).createGetUrl(
+                "full-body/validation/1/test.png"
+        );
     }
 
     @Test

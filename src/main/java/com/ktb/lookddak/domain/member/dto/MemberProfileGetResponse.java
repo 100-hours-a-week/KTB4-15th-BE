@@ -14,7 +14,7 @@ import java.math.BigDecimal;
         "age",
         "height",
         "weight",
-        "fullBodyImageKey",
+        "fullBodyImageUrl",
         "priceAlertEnabled"
 })
 public class MemberProfileGetResponse {
@@ -24,7 +24,7 @@ public class MemberProfileGetResponse {
     private final Integer age;
     private final BigDecimal height;
     private final BigDecimal weight;
-    private final String fullBodyImageKey;
+    private final String fullBodyImageUrl;
     private final boolean priceAlertEnabled;
 
     private MemberProfileGetResponse(
@@ -33,7 +33,7 @@ public class MemberProfileGetResponse {
             Integer age,
             BigDecimal height,
             BigDecimal weight,
-            String fullBodyImageKey,
+            String fullBodyImageUrl,
             boolean priceAlertEnabled
     ) {
         this.email = email;
@@ -41,11 +41,14 @@ public class MemberProfileGetResponse {
         this.age = age;
         this.height = height;
         this.weight = weight;
-        this.fullBodyImageKey = fullBodyImageKey;
+        this.fullBodyImageUrl = fullBodyImageUrl;
         this.priceAlertEnabled = priceAlertEnabled;
     }
 
-    public static MemberProfileGetResponse from(MemberProfile profile) {
+    public static MemberProfileGetResponse from(
+            MemberProfile profile,
+            String fullBodyImageUrl
+    ) {
         Member member = profile.getMember();
 
         return new MemberProfileGetResponse(
@@ -54,7 +57,7 @@ public class MemberProfileGetResponse {
                 profile.getAge(),
                 profile.getHeight(),
                 profile.getWeight(),
-                profile.getFullBodyImageKey(),
+                fullBodyImageUrl,
                 member.isPriceAlertEnabled()
         );
     }

@@ -20,15 +20,18 @@ class MemberProfileGetResponseTest {
         MemberProfile profile = createProfile();
 
         MemberProfileGetResponse response =
-                MemberProfileGetResponse.from(profile);
+                MemberProfileGetResponse.from(
+                        profile,
+                        "https://presigned.example.com/profile.jpg"
+                );
 
         assertThat(response.getEmail()).isEqualTo("test@lookddak.com");
         assertThat(response.getName()).isEqualTo("김민준");
         assertThat(response.getAge()).isEqualTo(29);
         assertThat(response.getHeight()).isEqualByComparingTo("175.0");
         assertThat(response.getWeight()).isEqualByComparingTo("70.0");
-        assertThat(response.getFullBodyImageKey())
-                .isEqualTo("members/1/full-body/profile.jpg");
+        assertThat(response.getFullBodyImageUrl())
+                .isEqualTo("https://presigned.example.com/profile.jpg");
         assertThat(response.isPriceAlertEnabled()).isTrue();
     }
 
@@ -36,7 +39,10 @@ class MemberProfileGetResponseTest {
     @DisplayName("회원 기본정보를 API 명세의 필드 순서로 직렬화한다")
     void serializeResponseInSpecifiedOrder() throws Exception {
         MemberProfileGetResponse response =
-                MemberProfileGetResponse.from(createProfile());
+                MemberProfileGetResponse.from(
+                        createProfile(),
+                        "https://presigned.example.com/profile.jpg"
+                );
         ObjectMapper objectMapper = JsonMapper.builder()
                 .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
                 .build();
@@ -49,10 +55,10 @@ class MemberProfileGetResponseTest {
                 "\"age\"",
                 "\"height\"",
                 "\"weight\"",
-                "\"fullBodyImageKey\"",
+                "\"fullBodyImageUrl\"",
                 "\"priceAlertEnabled\""
         );
-        assertThat(json).doesNotContain("fullBodyImageUrl");
+        assertThat(json).doesNotContain("fullBodyImageKey");
     }
 
     private MemberProfile createProfile() {

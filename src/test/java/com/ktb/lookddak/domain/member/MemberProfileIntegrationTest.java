@@ -92,7 +92,7 @@ class MemberProfileIntegrationTest {
                 .andExpect(jsonPath("$.code").value("CREATED"))
                 .andExpect(jsonPath("$.data.profileId").isNumber())
                 .andExpect(jsonPath("$.data.fullBodyImageKey")
-                        .value("full-body/validation/integration-test.png"));
+                        .doesNotExist());
 
         entityManager.flush();
         entityManager.clear();

@@ -11,6 +11,7 @@ import com.ktb.lookddak.domain.member.repository.MemberProfileRepository;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
+import com.ktb.lookddak.global.storage.s3.S3PresignedUrlProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ public class MemberProfileService {
     private final MemberRepository memberRepository;
     private final MemberProfileRepository memberProfileRepository;
     private final FullBodyImageValidationRepository validationRepository;
+    private final S3PresignedUrlProvider presignedUrlProvider;
 
     @Transactional
     public MemberProfileCreateResponse createProfile(
@@ -58,10 +60,7 @@ public class MemberProfileService {
 
         validationRepository.delete(validation);
 
-        return new MemberProfileCreateResponse(
-                savedProfile.getId(),
-                savedProfile.getFullBodyImageKey()
-        );
+        return new MemberProfileCreateResponse(savedProfile.getId());
     }
 
     public MemberProfileGetResponse getProfile(Long memberId) {
@@ -71,6 +70,9 @@ public class MemberProfileService {
                         ErrorCode.MEMBER_PROFILE_NOT_FOUND
                 ));
 
-        return MemberProfileGetResponse.from(profile);
+        String fullBodyImageUrl = presignedUrlProvider.createGetUrl(
+                profile.getFullBodyImageKey()
+        );
+        return MemberProfileGetResponse.from(profile, fullBodyImageUrl);
     }
 }
