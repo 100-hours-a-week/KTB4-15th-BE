@@ -102,7 +102,7 @@ class ChatServiceTest {
                 "5만원대 캐주얼 니트 추천해줘",
                 ChatSourceType.WISHLIST
         );
-        given(memberRepository.findByIdAndDeletedAtIsNull(1L))
+        given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(member));
         given(chatRoomRepository.save(any(ChatRoom.class)))
                 .willAnswer(invocation -> {
@@ -169,13 +169,36 @@ class ChatServiceTest {
                 "옷을 추천해줘",
                 ChatSourceType.GENERAL
         );
-        given(memberRepository.findByIdAndDeletedAtIsNull(1L))
+        given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.empty());
 
         assertThatThrownBy(() -> chatService.createChatRoom(1L, request))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND)
+                );
+
+        verify(chatRoomRepository, never()).save(any(ChatRoom.class));
+        verify(chatMessageRepository, never()).save(any(ChatMessage.class));
+    }
+
+    @Test
+    @DisplayName("활성 채팅방이 100개이면 새 대화를 시작할 수 없다")
+    void rejectChatRoomLimit() {
+        ChatRoomCreateRequest request = new ChatRoomCreateRequest(
+                "옷을 추천해줘",
+                ChatSourceType.GENERAL
+        );
+        given(memberRepository.findActiveByIdForUpdate(1L))
+                .willReturn(Optional.of(createMember(1L)));
+        given(chatRoomRepository.countByMemberIdAndDeletedAtIsNull(1L))
+                .willReturn(100L);
+
+        assertThatThrownBy(() -> chatService.createChatRoom(1L, request))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(
+                                ErrorCode.CHAT_ROOM_LIMIT_EXCEEDED
+                        )
                 );
 
         verify(chatRoomRepository, never()).save(any(ChatRoom.class));
@@ -426,12 +449,15 @@ class ChatServiceTest {
         );
         given(chatRoomRepository.findFirstPage(eq(1L), any(Pageable.class)))
                 .willReturn(List.of(firstRoom, secondRoom, nextPageRoom));
+        given(chatRoomRepository.countByMemberIdAndDeletedAtIsNull(1L))
+                .willReturn(3L);
 
         ChatRoomListResponse response = chatService.getChatRooms(1L, null, 2);
 
         assertThat(response.getItems())
                 .extracting(item -> item.getChatRoomId())
                 .containsExactly(30L, 20L);
+        assertThat(response.getTotalCount()).isEqualTo(3L);
         assertThat(response.getNextCursor()).isEqualTo(20L);
         assertThat(response.isHasNext()).isTrue();
 
@@ -452,10 +478,13 @@ class ChatServiceTest {
         );
         given(chatRoomRepository.findFirstPage(eq(1L), any(Pageable.class)))
                 .willReturn(List.of(chatRoom));
+        given(chatRoomRepository.countByMemberIdAndDeletedAtIsNull(1L))
+                .willReturn(1L);
 
         ChatRoomListResponse response = chatService.getChatRooms(1L, null, 2);
 
         assertThat(response.getItems()).hasSize(1);
+        assertThat(response.getTotalCount()).isEqualTo(1L);
         assertThat(response.getNextCursor()).isNull();
         assertThat(response.isHasNext()).isFalse();
     }
@@ -469,6 +498,7 @@ class ChatServiceTest {
         ChatRoomListResponse response = chatService.getChatRooms(1L, null, null);
 
         assertThat(response.getItems()).isEmpty();
+        assertThat(response.getTotalCount()).isZero();
         assertThat(response.getNextCursor()).isNull();
         assertThat(response.isHasNext()).isFalse();
 
@@ -491,6 +521,8 @@ class ChatServiceTest {
         );
         given(chatRoomRepository.findActiveCursor(1L, 25L))
                 .willReturn(Optional.of(cursorRoom));
+        given(chatRoomRepository.countByMemberIdAndDeletedAtIsNull(1L))
+                .willReturn(2L);
         given(chatRoomRepository.findNextPage(
                 eq(1L),
                 eq(cursorTime),
@@ -503,6 +535,7 @@ class ChatServiceTest {
         assertThat(response.getItems())
                 .extracting(item -> item.getChatRoomId())
                 .containsExactly(18L);
+        assertThat(response.getTotalCount()).isEqualTo(2L);
         assertThat(response.getNextCursor()).isNull();
         assertThat(response.isHasNext()).isFalse();
     }

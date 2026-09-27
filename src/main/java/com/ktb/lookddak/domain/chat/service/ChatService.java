@@ -55,6 +55,7 @@ public class ChatService {
     private static final int MIN_PAGE_SIZE = 1;
     private static final int MAX_PAGE_SIZE = 100;
     private static final int AI_WISHLIST_PRODUCT_LIMIT = 10;
+    private static final long MAX_CHAT_ROOM_COUNT = 100L;
 
     private final MemberRepository memberRepository;
     private final ChatRoomRepository chatRoomRepository;
@@ -70,8 +71,14 @@ public class ChatService {
             Long memberId,
             ChatRoomCreateRequest request
     ) {
-        Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
+        Member member = memberRepository.findActiveByIdForUpdate(memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        long chatRoomCount = chatRoomRepository
+                .countByMemberIdAndDeletedAtIsNull(memberId);
+        if (chatRoomCount >= MAX_CHAT_ROOM_COUNT) {
+            throw new BusinessException(ErrorCode.CHAT_ROOM_LIMIT_EXCEEDED);
+        }
 
         LocalDateTime messageCreatedAt = LocalDateTime.now();
         ChatRoom chatRoom = ChatRoom.create(
@@ -212,6 +219,9 @@ public class ChatService {
         int pageSize = size == null ? DEFAULT_PAGE_SIZE : size;
         validatePagination(cursor, pageSize);
 
+        long totalCount = chatRoomRepository
+                .countByMemberIdAndDeletedAtIsNull(memberId);
+
         PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
         List<ChatRoom> chatRooms;
 
@@ -248,7 +258,12 @@ public class ChatService {
                 ? responseRooms.get(responseRooms.size() - 1).getId()
                 : null;
 
-        return new ChatRoomListResponse(items, nextCursor, hasNext);
+        return new ChatRoomListResponse(
+                totalCount,
+                items,
+                nextCursor,
+                hasNext
+        );
     }
 
     public ChatRoomDetailResponse getChatRoomDetail(

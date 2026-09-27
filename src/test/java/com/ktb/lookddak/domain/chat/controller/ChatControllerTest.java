@@ -98,6 +98,7 @@ class ChatControllerTest {
         );
         given(chatService.getChatRooms(1L, null, 20))
                 .willReturn(new ChatRoomListResponse(
+                        25L,
                         List.of(item),
                         25L,
                         true
@@ -106,6 +107,7 @@ class ChatControllerTest {
         mockMvc.perform(get("/api/v1/chat-rooms"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.totalCount").value(25))
                 .andExpect(jsonPath("$.data.items[0].chatRoomId").value(25))
                 .andExpect(jsonPath("$.data.items[0].title")
                         .value("가을 출근용 니트 추천"))
@@ -123,12 +125,18 @@ class ChatControllerTest {
     @DisplayName("Cursor와 조회 크기를 다음 채팅방 목록 조회에 사용한다")
     void getNextChatRoomPage() throws Exception {
         given(chatService.getChatRooms(1L, 25L, 10))
-                .willReturn(new ChatRoomListResponse(List.of(), null, false));
+                .willReturn(new ChatRoomListResponse(
+                        25L,
+                        List.of(),
+                        null,
+                        false
+                ));
 
         mockMvc.perform(get("/api/v1/chat-rooms")
                         .queryParam("cursor", "25")
                         .queryParam("size", "10"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalCount").value(25))
                 .andExpect(jsonPath("$.data.items").isArray())
                 .andExpect(jsonPath("$.data.items").isEmpty())
                 .andExpect(jsonPath("$.data.nextCursor").isEmpty())

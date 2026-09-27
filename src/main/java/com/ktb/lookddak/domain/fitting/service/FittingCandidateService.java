@@ -31,7 +31,7 @@ import java.util.Set;
 @Transactional(readOnly = true)
 public class FittingCandidateService {
 
-    private static final long MAX_CANDIDATE_COUNT = 1_000L;
+    private static final long MAX_CANDIDATE_COUNT = 300L;
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MIN_PAGE_SIZE = 1;
     private static final int MAX_PAGE_SIZE = 100;

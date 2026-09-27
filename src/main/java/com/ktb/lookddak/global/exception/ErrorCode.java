@@ -41,6 +41,7 @@ public enum ErrorCode {
     // Chat errors
     CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "채팅방을 찾을 수 없습니다."),
     CHAT_ROOM_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 채팅방에 접근할 권한이 없습니다."),
+    CHAT_ROOM_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "채팅방은 최대 100개까지 생성할 수 있습니다."),
     CHAT_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "채팅 메시지를 찾을 수 없습니다."),
     AI_RESPONSE_GENERATING(HttpStatus.CONFLICT, "AI 응답을 생성 중입니다."),
 
@@ -54,7 +55,7 @@ public enum ErrorCode {
 
     // Fitting candidate errors
     FITTING_CANDIDATE_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 피팅 후보에 추가된 상품입니다."),
-    FITTING_CANDIDATE_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "피팅 후보 상품은 최대 1,000개까지 추가할 수 있습니다."),
+    FITTING_CANDIDATE_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "피팅 후보 상품은 최대 300개까지 추가할 수 있습니다."),
     FITTING_CANDIDATE_NOT_FOUND(HttpStatus.NOT_FOUND, "피팅 후보를 찾을 수 없습니다."),
     FITTING_CANDIDATE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 피팅 후보에 접근할 권한이 없습니다."),
 

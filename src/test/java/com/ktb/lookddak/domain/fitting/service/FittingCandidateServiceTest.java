@@ -62,8 +62,8 @@ class FittingCandidateServiceTest {
     }
 
     @Test
-    @DisplayName("피팅 후보가 999개이면 상품을 추가할 수 있다")
-    void createFittingCandidateAt999() {
+    @DisplayName("피팅 후보가 299개이면 상품을 추가할 수 있다")
+    void createFittingCandidateAt299() {
         Member member = createMember(1L);
         Product product = createProduct(10L);
         given(memberRepository.findActiveByIdForUpdate(1L))
@@ -71,7 +71,7 @@ class FittingCandidateServiceTest {
         given(productRepository.findById(10L)).willReturn(Optional.of(product));
         given(fittingCandidateRepository.existsByMemberIdAndProductId(1L, 10L))
                 .willReturn(false);
-        given(fittingCandidateRepository.countByMemberId(1L)).willReturn(999L);
+        given(fittingCandidateRepository.countByMemberId(1L)).willReturn(299L);
         given(fittingCandidateRepository.saveAndFlush(any(FittingCandidate.class)))
                 .willAnswer(invocation -> {
                     FittingCandidate candidate = invocation.getArgument(0);
@@ -90,7 +90,7 @@ class FittingCandidateServiceTest {
     }
 
     @Test
-    @DisplayName("피팅 후보가 1000개이면 상품을 추가할 수 없다")
+    @DisplayName("피팅 후보가 300개이면 상품을 추가할 수 없다")
     void rejectCandidateLimit() {
         Member member = createMember(1L);
         Product product = createProduct(10L);
@@ -99,7 +99,7 @@ class FittingCandidateServiceTest {
         given(productRepository.findById(10L)).willReturn(Optional.of(product));
         given(fittingCandidateRepository.existsByMemberIdAndProductId(1L, 10L))
                 .willReturn(false);
-        given(fittingCandidateRepository.countByMemberId(1L)).willReturn(1_000L);
+        given(fittingCandidateRepository.countByMemberId(1L)).willReturn(300L);
 
         assertThatThrownBy(() -> fittingCandidateService.createFittingCandidate(
                 1L,
@@ -114,7 +114,7 @@ class FittingCandidateServiceTest {
     }
 
     @Test
-    @DisplayName("1000개를 보유해도 중복 상품 오류를 먼저 반환한다")
+    @DisplayName("300개를 보유해도 중복 상품 오류를 먼저 반환한다")
     void rejectDuplicateBeforeLimit() {
         Member member = createMember(1L);
         Product product = createProduct(10L);
