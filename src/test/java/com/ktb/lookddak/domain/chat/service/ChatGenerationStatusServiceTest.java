@@ -206,10 +206,10 @@ class ChatGenerationStatusServiceTest {
                 Set.of(201L)
         )).willReturn(Set.of(201L));
         given(fittingCandidateRepository
-                .findProductIdsByMemberIdAndProductIdIn(
+                .findAllByMemberIdAndProductIdIn(
                         1L,
                         Set.of(201L)
-                )).willReturn(Set.of());
+                )).willReturn(List.of());
 
         ChatGenerationStatusResponse response =
                 chatService.getGenerationStatus(1L, 123L, 101L);
@@ -228,6 +228,7 @@ class ChatGenerationStatusServiceTest {
                             .isEqualTo("추천 당시 이유");
                     assertThat(productResponse.isWishlisted()).isTrue();
                     assertThat(productResponse.isFittingCandidate()).isFalse();
+                    assertThat(productResponse.getFittingCandidateId()).isNull();
                 });
     }
 

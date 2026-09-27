@@ -41,7 +41,7 @@ class ChatRoomDetailResponseTest {
                 RecommendedProductResponse.from(
                         recommendationProduct,
                         true,
-                        false
+                        25L
                 );
 
         assertThat(response.getProductId()).isEqualTo(201L);
@@ -56,7 +56,8 @@ class ChatRoomDetailResponseTest {
         assertThat(response.getRecommendedReason())
                 .isEqualTo("추천 당시 이유");
         assertThat(response.isWishlisted()).isTrue();
-        assertThat(response.isFittingCandidate()).isFalse();
+        assertThat(response.isFittingCandidate()).isTrue();
+        assertThat(response.getFittingCandidateId()).isEqualTo(25L);
     }
 
     @Test
@@ -86,7 +87,7 @@ class ChatRoomDetailResponseTest {
                                         "추천 당시 이유"
                                 ),
                                 true,
-                                false
+                                null
                         ))
                 );
 
@@ -155,7 +156,7 @@ class ChatRoomDetailResponseTest {
                                         "추천 당시 이유"
                                 ),
                                 true,
-                                false
+                                null
                         ))
                 );
         ChatMessageDetailResponse messageResponse =
@@ -202,7 +203,8 @@ class ChatRoomDetailResponseTest {
                 "\"purchaseUrl\"",
                 "\"recommendedReason\"",
                 "\"isWishlisted\"",
-                "\"isFittingCandidate\""
+                "\"isFittingCandidate\"",
+                "\"fittingCandidateId\""
         );
     }
 
