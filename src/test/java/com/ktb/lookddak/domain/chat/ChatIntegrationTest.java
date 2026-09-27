@@ -120,6 +120,7 @@ class ChatIntegrationTest {
                 .andExpect(jsonPath("$.code").value("CREATED"))
                 .andExpect(jsonPath("$.data.chatRoomId").isNumber())
                 .andExpect(jsonPath("$.data.messageId").isNumber())
+                .andExpect(jsonPath("$.data.createdAt").isNotEmpty())
                 .andReturn();
 
         String responseBody = createRoomResult.getResponse().getContentAsString();
@@ -174,7 +175,8 @@ class ChatIntegrationTest {
                 .andExpect(jsonPath("$.code").value("CREATED"))
                 .andExpect(jsonPath("$.data.chatRoomId").value(chatRoomId))
                 .andExpect(jsonPath("$.data.messageId").isNumber())
-                .andExpect(jsonPath("$.data.content").value("검은색으로 추천해줘"));
+                .andExpect(jsonPath("$.data.content").value("검은색으로 추천해줘"))
+                .andExpect(jsonPath("$.data.createdAt").isNotEmpty());
 
         assertThat(chatMessageRepository
                 .existsByChatRoomIdAndSenderTypeAndGenerationStatus(
@@ -330,6 +332,7 @@ class ChatIntegrationTest {
                         .queryParam("size", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.totalCount").value(3))
                 .andExpect(jsonPath("$.data.items.length()").value(2))
                 .andExpect(jsonPath("$.data.items[0].chatRoomId")
                         .value(sameTimeHigherIdRoom.getId()))
@@ -347,6 +350,7 @@ class ChatIntegrationTest {
                         )
                         .queryParam("size", "2"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalCount").value(3))
                 .andExpect(jsonPath("$.data.items.length()").value(1))
                 .andExpect(jsonPath("$.data.items[0].chatRoomId")
                         .value(olderRoom.getId()))
@@ -419,10 +423,20 @@ class ChatIntegrationTest {
                 "https://example.com/products/denim"
         );
         recommendationProductRepository.saveAndFlush(
-                RecommendationProduct.create(recommendation, firstProduct)
+                RecommendationProduct.create(
+                        recommendation,
+                        firstProduct,
+                        45_000,
+                        "검정 니트가 요청한 조건에 잘 어울립니다."
+                )
         );
         recommendationProductRepository.saveAndFlush(
-                RecommendationProduct.create(recommendation, secondProduct)
+                RecommendationProduct.create(
+                        recommendation,
+                        secondProduct,
+                        55_000,
+                        "편안한 실루엣의 데님입니다."
+                )
         );
         wishlistRepository.saveAndFlush(Wishlist.create(member, firstProduct));
         fittingCandidateRepository.saveAndFlush(
@@ -459,7 +473,9 @@ class ChatIntegrationTest {
                 .andExpect(jsonPath("$.data.messages[1].recommendation.products[0].productName")
                         .value("에센셜 검정 니트"))
                 .andExpect(jsonPath("$.data.messages[1].recommendation.products[0].currentPrice")
-                        .value(49000))
+                        .value(45000))
+                .andExpect(jsonPath("$.data.messages[1].recommendation.products[0].recommendedReason")
+                        .value("검정 니트가 요청한 조건에 잘 어울립니다."))
                 .andExpect(jsonPath("$.data.messages[1].recommendation.products[0].itemType")
                         .value("TOP"))
                 .andExpect(jsonPath("$.data.messages[1].recommendation.products[0].isWishlisted")
@@ -608,6 +624,7 @@ class ChatIntegrationTest {
             String purchaseUrl
     ) {
         return productRepository.saveAndFlush(Product.create(
+                "code-" + name,
                 name,
                 imageUrl,
                 currentPrice,

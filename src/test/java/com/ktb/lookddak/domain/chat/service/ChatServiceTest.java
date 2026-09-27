@@ -13,6 +13,7 @@ import com.ktb.lookddak.domain.chat.entity.ChatMessageType;
 import com.ktb.lookddak.domain.chat.entity.ChatRoom;
 import com.ktb.lookddak.domain.chat.entity.ChatSenderType;
 import com.ktb.lookddak.domain.chat.entity.ChatSourceType;
+import com.ktb.lookddak.domain.chat.event.ChatGenerationRequestedEvent;
 import com.ktb.lookddak.domain.chat.repository.ChatMessageRepository;
 import com.ktb.lookddak.domain.chat.repository.ChatRoomRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingCandidateRepository;
@@ -31,6 +32,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -70,6 +72,9 @@ class ChatServiceTest {
     @Mock
     private FittingCandidateRepository fittingCandidateRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private ChatService chatService;
 
     @BeforeEach
@@ -81,7 +86,8 @@ class ChatServiceTest {
                 recommendationRepository,
                 recommendationProductRepository,
                 wishlistRepository,
-                fittingCandidateRepository
+                fittingCandidateRepository,
+                eventPublisher
         );
     }
 
@@ -89,11 +95,14 @@ class ChatServiceTest {
     @DisplayName("새 채팅방과 첫 사용자 메시지를 생성한다")
     void createChatRoom() {
         Member member = createMember(1L);
+        LocalDateTime createdAt = LocalDateTime.of(
+                2026, 9, 24, 16, 50
+        );
         ChatRoomCreateRequest request = new ChatRoomCreateRequest(
                 "5만원대 캐주얼 니트 추천해줘",
                 ChatSourceType.WISHLIST
         );
-        given(memberRepository.findByIdAndDeletedAtIsNull(1L))
+        given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(member));
         given(chatRoomRepository.save(any(ChatRoom.class)))
                 .willAnswer(invocation -> {
@@ -105,13 +114,23 @@ class ChatServiceTest {
                 .willAnswer(invocation -> {
                     ChatMessage message = invocation.getArgument(0);
                     ReflectionTestUtils.setField(message, "id", 100L);
+                    ReflectionTestUtils.setField(
+                            message,
+                            "createdAt",
+                            createdAt
+                    );
                     return message;
                 });
+        given(wishlistRepository.findRecentProductCodesByMemberId(
+                eq(1L),
+                any(Pageable.class)
+        )).willReturn(List.of("product-10", "product-9"));
 
         ChatRoomCreateResponse response = chatService.createChatRoom(1L, request);
 
         assertThat(response.getChatRoomId()).isEqualTo(10L);
         assertThat(response.getMessageId()).isEqualTo(100L);
+        assertThat(response.getCreatedAt()).isEqualTo(createdAt);
 
         ArgumentCaptor<ChatRoom> chatRoomCaptor = ArgumentCaptor.forClass(ChatRoom.class);
         verify(chatRoomRepository).save(chatRoomCaptor.capture());
@@ -129,6 +148,18 @@ class ChatServiceTest {
         assertThat(savedMessage.getGenerationStatus())
                 .isEqualTo(ChatGenerationStatus.GENERATING);
         assertThat(savedMessage.getContent()).isEqualTo(request.getContent());
+
+        ArgumentCaptor<ChatGenerationRequestedEvent> eventCaptor =
+                ArgumentCaptor.forClass(ChatGenerationRequestedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        ChatGenerationRequestedEvent event = eventCaptor.getValue();
+        assertThat(event.getMemberId()).isEqualTo(1L);
+        assertThat(event.getChatRoomId()).isEqualTo(10L);
+        assertThat(event.getUserMessageId()).isEqualTo(100L);
+        assertThat(event.getContent()).isEqualTo(request.getContent());
+        assertThat(event.getSourceType()).isEqualTo(ChatSourceType.WISHLIST);
+        assertThat(event.getProductIds())
+                .containsExactly("product-10", "product-9");
     }
 
     @Test
@@ -138,7 +169,7 @@ class ChatServiceTest {
                 "옷을 추천해줘",
                 ChatSourceType.GENERAL
         );
-        given(memberRepository.findByIdAndDeletedAtIsNull(1L))
+        given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.empty());
 
         assertThatThrownBy(() -> chatService.createChatRoom(1L, request))
@@ -152,9 +183,35 @@ class ChatServiceTest {
     }
 
     @Test
+    @DisplayName("활성 채팅방이 100개이면 새 대화를 시작할 수 없다")
+    void rejectChatRoomLimit() {
+        ChatRoomCreateRequest request = new ChatRoomCreateRequest(
+                "옷을 추천해줘",
+                ChatSourceType.GENERAL
+        );
+        given(memberRepository.findActiveByIdForUpdate(1L))
+                .willReturn(Optional.of(createMember(1L)));
+        given(chatRoomRepository.countByMemberIdAndDeletedAtIsNull(1L))
+                .willReturn(100L);
+
+        assertThatThrownBy(() -> chatService.createChatRoom(1L, request))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(
+                                ErrorCode.CHAT_ROOM_LIMIT_EXCEEDED
+                        )
+                );
+
+        verify(chatRoomRepository, never()).save(any(ChatRoom.class));
+        verify(chatMessageRepository, never()).save(any(ChatMessage.class));
+    }
+
+    @Test
     @DisplayName("기존 채팅방에 새로운 사용자 메시지를 저장한다")
     void createMessage() {
         Member member = createMember(1L);
+        LocalDateTime createdAt = LocalDateTime.of(
+                2026, 9, 24, 16, 55
+        );
         LocalDateTime initialLastMessageAt = LocalDateTime.now().minusMinutes(10);
         ChatRoom chatRoom = createChatRoom(10L, member, initialLastMessageAt);
         ChatMessageCreateRequest request = new ChatMessageCreateRequest("검은색으로 추천해줘");
@@ -171,6 +228,11 @@ class ChatServiceTest {
                 .willAnswer(invocation -> {
                     ChatMessage message = invocation.getArgument(0);
                     ReflectionTestUtils.setField(message, "id", 101L);
+                    ReflectionTestUtils.setField(
+                            message,
+                            "createdAt",
+                            createdAt
+                    );
                     return message;
                 });
 
@@ -179,6 +241,7 @@ class ChatServiceTest {
         assertThat(response.getChatRoomId()).isEqualTo(10L);
         assertThat(response.getMessageId()).isEqualTo(101L);
         assertThat(response.getContent()).isEqualTo("검은색으로 추천해줘");
+        assertThat(response.getCreatedAt()).isEqualTo(createdAt);
         assertThat(chatRoom.getLastMessageAt()).isAfter(initialLastMessageAt);
 
         ArgumentCaptor<ChatMessage> messageCaptor = ArgumentCaptor.forClass(ChatMessage.class);
@@ -188,6 +251,18 @@ class ChatServiceTest {
         assertThat(savedMessage.getMessageType()).isEqualTo(ChatMessageType.TEXT);
         assertThat(savedMessage.getGenerationStatus())
                 .isEqualTo(ChatGenerationStatus.GENERATING);
+
+        ArgumentCaptor<ChatGenerationRequestedEvent> eventCaptor =
+                ArgumentCaptor.forClass(ChatGenerationRequestedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        ChatGenerationRequestedEvent event = eventCaptor.getValue();
+        assertThat(event.getMemberId()).isEqualTo(1L);
+        assertThat(event.getChatRoomId()).isEqualTo(10L);
+        assertThat(event.getUserMessageId()).isEqualTo(101L);
+        assertThat(event.getContent()).isEqualTo(request.getContent());
+        assertThat(event.getSourceType()).isEqualTo(ChatSourceType.GENERAL);
+        assertThat(event.getProductIds()).isEmpty();
+        verifyNoInteractions(wishlistRepository);
     }
 
     @Test
@@ -374,12 +449,15 @@ class ChatServiceTest {
         );
         given(chatRoomRepository.findFirstPage(eq(1L), any(Pageable.class)))
                 .willReturn(List.of(firstRoom, secondRoom, nextPageRoom));
+        given(chatRoomRepository.countByMemberIdAndDeletedAtIsNull(1L))
+                .willReturn(3L);
 
         ChatRoomListResponse response = chatService.getChatRooms(1L, null, 2);
 
         assertThat(response.getItems())
                 .extracting(item -> item.getChatRoomId())
                 .containsExactly(30L, 20L);
+        assertThat(response.getTotalCount()).isEqualTo(3L);
         assertThat(response.getNextCursor()).isEqualTo(20L);
         assertThat(response.isHasNext()).isTrue();
 
@@ -400,10 +478,13 @@ class ChatServiceTest {
         );
         given(chatRoomRepository.findFirstPage(eq(1L), any(Pageable.class)))
                 .willReturn(List.of(chatRoom));
+        given(chatRoomRepository.countByMemberIdAndDeletedAtIsNull(1L))
+                .willReturn(1L);
 
         ChatRoomListResponse response = chatService.getChatRooms(1L, null, 2);
 
         assertThat(response.getItems()).hasSize(1);
+        assertThat(response.getTotalCount()).isEqualTo(1L);
         assertThat(response.getNextCursor()).isNull();
         assertThat(response.isHasNext()).isFalse();
     }
@@ -417,6 +498,7 @@ class ChatServiceTest {
         ChatRoomListResponse response = chatService.getChatRooms(1L, null, null);
 
         assertThat(response.getItems()).isEmpty();
+        assertThat(response.getTotalCount()).isZero();
         assertThat(response.getNextCursor()).isNull();
         assertThat(response.isHasNext()).isFalse();
 
@@ -439,6 +521,8 @@ class ChatServiceTest {
         );
         given(chatRoomRepository.findActiveCursor(1L, 25L))
                 .willReturn(Optional.of(cursorRoom));
+        given(chatRoomRepository.countByMemberIdAndDeletedAtIsNull(1L))
+                .willReturn(2L);
         given(chatRoomRepository.findNextPage(
                 eq(1L),
                 eq(cursorTime),
@@ -451,6 +535,7 @@ class ChatServiceTest {
         assertThat(response.getItems())
                 .extracting(item -> item.getChatRoomId())
                 .containsExactly(18L);
+        assertThat(response.getTotalCount()).isEqualTo(2L);
         assertThat(response.getNextCursor()).isNull();
         assertThat(response.isHasNext()).isFalse();
     }

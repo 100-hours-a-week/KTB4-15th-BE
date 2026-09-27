@@ -201,6 +201,7 @@ class WishlistServiceTest {
 
     private Product createProduct(Long id, Integer currentPrice) {
         Product product = Product.create(
+                "product-" + id,
                 "테스트 상품",
                 "https://image.lookddak.com/test.jpg",
                 currentPrice,

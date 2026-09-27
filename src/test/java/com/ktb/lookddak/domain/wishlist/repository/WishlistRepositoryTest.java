@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 
 import java.util.List;
 import java.util.Set;
@@ -109,6 +110,31 @@ class WishlistRepositoryTest {
     }
 
     @Test
+    @DisplayName("최근에 찜한 상품 코드를 최신순으로 제한하여 조회한다")
+    void findRecentProductCodes() {
+        Product secondProduct = productRepository.save(
+                createProduct("상품 2", 59_000)
+        );
+        Product thirdProduct = productRepository.save(
+                createProduct("상품 3", 69_000)
+        );
+        wishlistRepository.save(Wishlist.create(member, product));
+        wishlistRepository.save(Wishlist.create(member, secondProduct));
+        wishlistRepository.saveAndFlush(Wishlist.create(member, thirdProduct));
+
+        List<String> productCodes = wishlistRepository
+                .findRecentProductCodesByMemberId(
+                        member.getId(),
+                        PageRequest.of(0, 2)
+                );
+
+        assertThat(productCodes).containsExactly(
+                thirdProduct.getProductCode(),
+                secondProduct.getProductCode()
+        );
+    }
+
+    @Test
     @DisplayName("한 회원이 같은 상품을 중복으로 찜할 수 없다")
     void enforceUniqueMemberAndProduct() {
         wishlistRepository.saveAndFlush(Wishlist.create(member, product));
@@ -133,6 +159,7 @@ class WishlistRepositoryTest {
 
     private Product createProduct(String name, Integer currentPrice) {
         return Product.create(
+                "code-" + name,
                 name,
                 "https://image.lookddak.com/test.jpg",
                 currentPrice,

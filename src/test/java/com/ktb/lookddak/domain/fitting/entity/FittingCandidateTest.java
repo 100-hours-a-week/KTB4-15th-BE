@@ -17,6 +17,7 @@ class FittingCandidateTest {
         Member member = Member.create("member@lookddak.com", "encoded");
         ReflectionTestUtils.setField(member, "id", 1L);
         Product product = Product.create(
+                "0000001",
                 "테스트 상품",
                 "https://image.lookddak.com/test.jpg",
                 49_000,

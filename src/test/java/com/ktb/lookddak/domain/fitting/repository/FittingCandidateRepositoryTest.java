@@ -49,6 +49,7 @@ class FittingCandidateRepositoryTest {
                 "encoded-password"
         ));
         product = productRepository.save(Product.create(
+                "0000001",
                 "에센셜 램스울 크루넥",
                 "https://image.lookddak.com/products/1.jpg",
                 49_000,
@@ -70,6 +71,16 @@ class FittingCandidateRepositoryTest {
                 .isTrue();
         assertThat(fittingCandidateRepository.countByMemberId(member.getId()))
                 .isEqualTo(1L);
+        assertThat(fittingCandidateRepository
+                .countByMemberIdAndProductItemType(
+                        member.getId(),
+                        ProductItemType.TOP
+                )).isEqualTo(1L);
+        assertThat(fittingCandidateRepository
+                .countByMemberIdAndProductItemType(
+                        member.getId(),
+                        ProductItemType.BOTTOM
+                )).isZero();
     }
 
     @Test
@@ -103,6 +114,34 @@ class FittingCandidateRepositoryTest {
                 );
 
         assertThat(productIds).containsExactly(product.getId());
+    }
+
+    @Test
+    @DisplayName("여러 피팅 후보를 ID 오름차순으로 잠금 조회한다")
+    void findAllByIdInForUpdate() {
+        Member otherMember = memberRepository.save(Member.create(
+                "other-lock-fitting@lookddak.com",
+                "encoded-password"
+        ));
+        FittingCandidate first = saveCandidate(
+                member,
+                product
+        );
+        FittingCandidate second = saveCandidate(
+                otherMember,
+                createProduct("다른 회원 상품", 59_000)
+        );
+        flushAndClear();
+
+        List<FittingCandidate> candidates = fittingCandidateRepository
+                .findAllByIdInForUpdate(List.of(
+                        second.getId(),
+                        first.getId()
+                ));
+
+        assertThat(candidates)
+                .extracting(FittingCandidate::getId)
+                .containsExactly(first.getId(), second.getId());
     }
 
     @Test
@@ -292,6 +331,7 @@ class FittingCandidateRepositoryTest {
             ProductItemType itemType
     ) {
         return Product.create(
+                "code-" + name,
                 name,
                 "https://image.lookddak.com/test.jpg",
                 currentPrice,

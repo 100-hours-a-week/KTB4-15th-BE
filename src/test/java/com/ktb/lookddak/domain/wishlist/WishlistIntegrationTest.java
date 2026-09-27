@@ -60,6 +60,7 @@ class WishlistIntegrationTest {
                 passwordEncoder.encode(PASSWORD)
         ));
         product = productRepository.saveAndFlush(Product.create(
+                "0000001",
                 "에센셜 램스울 크루넥",
                 "https://image.lookddak.com/products/1.jpg",
                 49_000,

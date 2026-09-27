@@ -29,4 +29,18 @@ class ApiResponseTest {
         assertThat(response.getData()).isNull();
         assertThat(response.getMessage()).isEqualTo("입력값이 올바르지 않습니다.");
     }
+
+    @Test
+    @DisplayName("동적 오류 코드와 메시지로 실패 응답을 생성한다")
+    void createDynamicFailureResponse() {
+        ApiResponse<Void> response = ApiResponse.failure(
+                "FULL_BODY_NOT_VISIBLE",
+                "머리부터 발끝까지 모두 나오도록 촬영해주세요."
+        );
+
+        assertThat(response.getCode()).isEqualTo("FULL_BODY_NOT_VISIBLE");
+        assertThat(response.getData()).isNull();
+        assertThat(response.getMessage())
+                .isEqualTo("머리부터 발끝까지 모두 나오도록 촬영해주세요.");
+    }
 }

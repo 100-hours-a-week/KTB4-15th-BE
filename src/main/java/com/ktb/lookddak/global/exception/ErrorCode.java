@@ -30,9 +30,18 @@ public enum ErrorCode {
     MEMBER_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "회원 기본정보를 찾을 수 없습니다."),
     INVALID_FULL_BODY_IMAGE(HttpStatus.BAD_REQUEST, "사용할 수 없는 전신사진 검증 정보입니다."),
 
+    // Full body image validation request errors
+    IMAGE_EMPTY(HttpStatus.BAD_REQUEST, "이미지 파일을 첨부해주세요."),
+    IMAGE_FORMAT_UNSUPPORTED(HttpStatus.BAD_REQUEST, "JPG, JPEG 또는 PNG 이미지만 업로드해주세요."),
+    IMAGE_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE, "이미지 크기는 10MB 이하여야 합니다."),
+    BODY_IMAGE_VALIDATION_SYSTEM_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "전신사진 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."),
+    BODY_IMAGE_AI_SERVER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "전신사진 검증 서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요."),
+    BODY_IMAGE_VALIDATION_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "전신사진 검증 시간이 초과되었습니다. 다시 시도해주세요."),
+
     // Chat errors
     CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "채팅방을 찾을 수 없습니다."),
     CHAT_ROOM_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 채팅방에 접근할 권한이 없습니다."),
+    CHAT_ROOM_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "채팅방은 최대 100개까지 생성할 수 있습니다."),
     CHAT_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "채팅 메시지를 찾을 수 없습니다."),
     AI_RESPONSE_GENERATING(HttpStatus.CONFLICT, "AI 응답을 생성 중입니다."),
 
@@ -46,9 +55,17 @@ public enum ErrorCode {
 
     // Fitting candidate errors
     FITTING_CANDIDATE_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 피팅 후보에 추가된 상품입니다."),
-    FITTING_CANDIDATE_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "피팅 후보 상품은 최대 1,000개까지 추가할 수 있습니다."),
+    FITTING_CANDIDATE_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "피팅 후보 상품은 최대 300개까지 추가할 수 있습니다."),
     FITTING_CANDIDATE_NOT_FOUND(HttpStatus.NOT_FOUND, "피팅 후보를 찾을 수 없습니다."),
     FITTING_CANDIDATE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 피팅 후보에 접근할 권한이 없습니다."),
+
+    // Fitting job errors
+    FITTING_PRODUCT_REQUIRED(HttpStatus.BAD_REQUEST, "선택한 상품이 필요합니다."),
+    FITTING_PRODUCT_TYPE_MISMATCH(HttpStatus.BAD_REQUEST, "선택한 상품 종류가 올바르지 않습니다."),
+    FITTING_PRODUCT_NOT_CANDIDATE(HttpStatus.BAD_REQUEST, "피팅 후보에 등록된 상품만 사용할 수 있습니다."),
+    FITTING_JOB_ALREADY_GENERATING(HttpStatus.CONFLICT, "이미 생성 중인 가상피팅 작업이 있습니다."),
+    FITTING_JOB_NOT_FOUND(HttpStatus.NOT_FOUND, "가상피팅 작업을 찾을 수 없습니다."),
+    FITTING_JOB_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 가상피팅 작업에 접근할 권한이 없습니다."),
 
     // Server errors
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");

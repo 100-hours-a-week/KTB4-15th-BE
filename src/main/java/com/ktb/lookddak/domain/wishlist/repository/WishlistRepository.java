@@ -5,9 +5,11 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -16,6 +18,17 @@ public interface WishlistRepository extends JpaRepository<Wishlist, Long> {
     boolean existsByMemberIdAndProductId(Long memberId, Long productId);
 
     long countByMemberId(Long memberId);
+
+    @Query("""
+            select wishlist.product.productCode
+            from Wishlist wishlist
+            where wishlist.member.id = :memberId
+            order by wishlist.id desc
+            """)
+    List<String> findRecentProductCodesByMemberId(
+            @Param("memberId") Long memberId,
+            Pageable pageable
+    );
 
     @Query("""
             select wishlist.product.id

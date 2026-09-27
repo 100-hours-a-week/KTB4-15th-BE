@@ -2,6 +2,8 @@ package com.ktb.lookddak.domain.fitting.controller;
 
 import com.ktb.lookddak.domain.fitting.dto.FittingCandidateCreateRequest;
 import com.ktb.lookddak.domain.fitting.dto.FittingCandidateCreateResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingCandidateBulkDeleteRequest;
+import com.ktb.lookddak.domain.fitting.dto.FittingCandidateBulkDeleteResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingCandidateListResponse;
 import com.ktb.lookddak.domain.fitting.service.FittingCandidateService;
 import com.ktb.lookddak.domain.product.entity.ProductItemType;
@@ -82,5 +84,23 @@ public class FittingCandidateController {
         return ResponseEntity
                 .status(SuccessCode.OK.getStatus())
                 .body(ApiResponse.success(SuccessCode.OK, null));
+    }
+
+    @DeleteMapping
+    public ResponseEntity<ApiResponse<FittingCandidateBulkDeleteResponse>>
+            deleteFittingCandidates(
+                    @AuthenticationPrincipal MemberPrincipal principal,
+                    @Valid @RequestBody
+                    FittingCandidateBulkDeleteRequest request
+            ) {
+        FittingCandidateBulkDeleteResponse response =
+                fittingCandidateService.deleteFittingCandidates(
+                        principal.getMemberId(),
+                        request
+                );
+
+        return ResponseEntity
+                .status(SuccessCode.OK.getStatus())
+                .body(ApiResponse.success(SuccessCode.OK, response));
     }
 }

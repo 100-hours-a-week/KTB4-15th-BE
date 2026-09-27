@@ -33,4 +33,21 @@ class ErrorCodeTest {
         assertThat(response.getMessage())
                 .isEqualTo("회원 기본정보를 찾을 수 없습니다.");
     }
+
+    @Test
+    @DisplayName("가상피팅 작업 오류는 상황에 맞는 HTTP 상태로 변환된다")
+    void fittingJobErrors() {
+        assertThat(ErrorCode.FITTING_PRODUCT_REQUIRED.getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.FITTING_PRODUCT_TYPE_MISMATCH.getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.FITTING_PRODUCT_NOT_CANDIDATE.getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.FITTING_JOB_ALREADY_GENERATING.getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+        assertThat(ErrorCode.FITTING_JOB_NOT_FOUND.getStatus())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(ErrorCode.FITTING_JOB_ACCESS_DENIED.getStatus())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
 }

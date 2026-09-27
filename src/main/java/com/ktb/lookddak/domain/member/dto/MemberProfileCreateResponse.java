@@ -6,10 +6,8 @@ import lombok.Getter;
 public class MemberProfileCreateResponse {
 
     private final Long profileId;
-    private final String fullBodyImageKey;
 
-    public MemberProfileCreateResponse(Long profileId, String fullBodyImageKey) {
+    public MemberProfileCreateResponse(Long profileId) {
         this.profileId = profileId;
-        this.fullBodyImageKey = fullBodyImageKey;
     }
 }

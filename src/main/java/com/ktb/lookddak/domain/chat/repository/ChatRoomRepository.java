@@ -14,6 +14,8 @@ import java.util.Optional;
 
 public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
 
+    long countByMemberIdAndDeletedAtIsNull(Long memberId);
+
     @Query("""
             select chatRoom
             from ChatRoom chatRoom

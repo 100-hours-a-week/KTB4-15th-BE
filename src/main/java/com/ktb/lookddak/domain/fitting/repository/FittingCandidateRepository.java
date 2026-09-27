@@ -21,6 +21,11 @@ public interface FittingCandidateRepository
 
     long countByMemberId(Long memberId);
 
+    long countByMemberIdAndProductItemType(
+            Long memberId,
+            ProductItemType itemType
+    );
+
     @Query("""
             select candidate.product.id
             from FittingCandidate candidate
@@ -92,5 +97,16 @@ public interface FittingCandidateRepository
     @Query("select fc from FittingCandidate fc where fc.id = :candidateId")
     Optional<FittingCandidate> findByIdForUpdate(
             @Param("candidateId") Long candidateId
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select candidate
+            from FittingCandidate candidate
+            where candidate.id in :candidateIds
+            order by candidate.id asc
+            """)
+    List<FittingCandidate> findAllByIdInForUpdate(
+            @Param("candidateIds") Collection<Long> candidateIds
     );
 }

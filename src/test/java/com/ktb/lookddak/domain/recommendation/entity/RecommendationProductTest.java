@@ -16,10 +16,18 @@ class RecommendationProductTest {
         Product product = mock(Product.class);
 
         RecommendationProduct recommendationProduct =
-                RecommendationProduct.create(recommendation, product);
+                RecommendationProduct.create(
+                        recommendation,
+                        product,
+                        59_000,
+                        "추천 당시 이유"
+                );
 
         assertThat(recommendationProduct.getRecommendation())
                 .isSameAs(recommendation);
         assertThat(recommendationProduct.getProduct()).isSameAs(product);
+        assertThat(recommendationProduct.getPriceSnapshot()).isEqualTo(59_000);
+        assertThat(recommendationProduct.getRecommendedReason())
+                .isEqualTo("추천 당시 이유");
     }
 }

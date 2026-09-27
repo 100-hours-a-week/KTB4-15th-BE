@@ -36,12 +36,14 @@ class ChatRoomListResponseTest {
         );
 
         ChatRoomListResponse response = new ChatRoomListResponse(
+                25L,
                 List.of(item),
                 18L,
                 true
         );
 
         assertThat(response.getItems()).containsExactly(item);
+        assertThat(response.getTotalCount()).isEqualTo(25L);
         assertThat(response.getNextCursor()).isEqualTo(18L);
         assertThat(response.isHasNext()).isTrue();
     }
@@ -50,12 +52,14 @@ class ChatRoomListResponseTest {
     @DisplayName("조회 결과가 없으면 빈 목록과 null Cursor를 반환한다")
     void createEmptyResponse() {
         ChatRoomListResponse response = new ChatRoomListResponse(
+                0L,
                 List.of(),
                 null,
                 false
         );
 
         assertThat(response.getItems()).isEmpty();
+        assertThat(response.getTotalCount()).isZero();
         assertThat(response.getNextCursor()).isNull();
         assertThat(response.isHasNext()).isFalse();
     }
@@ -70,6 +74,7 @@ class ChatRoomListResponseTest {
         items.add(item);
 
         ChatRoomListResponse response = new ChatRoomListResponse(
+                1L,
                 items,
                 null,
                 false

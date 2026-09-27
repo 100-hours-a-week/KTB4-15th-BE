@@ -76,10 +76,7 @@ class MemberProfileControllerTest {
     @DisplayName("인증된 회원이 기본정보를 등록하면 201 Created를 반환한다")
     void createProfile() throws Exception {
         given(memberProfileService.createProfile(any(), any()))
-                .willReturn(new MemberProfileCreateResponse(
-                        10L,
-                        "full-body/validation/1/test.png"
-                ));
+                .willReturn(new MemberProfileCreateResponse(10L));
 
         mockMvc.perform(post("/api/v1/members/me/profile")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -88,7 +85,7 @@ class MemberProfileControllerTest {
                 .andExpect(jsonPath("$.code").value("CREATED"))
                 .andExpect(jsonPath("$.data.profileId").value(10))
                 .andExpect(jsonPath("$.data.fullBodyImageKey")
-                        .value("full-body/validation/1/test.png"))
+                        .doesNotExist())
                 .andExpect(jsonPath("$.message")
                         .value("리소스가 성공적으로 생성되었습니다."));
 
@@ -100,7 +97,8 @@ class MemberProfileControllerTest {
     void getProfile() throws Exception {
         given(memberProfileService.getProfile(1L))
                 .willReturn(MemberProfileGetResponse.from(
-                        createMemberProfile()
+                        createMemberProfile(),
+                        "https://presigned.example.com/full-body.png"
                 ));
 
         mockMvc.perform(get("/api/v1/members/me/profile"))
@@ -112,8 +110,10 @@ class MemberProfileControllerTest {
                 .andExpect(jsonPath("$.data.age").value(29))
                 .andExpect(jsonPath("$.data.height").value(175.5))
                 .andExpect(jsonPath("$.data.weight").value(70.3))
+                .andExpect(jsonPath("$.data.fullBodyImageUrl")
+                        .value("https://presigned.example.com/full-body.png"))
                 .andExpect(jsonPath("$.data.fullBodyImageKey")
-                        .value("full-body/validation/1/test.png"))
+                        .doesNotExist())
                 .andExpect(jsonPath("$.data.priceAlertEnabled").value(true))
                 .andExpect(jsonPath("$.message")
                         .value("요청이 성공적으로 처리되었습니다."));

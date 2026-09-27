@@ -27,6 +27,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -67,6 +68,9 @@ class ChatRoomDetailServiceTest {
     @Mock
     private FittingCandidateRepository fittingCandidateRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private ChatService chatService;
 
     @BeforeEach
@@ -78,7 +82,8 @@ class ChatRoomDetailServiceTest {
                 recommendationRepository,
                 recommendationProductRepository,
                 wishlistRepository,
-                fittingCandidateRepository
+                fittingCandidateRepository,
+                eventPublisher
         );
     }
 
@@ -115,9 +120,19 @@ class ChatRoomDetailServiceTest {
         Product firstProduct = createProduct(201L, "첫 번째 추천 상품");
         Product secondProduct = createProduct(202L, "두 번째 추천 상품");
         RecommendationProduct firstRecommendationProduct =
-                RecommendationProduct.create(recommendation, firstProduct);
+                RecommendationProduct.create(
+                        recommendation,
+                        firstProduct,
+                        49_000,
+                        "첫 번째 추천 이유"
+                );
         RecommendationProduct secondRecommendationProduct =
-                RecommendationProduct.create(recommendation, secondProduct);
+                RecommendationProduct.create(
+                        recommendation,
+                        secondProduct,
+                        69_000,
+                        "두 번째 추천 이유"
+                );
 
         given(chatRoomRepository.findActiveById(123L))
                 .willReturn(Optional.of(chatRoom));
@@ -336,6 +351,7 @@ class ChatRoomDetailServiceTest {
 
     private Product createProduct(Long id, String name) {
         Product product = Product.create(
+                "product-" + id,
                 name,
                 "https://image.lookddak.com/products/" + id + ".jpg",
                 59_000,

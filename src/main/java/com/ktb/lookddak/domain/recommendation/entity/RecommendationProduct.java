@@ -45,22 +45,39 @@ public class RecommendationProduct {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
+    @Column(name = "price_snapshot", nullable = false)
+    private Integer priceSnapshot;
+
+    @Column(name = "recommended_reason", nullable = false, columnDefinition = "TEXT")
+    private String recommendedReason;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     private RecommendationProduct(
             Recommendation recommendation,
-            Product product
+            Product product,
+            Integer priceSnapshot,
+            String recommendedReason
     ) {
         this.recommendation = recommendation;
         this.product = product;
+        this.priceSnapshot = priceSnapshot;
+        this.recommendedReason = recommendedReason;
     }
 
     public static RecommendationProduct create(
             Recommendation recommendation,
-            Product product
+            Product product,
+            Integer priceSnapshot,
+            String recommendedReason
     ) {
-        return new RecommendationProduct(recommendation, product);
+        return new RecommendationProduct(
+                recommendation,
+                product,
+                priceSnapshot,
+                recommendedReason
+        );
     }
 }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.ktb.lookddak.domain.product.entity.Product;
 import com.ktb.lookddak.domain.product.entity.ProductItemType;
+import com.ktb.lookddak.domain.recommendation.entity.RecommendationProduct;
 import lombok.Getter;
 
 @Getter
@@ -15,6 +16,7 @@ import lombok.Getter;
         "color",
         "itemType",
         "purchaseUrl",
+        "recommendedReason",
         "isWishlisted",
         "isFittingCandidate"
 })
@@ -27,6 +29,7 @@ public class RecommendedProductResponse {
     private final String color;
     private final ProductItemType itemType;
     private final String purchaseUrl;
+    private final String recommendedReason;
 
     @JsonProperty("isWishlisted")
     private final boolean wishlisted;
@@ -42,6 +45,7 @@ public class RecommendedProductResponse {
             String color,
             ProductItemType itemType,
             String purchaseUrl,
+            String recommendedReason,
             boolean wishlisted,
             boolean fittingCandidate
     ) {
@@ -52,23 +56,27 @@ public class RecommendedProductResponse {
         this.color = color;
         this.itemType = itemType;
         this.purchaseUrl = purchaseUrl;
+        this.recommendedReason = recommendedReason;
         this.wishlisted = wishlisted;
         this.fittingCandidate = fittingCandidate;
     }
 
     public static RecommendedProductResponse from(
-            Product product,
+            RecommendationProduct recommendationProduct,
             boolean wishlisted,
             boolean fittingCandidate
     ) {
+        Product product = recommendationProduct.getProduct();
+
         return new RecommendedProductResponse(
                 product.getId(),
                 product.getName(),
                 product.getImageUrl(),
-                product.getCurrentPrice(),
+                recommendationProduct.getPriceSnapshot(),
                 product.getColor(),
                 product.getItemType(),
                 product.getPurchaseUrl(),
+                recommendationProduct.getRecommendedReason(),
                 wishlisted,
                 fittingCandidate
         );

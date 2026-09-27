@@ -11,6 +11,7 @@ class ProductTest {
     @DisplayName("추천 카드에 필요한 정보로 상품을 생성한다")
     void createProduct() {
         Product product = Product.create(
+                "0000001",
                 "에센셜 램스울 크루넥",
                 "https://image.lookddak.com/products/1.jpg",
                 49_000,
@@ -19,6 +20,7 @@ class ProductTest {
                 "https://shop.lookddak.com/products/1"
         );
 
+        assertThat(product.getProductCode()).isEqualTo("0000001");
         assertThat(product.getName()).isEqualTo("에센셜 램스울 크루넥");
         assertThat(product.getImageUrl())
                 .isEqualTo("https://image.lookddak.com/products/1.jpg");

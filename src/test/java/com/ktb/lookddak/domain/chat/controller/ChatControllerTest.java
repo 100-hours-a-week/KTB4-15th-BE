@@ -19,6 +19,7 @@ import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.product.entity.Product;
 import com.ktb.lookddak.domain.product.entity.ProductItemType;
 import com.ktb.lookddak.domain.recommendation.entity.Recommendation;
+import com.ktb.lookddak.domain.recommendation.entity.RecommendationProduct;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import com.ktb.lookddak.global.exception.GlobalExceptionHandler;
@@ -97,6 +98,7 @@ class ChatControllerTest {
         );
         given(chatService.getChatRooms(1L, null, 20))
                 .willReturn(new ChatRoomListResponse(
+                        25L,
                         List.of(item),
                         25L,
                         true
@@ -105,6 +107,7 @@ class ChatControllerTest {
         mockMvc.perform(get("/api/v1/chat-rooms"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.totalCount").value(25))
                 .andExpect(jsonPath("$.data.items[0].chatRoomId").value(25))
                 .andExpect(jsonPath("$.data.items[0].title")
                         .value("가을 출근용 니트 추천"))
@@ -122,12 +125,18 @@ class ChatControllerTest {
     @DisplayName("Cursor와 조회 크기를 다음 채팅방 목록 조회에 사용한다")
     void getNextChatRoomPage() throws Exception {
         given(chatService.getChatRooms(1L, 25L, 10))
-                .willReturn(new ChatRoomListResponse(List.of(), null, false));
+                .willReturn(new ChatRoomListResponse(
+                        25L,
+                        List.of(),
+                        null,
+                        false
+                ));
 
         mockMvc.perform(get("/api/v1/chat-rooms")
                         .queryParam("cursor", "25")
                         .queryParam("size", "10"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalCount").value(25))
                 .andExpect(jsonPath("$.data.items").isArray())
                 .andExpect(jsonPath("$.data.items").isEmpty())
                 .andExpect(jsonPath("$.data.nextCursor").isEmpty())
@@ -191,7 +200,12 @@ class ChatControllerTest {
                 RecommendationResponse.from(
                         recommendation,
                         List.of(RecommendedProductResponse.from(
-                                product,
+                                RecommendationProduct.create(
+                                        recommendation,
+                                        product,
+                                        49_000,
+                                        "추천 당시 이유"
+                                ),
                                 true,
                                 false
                         ))
@@ -222,6 +236,10 @@ class ChatControllerTest {
                         .value(15))
                 .andExpect(jsonPath("$.data.messages[0].recommendation.products[0].productId")
                         .value(201))
+                .andExpect(jsonPath("$.data.messages[0].recommendation.products[0].currentPrice")
+                        .value(49000))
+                .andExpect(jsonPath("$.data.messages[0].recommendation.products[0].recommendedReason")
+                        .value("추천 당시 이유"))
                 .andExpect(jsonPath("$.data.messages[0].recommendation.products[0].isWishlisted")
                         .value(true))
                 .andExpect(jsonPath("$.data.messages[0].recommendation.products[0].isFittingCandidate")
@@ -360,7 +378,11 @@ class ChatControllerTest {
     @DisplayName("새 대화를 시작하면 201 Created를 반환한다")
     void createChatRoom() throws Exception {
         given(chatService.createChatRoom(any(), any()))
-                .willReturn(new ChatRoomCreateResponse(10L, 100L));
+                .willReturn(new ChatRoomCreateResponse(
+                        10L,
+                        100L,
+                        LocalDateTime.of(2026, 9, 24, 16, 50)
+                ));
 
         mockMvc.perform(post("/api/v1/chat-rooms")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -374,6 +396,8 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.code").value("CREATED"))
                 .andExpect(jsonPath("$.data.chatRoomId").value(10))
                 .andExpect(jsonPath("$.data.messageId").value(100))
+                .andExpect(jsonPath("$.data.createdAt")
+                        .value("2026-09-24T16:50:00"))
                 .andExpect(jsonPath("$.message")
                         .value("리소스가 성공적으로 생성되었습니다."));
 
@@ -387,7 +411,8 @@ class ChatControllerTest {
                 .willReturn(new ChatMessageCreateResponse(
                         10L,
                         101L,
-                        "검은색으로 추천해줘"
+                        "검은색으로 추천해줘",
+                        LocalDateTime.of(2026, 9, 24, 16, 55)
                 ));
 
         mockMvc.perform(post("/api/v1/chat-rooms/10/messages")
@@ -401,7 +426,9 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.code").value("CREATED"))
                 .andExpect(jsonPath("$.data.chatRoomId").value(10))
                 .andExpect(jsonPath("$.data.messageId").value(101))
-                .andExpect(jsonPath("$.data.content").value("검은색으로 추천해줘"));
+                .andExpect(jsonPath("$.data.content").value("검은색으로 추천해줘"))
+                .andExpect(jsonPath("$.data.createdAt")
+                        .value("2026-09-24T16:55:00"));
 
         verify(chatService).createMessage(eq(1L), eq(10L), any());
     }
@@ -581,6 +608,7 @@ class ChatControllerTest {
 
     private Product createProduct(Long productId) {
         Product product = Product.create(
+                "product-" + productId,
                 "에센셜 램스울 크루넥",
                 "https://image.lookddak.com/products/201.jpg",
                 59_000,

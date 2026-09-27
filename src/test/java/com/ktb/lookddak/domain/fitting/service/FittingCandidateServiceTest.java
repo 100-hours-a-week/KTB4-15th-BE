@@ -2,6 +2,8 @@ package com.ktb.lookddak.domain.fitting.service;
 
 import com.ktb.lookddak.domain.fitting.dto.FittingCandidateCreateRequest;
 import com.ktb.lookddak.domain.fitting.dto.FittingCandidateCreateResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingCandidateBulkDeleteRequest;
+import com.ktb.lookddak.domain.fitting.dto.FittingCandidateBulkDeleteResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingCandidateListResponse;
 import com.ktb.lookddak.domain.fitting.entity.FittingCandidate;
 import com.ktb.lookddak.domain.fitting.repository.FittingCandidateRepository;
@@ -24,6 +26,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -59,8 +62,8 @@ class FittingCandidateServiceTest {
     }
 
     @Test
-    @DisplayName("피팅 후보가 999개이면 상품을 추가할 수 있다")
-    void createFittingCandidateAt999() {
+    @DisplayName("피팅 후보가 299개이면 상품을 추가할 수 있다")
+    void createFittingCandidateAt299() {
         Member member = createMember(1L);
         Product product = createProduct(10L);
         given(memberRepository.findActiveByIdForUpdate(1L))
@@ -68,7 +71,7 @@ class FittingCandidateServiceTest {
         given(productRepository.findById(10L)).willReturn(Optional.of(product));
         given(fittingCandidateRepository.existsByMemberIdAndProductId(1L, 10L))
                 .willReturn(false);
-        given(fittingCandidateRepository.countByMemberId(1L)).willReturn(999L);
+        given(fittingCandidateRepository.countByMemberId(1L)).willReturn(299L);
         given(fittingCandidateRepository.saveAndFlush(any(FittingCandidate.class)))
                 .willAnswer(invocation -> {
                     FittingCandidate candidate = invocation.getArgument(0);
@@ -87,7 +90,7 @@ class FittingCandidateServiceTest {
     }
 
     @Test
-    @DisplayName("피팅 후보가 1000개이면 상품을 추가할 수 없다")
+    @DisplayName("피팅 후보가 300개이면 상품을 추가할 수 없다")
     void rejectCandidateLimit() {
         Member member = createMember(1L);
         Product product = createProduct(10L);
@@ -96,7 +99,7 @@ class FittingCandidateServiceTest {
         given(productRepository.findById(10L)).willReturn(Optional.of(product));
         given(fittingCandidateRepository.existsByMemberIdAndProductId(1L, 10L))
                 .willReturn(false);
-        given(fittingCandidateRepository.countByMemberId(1L)).willReturn(1_000L);
+        given(fittingCandidateRepository.countByMemberId(1L)).willReturn(300L);
 
         assertThatThrownBy(() -> fittingCandidateService.createFittingCandidate(
                 1L,
@@ -111,7 +114,7 @@ class FittingCandidateServiceTest {
     }
 
     @Test
-    @DisplayName("1000개를 보유해도 중복 상품 오류를 먼저 반환한다")
+    @DisplayName("300개를 보유해도 중복 상품 오류를 먼저 반환한다")
     void rejectDuplicateBeforeLimit() {
         Member member = createMember(1L);
         Product product = createProduct(10L);
@@ -219,6 +222,81 @@ class FittingCandidateServiceTest {
     }
 
     @Test
+    @DisplayName("본인의 피팅 후보 여러 개를 한 번에 하드 삭제한다")
+    void deleteFittingCandidates() {
+        Member member = createMember(1L);
+        FittingCandidate first = createCandidate(25L, member);
+        FittingCandidate second = createCandidate(26L, member);
+        given(fittingCandidateRepository.findAllByIdInForUpdate(
+                Set.of(25L, 26L)
+        )).willReturn(List.of(first, second));
+
+        FittingCandidateBulkDeleteResponse response =
+                fittingCandidateService.deleteFittingCandidates(
+                        1L,
+                        new FittingCandidateBulkDeleteRequest(
+                                List.of(25L, 26L, 25L)
+                        )
+                );
+
+        assertThat(response.getDeletedCount()).isEqualTo(2);
+        verify(fittingCandidateRepository)
+                .deleteAllInBatch(List.of(first, second));
+    }
+
+    @Test
+    @DisplayName("다건 삭제 대상 중 존재하지 않는 피팅 후보가 있으면 삭제하지 않는다")
+    void rejectBulkDeleteWithMissingCandidate() {
+        FittingCandidate candidate = createCandidate(
+                25L,
+                createMember(1L)
+        );
+        given(fittingCandidateRepository.findAllByIdInForUpdate(
+                Set.of(25L, 999L)
+        )).willReturn(List.of(candidate));
+
+        assertThatThrownBy(() ->
+                fittingCandidateService.deleteFittingCandidates(
+                        1L,
+                        new FittingCandidateBulkDeleteRequest(
+                                List.of(25L, 999L)
+                        )
+                )
+        ).isInstanceOfSatisfying(BusinessException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(
+                        ErrorCode.FITTING_CANDIDATE_NOT_FOUND
+                )
+        );
+
+        verify(fittingCandidateRepository, never()).deleteAllInBatch(any());
+    }
+
+    @Test
+    @DisplayName("다건 삭제 대상 중 다른 회원의 피팅 후보가 있으면 삭제하지 않는다")
+    void rejectBulkDeleteWithOtherMembersCandidate() {
+        FittingCandidate mine = createCandidate(25L, createMember(1L));
+        FittingCandidate others = createCandidate(26L, createMember(2L));
+        given(fittingCandidateRepository.findAllByIdInForUpdate(
+                Set.of(25L, 26L)
+        )).willReturn(List.of(mine, others));
+
+        assertThatThrownBy(() ->
+                fittingCandidateService.deleteFittingCandidates(
+                        1L,
+                        new FittingCandidateBulkDeleteRequest(
+                                List.of(25L, 26L)
+                        )
+                )
+        ).isInstanceOfSatisfying(BusinessException.class, exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(
+                        ErrorCode.FITTING_CANDIDATE_ACCESS_DENIED
+                )
+        );
+
+        verify(fittingCandidateRepository, never()).deleteAllInBatch(any());
+    }
+
+    @Test
     @DisplayName("전체 첫 페이지에 다음 데이터가 있으면 size개와 Cursor를 반환한다")
     void getFirstPageWithNextPage() {
         Member member = createMember(1L);
@@ -229,6 +307,7 @@ class FittingCandidateServiceTest {
                 eq(1L),
                 any(Pageable.class)
         )).willReturn(List.of(first, second, nextPageCandidate));
+        given(fittingCandidateRepository.countByMemberId(1L)).willReturn(3L);
 
         FittingCandidateListResponse response = fittingCandidateService
                 .getFittingCandidates(1L, null, null, 2);
@@ -236,6 +315,7 @@ class FittingCandidateServiceTest {
         assertThat(response.getItems())
                 .extracting(item -> item.getFittingCandidateId())
                 .containsExactly(30L, 29L);
+        assertThat(response.getTotalCount()).isEqualTo(3L);
         assertThat(response.getNextCursor()).isEqualTo(29L);
         assertThat(response.isHasNext()).isTrue();
         verify(fittingCandidateRepository).findFirstPage(
@@ -280,6 +360,11 @@ class FittingCandidateServiceTest {
                 eq(ProductItemType.TOP),
                 any(Pageable.class)
         )).willReturn(List.of(topCandidate));
+        given(fittingCandidateRepository
+                .countByMemberIdAndProductItemType(
+                        1L,
+                        ProductItemType.TOP
+                )).willReturn(4L);
 
         FittingCandidateListResponse response = fittingCandidateService
                 .getFittingCandidates(
@@ -290,6 +375,7 @@ class FittingCandidateServiceTest {
                 );
 
         assertThat(response.getItems()).hasSize(1);
+        assertThat(response.getTotalCount()).isEqualTo(4L);
         assertThat(response.getItems().get(0).getItemType())
                 .isEqualTo(ProductItemType.TOP);
     }
@@ -382,6 +468,7 @@ class FittingCandidateServiceTest {
 
     private Product createProduct(Long id, ProductItemType itemType) {
         Product product = Product.create(
+                "product-" + id,
                 "테스트 상품",
                 "https://image.lookddak.com/test.jpg",
                 49_000,
