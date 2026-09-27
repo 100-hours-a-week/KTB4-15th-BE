@@ -24,6 +24,7 @@ import com.ktb.lookddak.domain.chat.repository.ChatMessageRepository;
 import com.ktb.lookddak.domain.chat.repository.ChatRoomRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
+import com.ktb.lookddak.domain.fitting.entity.FittingCandidate;
 import com.ktb.lookddak.domain.fitting.repository.FittingCandidateRepository;
 import com.ktb.lookddak.domain.recommendation.entity.Recommendation;
 import com.ktb.lookddak.domain.recommendation.entity.RecommendationProduct;
@@ -457,13 +458,20 @@ public class ChatService {
                         productIds
                 );
 
-        Set<Long> fittingCandidateProductIds = productIds.isEmpty()
-                ? Set.of()
+        List<FittingCandidate> fittingCandidates = productIds.isEmpty()
+                ? List.of()
                 : fittingCandidateRepository
-                        .findProductIdsByMemberIdAndProductIdIn(
+                        .findAllByMemberIdAndProductIdIn(
                                 memberId,
                                 productIds
                         );
+        Map<Long, Long> fittingCandidateIdByProductId = new LinkedHashMap<>();
+        for (FittingCandidate fittingCandidate : fittingCandidates) {
+            fittingCandidateIdByProductId.put(
+                    fittingCandidate.getProduct().getId(),
+                    fittingCandidate.getId()
+            );
+        }
 
         Map<Long, RecommendationResponse> responses = new LinkedHashMap<>();
 
@@ -482,7 +490,7 @@ public class ChatService {
                 productResponses.add(RecommendedProductResponse.from(
                         recommendationProduct,
                         wishlistedProductIds.contains(productId),
-                        fittingCandidateProductIds.contains(productId)
+                        fittingCandidateIdByProductId.get(productId)
                 ));
             }
 

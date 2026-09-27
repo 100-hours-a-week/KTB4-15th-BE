@@ -8,6 +8,7 @@ import com.ktb.lookddak.domain.chat.entity.ChatRoom;
 import com.ktb.lookddak.domain.chat.entity.ChatSourceType;
 import com.ktb.lookddak.domain.chat.repository.ChatMessageRepository;
 import com.ktb.lookddak.domain.chat.repository.ChatRoomRepository;
+import com.ktb.lookddak.domain.fitting.entity.FittingCandidate;
 import com.ktb.lookddak.domain.fitting.repository.FittingCandidateRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
@@ -155,11 +156,16 @@ class ChatRoomDetailServiceTest {
                 eq(1L),
                 eq(Set.of(201L, 202L))
         )).willReturn(Set.of(201L));
+        FittingCandidate fittingCandidate = FittingCandidate.create(
+                member,
+                secondProduct
+        );
+        ReflectionTestUtils.setField(fittingCandidate, "id", 302L);
         given(fittingCandidateRepository
-                .findProductIdsByMemberIdAndProductIdIn(
+                .findAllByMemberIdAndProductIdIn(
                         eq(1L),
                         eq(Set.of(201L, 202L))
-                )).willReturn(Set.of(202L));
+                )).willReturn(List.of(fittingCandidate));
 
         ChatRoomDetailResponse response = chatService.getChatRoomDetail(
                 1L,
@@ -186,10 +192,14 @@ class ChatRoomDetailServiceTest {
                 .isWishlisted()).isTrue();
         assertThat(recommendationResponse.getRecommendation().getProducts().get(0)
                 .isFittingCandidate()).isFalse();
+        assertThat(recommendationResponse.getRecommendation().getProducts().get(0)
+                .getFittingCandidateId()).isNull();
         assertThat(recommendationResponse.getRecommendation().getProducts().get(1)
                 .isWishlisted()).isFalse();
         assertThat(recommendationResponse.getRecommendation().getProducts().get(1)
                 .isFittingCandidate()).isTrue();
+        assertThat(recommendationResponse.getRecommendation().getProducts().get(1)
+                .getFittingCandidateId()).isEqualTo(302L);
         assertThat(response.getMessages().get(0).getRecommendation()).isNull();
         assertThat(response.getMessages().get(2).getRecommendation()).isNull();
     }

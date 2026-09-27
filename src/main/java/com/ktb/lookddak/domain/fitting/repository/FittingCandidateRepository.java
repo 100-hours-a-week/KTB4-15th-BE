@@ -40,6 +40,17 @@ public interface FittingCandidateRepository
     @Query("""
             select candidate
             from FittingCandidate candidate
+            where candidate.member.id = :memberId
+              and candidate.product.id in :productIds
+            """)
+    List<FittingCandidate> findAllByMemberIdAndProductIdIn(
+            @Param("memberId") Long memberId,
+            @Param("productIds") Collection<Long> productIds
+    );
+
+    @Query("""
+            select candidate
+            from FittingCandidate candidate
             join fetch candidate.product product
             where candidate.member.id = :memberId
             order by candidate.id desc

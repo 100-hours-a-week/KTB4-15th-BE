@@ -207,7 +207,7 @@ class ChatControllerTest {
                                         "추천 당시 이유"
                                 ),
                                 true,
-                                false
+                                null
                         ))
                 );
         ChatRoomDetailResponse response = ChatRoomDetailResponse.from(
@@ -244,6 +244,8 @@ class ChatControllerTest {
                         .value(true))
                 .andExpect(jsonPath("$.data.messages[0].recommendation.products[0].isFittingCandidate")
                         .value(false))
+                .andExpect(jsonPath("$.data.messages[0].recommendation.products[0].fittingCandidateId")
+                        .isEmpty())
                 .andExpect(jsonPath("$.data.nextCursor").value(102))
                 .andExpect(jsonPath("$.data.hasNext").value(true))
                 .andExpect(jsonPath("$.message")

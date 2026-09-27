@@ -439,7 +439,7 @@ class ChatIntegrationTest {
                 )
         );
         wishlistRepository.saveAndFlush(Wishlist.create(member, firstProduct));
-        fittingCandidateRepository.saveAndFlush(
+        FittingCandidate fittingCandidate = fittingCandidateRepository.saveAndFlush(
                 FittingCandidate.create(member, secondProduct)
         );
         entityManager.clear();
@@ -482,12 +482,16 @@ class ChatIntegrationTest {
                         .value(true))
                 .andExpect(jsonPath("$.data.messages[1].recommendation.products[0].isFittingCandidate")
                         .value(false))
+                .andExpect(jsonPath("$.data.messages[1].recommendation.products[0].fittingCandidateId")
+                        .isEmpty())
                 .andExpect(jsonPath("$.data.messages[1].recommendation.products[1].productId")
                         .value(secondProduct.getId()))
                 .andExpect(jsonPath("$.data.messages[1].recommendation.products[1].isWishlisted")
                         .value(false))
                 .andExpect(jsonPath("$.data.messages[1].recommendation.products[1].isFittingCandidate")
                         .value(true))
+                .andExpect(jsonPath("$.data.messages[1].recommendation.products[1].fittingCandidateId")
+                        .value(fittingCandidate.getId()))
                 .andExpect(jsonPath("$.data.messages[2].messageId")
                         .value(aiTextMessage.getId()))
                 .andExpect(jsonPath("$.data.messages[2].recommendation").isEmpty())
