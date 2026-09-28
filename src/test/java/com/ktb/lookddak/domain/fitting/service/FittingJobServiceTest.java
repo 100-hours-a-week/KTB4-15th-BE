@@ -40,6 +40,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class FittingJobServiceTest {
@@ -125,6 +126,7 @@ class FittingJobServiceTest {
         assertThat(response.getFittingJobId()).isEqualTo(100L);
         assertThat(response.getStatus())
                 .isEqualTo(FittingJobStatus.GENERATING);
+        assertThat(member.getFittingRequestCount()).isEqualTo(1);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Iterable<FittingJobProduct>> captor =
@@ -146,9 +148,10 @@ class FittingJobServiceTest {
     }
 
     @Test
-    @DisplayName("상의만 선택해도 가상피팅 작업을 생성할 수 있다")
+    @DisplayName("9회 사용한 회원은 마지막 가상피팅 작업을 생성할 수 있다")
     void createFittingJobWithTopOnly() {
         Member member = createMember(1L);
+        ReflectionTestUtils.setField(member, "fittingRequestCount", 9);
         Product top = createProduct(10L, ProductItemType.TOP);
         given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(member));
@@ -177,7 +180,30 @@ class FittingJobServiceTest {
                 );
 
         assertThat(response.getFittingJobId()).isEqualTo(100L);
+        assertThat(member.getFittingRequestCount()).isEqualTo(10);
         verify(fittingJobProductRepository).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("가상피팅을 10회 요청한 회원은 새로운 작업을 생성할 수 없다")
+    void rejectFittingRequestLimit() {
+        Member member = createMember(1L);
+        ReflectionTestUtils.setField(member, "fittingRequestCount", 10);
+        given(memberRepository.findActiveByIdForUpdate(1L))
+                .willReturn(Optional.of(member));
+
+        assertBusinessException(
+                () -> fittingJobService.createFittingJob(
+                        1L,
+                        new FittingJobCreateRequest(10L, null)
+                ),
+                ErrorCode.FITTING_REQUEST_LIMIT_EXCEEDED
+        );
+
+        assertThat(member.getFittingRequestCount()).isEqualTo(10);
+        verifyNoInteractions(memberProfileRepository);
+        verify(fittingJobRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
