@@ -63,6 +63,7 @@ public enum ErrorCode {
     FITTING_PRODUCT_REQUIRED(HttpStatus.BAD_REQUEST, "선택한 상품이 필요합니다."),
     FITTING_PRODUCT_TYPE_MISMATCH(HttpStatus.BAD_REQUEST, "선택한 상품 종류가 올바르지 않습니다."),
     FITTING_PRODUCT_NOT_CANDIDATE(HttpStatus.BAD_REQUEST, "피팅 후보에 등록된 상품만 사용할 수 있습니다."),
+    FITTING_REQUEST_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "가상피팅은 최대 10회까지 요청할 수 있습니다."),
     FITTING_JOB_ALREADY_GENERATING(HttpStatus.CONFLICT, "이미 생성 중인 가상피팅 작업이 있습니다."),
     FITTING_JOB_NOT_FOUND(HttpStatus.NOT_FOUND, "가상피팅 작업을 찾을 수 없습니다."),
     FITTING_JOB_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 가상피팅 작업에 접근할 권한이 없습니다."),

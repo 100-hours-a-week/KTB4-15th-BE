@@ -40,6 +40,8 @@ import java.util.Set;
 @Transactional(readOnly = true)
 public class FittingJobService {
 
+    private static final int MAX_FITTING_REQUEST_COUNT = 10;
+
     private final MemberRepository memberRepository;
     private final MemberProfileRepository memberProfileRepository;
     private final ProductRepository productRepository;
@@ -60,6 +62,14 @@ public class FittingJobService {
                 .orElseThrow(() ->
                         new BusinessException(ErrorCode.RESOURCE_NOT_FOUND)
                 );
+
+        if (member.hasReachedFittingRequestLimit(
+                MAX_FITTING_REQUEST_COUNT
+        )) {
+            throw new BusinessException(
+                    ErrorCode.FITTING_REQUEST_LIMIT_EXCEEDED
+            );
+        }
 
         if (!memberProfileRepository.existsByMemberId(memberId)) {
             throw new BusinessException(
@@ -95,6 +105,7 @@ public class FittingJobService {
             ));
         }
         fittingJobProductRepository.saveAll(jobProducts);
+        member.increaseFittingRequestCount();
         eventPublisher.publishEvent(new FittingGenerationRequestedEvent(
                 fittingJob.getId()
         ));

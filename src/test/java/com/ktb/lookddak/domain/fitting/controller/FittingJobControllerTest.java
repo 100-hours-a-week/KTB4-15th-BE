@@ -139,6 +139,27 @@ class FittingJobControllerTest {
     }
 
     @Test
+    @DisplayName("가상피팅 요청 횟수를 모두 사용하면 429 Too Many Requests를 반환한다")
+    void rejectFittingRequestLimit() throws Exception {
+        given(fittingJobService.createFittingJob(eq(1L), any()))
+                .willThrow(new BusinessException(
+                        ErrorCode.FITTING_REQUEST_LIMIT_EXCEEDED
+                ));
+
+        mockMvc.perform(post("/api/v1/fitting-jobs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"topProductId": 10}
+                                """))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code")
+                        .value("FITTING_REQUEST_LIMIT_EXCEEDED"))
+                .andExpect(jsonPath("$.data").isEmpty())
+                .andExpect(jsonPath("$.message")
+                        .value("가상피팅은 최대 10회까지 요청할 수 있습니다."));
+    }
+
+    @Test
     @DisplayName("생성 중인 가상피팅 작업 상태를 조회한다")
     void getFittingJobStatus() throws Exception {
         FittingJob fittingJob = createFittingJob(100L);
