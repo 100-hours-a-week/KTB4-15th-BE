@@ -2,6 +2,7 @@ package com.ktb.lookddak.domain.fitting.event;
 
 import com.ktb.lookddak.domain.fitting.command.FittingGenerationCommand;
 import com.ktb.lookddak.domain.fitting.service.FittingGenerationQueryService;
+import com.ktb.lookddak.global.client.ai.config.AiTaskExecutorMonitor;
 import com.ktb.lookddak.global.client.ai.fitting.AiFittingClient;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingRequest;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingResultData;
@@ -145,7 +146,8 @@ class FittingGenerationEventListenerTest {
                 presignedUrlProvider,
                 aiFittingClient,
                 eventPublisher,
-                executor
+                executor,
+                new AiTaskExecutorMonitor()
         );
     }
 

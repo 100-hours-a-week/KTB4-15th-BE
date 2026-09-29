@@ -2,6 +2,7 @@ package com.ktb.lookddak.domain.chat.event;
 
 import com.ktb.lookddak.domain.chat.entity.ChatSourceType;
 import com.ktb.lookddak.global.client.ai.chat.AiChatClient;
+import com.ktb.lookddak.global.client.ai.config.AiTaskExecutorMonitor;
 import com.ktb.lookddak.global.client.ai.dto.AiChatDoneResponse;
 import com.ktb.lookddak.global.client.ai.dto.AiChatRequest;
 import com.ktb.lookddak.global.client.ai.exception.AiChatException;
@@ -38,7 +39,8 @@ class ChatGenerationEventListenerTest {
         listener = new ChatGenerationEventListener(
                 aiChatClient,
                 eventPublisher,
-                Runnable::run
+                Runnable::run,
+                new AiTaskExecutorMonitor()
         );
     }
 
@@ -107,7 +109,8 @@ class ChatGenerationEventListenerTest {
                 eventPublisher,
                 command -> {
                     throw new RejectedExecutionException("queue full");
-                }
+                },
+                new AiTaskExecutorMonitor()
         );
 
         listener.handle(requestedEvent());
