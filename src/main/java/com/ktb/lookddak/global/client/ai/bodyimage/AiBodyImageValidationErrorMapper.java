@@ -2,10 +2,10 @@ package com.ktb.lookddak.global.client.ai.bodyimage;
 
 import com.ktb.lookddak.domain.image.exception.BodyImageValidationException;
 import com.ktb.lookddak.global.client.ai.bodyimage.exception.AiBodyImageValidationException;
+import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import com.ktb.lookddak.global.exception.ExternalApiException;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 @Component
 public class AiBodyImageValidationErrorMapper {
@@ -23,11 +23,15 @@ public class AiBodyImageValidationErrorMapper {
                     exception
             );
         }
+        if ("SERVER_BUSY".equals(exception.getCode())
+                && Integer.valueOf(429).equals(exception.getHttpStatus())) {
+            return new BusinessException(ErrorCode.SERVER_BUSY);
+        }
 
         if (isUserValidationError(exception)) {
             return new BodyImageValidationException(
-                    exception.getReasonCode(),
-                    exception.getReason()
+                    exception.getCode(),
+                    exception.getMessage()
             );
         }
 
@@ -41,10 +45,7 @@ public class AiBodyImageValidationErrorMapper {
             AiBodyImageValidationException exception
     ) {
         Integer status = exception.getHttpStatus();
-        return "body_image_validation_failed".equals(exception.getCode())
-                && status != null
-                && (status == 400 || status == 413 || status == 422)
-                && StringUtils.hasText(exception.getReasonCode())
-                && StringUtils.hasText(exception.getReason());
+        return status != null
+                && (status == 400 || status == 413 || status == 422);
     }
 }

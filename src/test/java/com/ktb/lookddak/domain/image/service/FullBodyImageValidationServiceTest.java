@@ -103,8 +103,6 @@ class FullBodyImageValidationServiceTest {
                 new AiBodyImageValidationException(
                         "AI_SERVER_UNAVAILABLE",
                         "AI server unavailable",
-                        null,
-                        null,
                         null
                 );
         ExternalApiException mappedException = new ExternalApiException(

@@ -1,6 +1,7 @@
 package com.ktb.lookddak.global.client.ai.fitting;
 
 import com.ktb.lookddak.global.client.ai.config.AiClientProperties;
+import com.ktb.lookddak.global.client.ai.dto.AiErrorResponse;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingRequest;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingResponse;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingResultData;
@@ -11,7 +12,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
-import reactor.core.publisher.Mono;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -81,16 +81,16 @@ public class AiFittingClient {
         }
 
         try {
-            AiFittingResponse response = objectMapper.readValue(
+            AiErrorResponse response = objectMapper.readValue(
                     body,
-                    AiFittingResponse.class
+                    AiErrorResponse.class
             );
-            String code = StringUtils.hasText(response.getMessage())
-                    ? response.getMessage()
+            String code = StringUtils.hasText(response.getCode())
+                    ? response.getCode()
                     : "AI_HTTP_ERROR";
             return new AiFittingException(
                     code,
-                    "AI 가상피팅 요청이 실패했습니다.",
+                    response.getMessage(),
                     httpStatus
             );
         } catch (JacksonException exception) {
@@ -110,9 +110,7 @@ public class AiFittingClient {
                 ? null
                 : response.getData();
         if (response == null
-                || response.getCode() == null
-                || response.getCode() != 200
-                || !"fitting_succeeded".equals(response.getMessage())
+                || !"FITTING_SUCCESS".equals(response.getCode())
                 || data == null
                 || !StringUtils.hasText(data.getResultImageKey())
                 || !StringUtils.hasText(data.getLlmTitle())

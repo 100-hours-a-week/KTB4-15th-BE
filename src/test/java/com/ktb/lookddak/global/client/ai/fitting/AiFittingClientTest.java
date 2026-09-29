@@ -48,9 +48,9 @@ class AiFittingClientTest {
         AiFittingClient client = createClient(
                 jsonResponse(HttpStatus.NOT_FOUND, """
                         {
-                          "code": 404,
-                          "message": "product_not_found",
-                          "data": null
+                          "code": "PRODUCT_NOT_FOUND",
+                          "data": null,
+                          "message": "요청한 상품을 찾을 수 없습니다."
                         }
                         """),
                 Duration.ofSeconds(1)
@@ -59,7 +59,7 @@ class AiFittingClientTest {
         assertThatThrownBy(() -> client.requestFitting(request()))
                 .isInstanceOfSatisfying(AiFittingException.class, exception -> {
                     assertThat(exception.getCode())
-                            .isEqualTo("product_not_found");
+                            .isEqualTo("PRODUCT_NOT_FOUND");
                     assertThat(exception.getHttpStatus()).isEqualTo(404);
                 });
     }
@@ -70,13 +70,13 @@ class AiFittingClientTest {
         AiFittingClient client = createClient(
                 jsonResponse(HttpStatus.OK, """
                         {
-                          "code": 200,
-                          "message": "fitting_succeeded",
+                          "code": "FITTING_SUCCESS",
                           "data": {
                             "result_image_key": "",
                             "llm_title": "데일리 룩",
                             "llm_comment": "코디 설명"
-                          }
+                          },
+                          "message": "가상 피팅이 완료되었습니다."
                         }
                         """),
                 Duration.ofSeconds(1)
@@ -142,13 +142,13 @@ class AiFittingClientTest {
     private String successBody() {
         return """
                 {
-                  "code": 200,
-                  "message": "fitting_succeeded",
+                  "code": "FITTING_SUCCESS",
                   "data": {
                     "result_image_key": "virtual-fitting/results/result.png",
                     "llm_title": "데일리 룩",
                     "llm_comment": "자연스러운 코디입니다."
-                  }
+                  },
+                  "message": "가상 피팅이 완료되었습니다."
                 }
                 """;
     }
