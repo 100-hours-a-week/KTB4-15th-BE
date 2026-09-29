@@ -1,5 +1,6 @@
 package com.ktb.lookddak.global.client.ai.config;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -8,8 +9,8 @@ import org.springframework.validation.annotation.Validated;
 import java.time.Duration;
 
 @Validated
-@ConfigurationProperties(prefix = "ai.task")
-public class AiTaskProperties {
+@ConfigurationProperties(prefix = "ai.fitting-task")
+public class AiFittingTaskProperties {
 
     @Min(1)
     private final int corePoolSize;
@@ -23,7 +24,7 @@ public class AiTaskProperties {
     @NotNull
     private final Duration awaitTermination;
 
-    public AiTaskProperties(
+    public AiFittingTaskProperties(
             int corePoolSize,
             int maxPoolSize,
             int queueCapacity,
@@ -33,6 +34,11 @@ public class AiTaskProperties {
         this.maxPoolSize = maxPoolSize;
         this.queueCapacity = queueCapacity;
         this.awaitTermination = awaitTermination;
+    }
+
+    @AssertTrue(message = "maxPoolSize는 corePoolSize 이상이어야 합니다.")
+    public boolean isPoolSizeValid() {
+        return maxPoolSize >= corePoolSize;
     }
 
     public int getCorePoolSize() {
