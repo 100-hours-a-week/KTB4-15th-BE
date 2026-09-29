@@ -12,22 +12,10 @@ import java.util.concurrent.Executor;
 @EnableAsync
 @Configuration
 @EnableConfigurationProperties({
-        AiTaskProperties.class,
         AiChatTaskProperties.class,
         AiFittingTaskProperties.class
 })
 public class AiAsyncConfig {
-
-    @Bean(name = "aiTaskExecutor")
-    public Executor aiTaskExecutor(AiTaskProperties properties) {
-        return createExecutor(
-                properties.getCorePoolSize(),
-                properties.getMaxPoolSize(),
-                properties.getQueueCapacity(),
-                properties.getAwaitTermination(),
-                "ai-legacy-"
-        );
-    }
 
     @Bean(name = "chatTaskExecutor")
     public Executor chatTaskExecutor(AiChatTaskProperties properties) {

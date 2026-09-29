@@ -10,7 +10,7 @@ import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class AiTaskPropertiesBindingTest {
+class AiExecutorPropertiesBindingTest {
 
     private final ApplicationContextRunner contextRunner =
             new ApplicationContextRunner()
