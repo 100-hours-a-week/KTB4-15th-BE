@@ -2,19 +2,21 @@ package com.ktb.lookddak.domain.chat.event;
 
 import com.ktb.lookddak.domain.chat.entity.ChatSourceType;
 import com.ktb.lookddak.global.client.ai.chat.AiChatClient;
+import com.ktb.lookddak.global.client.ai.config.AiTaskExecutorMonitor;
 import com.ktb.lookddak.global.client.ai.dto.AiChatDoneResponse;
 import com.ktb.lookddak.global.client.ai.dto.AiChatRequest;
 import com.ktb.lookddak.global.client.ai.exception.AiChatException;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
+import java.util.concurrent.RejectedExecutionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -30,8 +32,17 @@ class ChatGenerationEventListenerTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
-    @InjectMocks
     private ChatGenerationEventListener listener;
+
+    @BeforeEach
+    void setUp() {
+        listener = new ChatGenerationEventListener(
+                aiChatClient,
+                eventPublisher,
+                Runnable::run,
+                new AiTaskExecutorMonitor()
+        );
+    }
 
     @Test
     @DisplayName("AI done 응답을 받으면 생성 성공 이벤트를 발행한다")
@@ -88,6 +99,28 @@ class ChatGenerationEventListenerTest {
         verify(eventPublisher).publishEvent(captor.capture());
         assertThat(captor.getValue().getCode())
                 .isEqualTo("AI_UNEXPECTED_ERROR");
+    }
+
+    @Test
+    @DisplayName("채팅 Executor가 작업을 거절하면 생성 실패 이벤트를 발행한다")
+    void publishFailedEventWhenTaskRejected() {
+        listener = new ChatGenerationEventListener(
+                aiChatClient,
+                eventPublisher,
+                command -> {
+                    throw new RejectedExecutionException("queue full");
+                },
+                new AiTaskExecutorMonitor()
+        );
+
+        listener.handle(requestedEvent());
+
+        ArgumentCaptor<ChatGenerationFailedEvent> captor =
+                ArgumentCaptor.forClass(ChatGenerationFailedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().getUserMessageId()).isEqualTo(501L);
+        assertThat(captor.getValue().getCode())
+                .isEqualTo("AI_TASK_REJECTED");
     }
 
     @Test

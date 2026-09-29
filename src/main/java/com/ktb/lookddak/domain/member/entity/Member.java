@@ -38,6 +38,10 @@ public class Member extends BaseEntity {
     @ColumnDefault("false")
     private boolean priceAlertEnabled;
 
+    @Column(name = "fitting_request_count", nullable = false)
+    @ColumnDefault("0")
+    private int fittingRequestCount;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
@@ -45,6 +49,7 @@ public class Member extends BaseEntity {
         this.email = email;
         this.passwordHash = passwordHash;
         this.priceAlertEnabled = false;
+        this.fittingRequestCount = 0;
     }
 
     public static Member create(String email, String passwordHash) {
@@ -53,5 +58,13 @@ public class Member extends BaseEntity {
 
     public void updatePriceAlertEnabled(boolean priceAlertEnabled) {
         this.priceAlertEnabled = priceAlertEnabled;
+    }
+
+    public boolean hasReachedFittingRequestLimit(int limit) {
+        return fittingRequestCount >= limit;
+    }
+
+    public void increaseFittingRequestCount() {
+        fittingRequestCount++;
     }
 }

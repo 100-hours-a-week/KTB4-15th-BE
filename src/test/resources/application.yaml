@@ -31,10 +31,15 @@ ai:
     api-key:
     connect-timeout: 3s
     response-timeout: 60s
-  task:
+  chat-task:
     core-pool-size: 2
     max-pool-size: 4
     queue-capacity: 20
+    await-termination: 5s
+  fitting-task:
+    core-pool-size: 1
+    max-pool-size: 1
+    queue-capacity: 5
     await-termination: 5s
 
 aws:
