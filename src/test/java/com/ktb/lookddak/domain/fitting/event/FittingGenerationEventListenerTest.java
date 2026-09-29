@@ -15,6 +15,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.scheduling.annotation.Async;
 
 import java.util.List;
 
@@ -40,6 +41,20 @@ class FittingGenerationEventListenerTest {
 
     @InjectMocks
     private FittingGenerationEventListener listener;
+
+    @Test
+    @DisplayName("가상피팅 전용 Executor에서 AI 생성을 실행한다")
+    void useFittingTaskExecutor() throws NoSuchMethodException {
+        Async async = FittingGenerationEventListener.class
+                .getDeclaredMethod(
+                        "handle",
+                        FittingGenerationRequestedEvent.class
+                )
+                .getAnnotation(Async.class);
+
+        assertThat(async).isNotNull();
+        assertThat(async.value()).isEqualTo("fittingTaskExecutor");
+    }
 
     @Test
     @DisplayName("가상피팅 요청 정보를 AI 요청으로 변환하고 성공 이벤트를 발행한다")

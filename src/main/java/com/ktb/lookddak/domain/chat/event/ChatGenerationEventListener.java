@@ -19,7 +19,7 @@ public class ChatGenerationEventListener {
     private final AiChatClient aiChatClient;
     private final ApplicationEventPublisher eventPublisher;
 
-    @Async("aiTaskExecutor")
+    @Async("chatTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(ChatGenerationRequestedEvent event) {
         try {

@@ -13,6 +13,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.scheduling.annotation.Async;
 
 import java.util.List;
 
@@ -32,6 +33,20 @@ class ChatGenerationEventListenerTest {
 
     @InjectMocks
     private ChatGenerationEventListener listener;
+
+    @Test
+    @DisplayName("채팅 전용 Executor에서 AI 응답 생성을 실행한다")
+    void useChatTaskExecutor() throws NoSuchMethodException {
+        Async async = ChatGenerationEventListener.class
+                .getDeclaredMethod(
+                        "handle",
+                        ChatGenerationRequestedEvent.class
+                )
+                .getAnnotation(Async.class);
+
+        assertThat(async).isNotNull();
+        assertThat(async.value()).isEqualTo("chatTaskExecutor");
+    }
 
     @Test
     @DisplayName("AI done 응답을 받으면 생성 성공 이벤트를 발행한다")

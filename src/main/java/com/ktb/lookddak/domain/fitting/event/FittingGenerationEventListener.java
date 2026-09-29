@@ -29,7 +29,7 @@ public class FittingGenerationEventListener {
     private final AiFittingClient aiFittingClient;
     private final ApplicationEventPublisher eventPublisher;
 
-    @Async("aiTaskExecutor")
+    @Async("fittingTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(FittingGenerationRequestedEvent event) {
         try {
