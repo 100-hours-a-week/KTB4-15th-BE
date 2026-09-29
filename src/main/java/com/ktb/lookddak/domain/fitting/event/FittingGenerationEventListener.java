@@ -8,30 +8,61 @@ import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingRequest;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingResultData;
 import com.ktb.lookddak.global.client.ai.fitting.exception.AiFittingException;
 import com.ktb.lookddak.global.storage.s3.S3PresignedUrlProvider;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class FittingGenerationEventListener {
 
     private final FittingGenerationQueryService queryService;
     private final S3PresignedUrlProvider presignedUrlProvider;
     private final AiFittingClient aiFittingClient;
     private final ApplicationEventPublisher eventPublisher;
+    private final Executor fittingTaskExecutor;
 
-    @Async("fittingTaskExecutor")
+    public FittingGenerationEventListener(
+            FittingGenerationQueryService queryService,
+            S3PresignedUrlProvider presignedUrlProvider,
+            AiFittingClient aiFittingClient,
+            ApplicationEventPublisher eventPublisher,
+            @Qualifier("fittingTaskExecutor") Executor fittingTaskExecutor
+    ) {
+        this.queryService = queryService;
+        this.presignedUrlProvider = presignedUrlProvider;
+        this.aiFittingClient = aiFittingClient;
+        this.eventPublisher = eventPublisher;
+        this.fittingTaskExecutor = fittingTaskExecutor;
+    }
+
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(FittingGenerationRequestedEvent event) {
+        try {
+            fittingTaskExecutor.execute(() -> generate(event));
+        } catch (RejectedExecutionException exception) {
+            log.warn(
+                    "AI fitting task rejected. fittingJobId={}",
+                    event.getFittingJobId(),
+                    exception
+            );
+            publishFailure(
+                    event.getFittingJobId(),
+                    "AI_TASK_REJECTED",
+                    "AI 가상피팅 요청이 많아 작업을 시작하지 못했습니다."
+            );
+        }
+    }
+
+    private void generate(FittingGenerationRequestedEvent event) {
         try {
             FittingGenerationCommand command = queryService.createCommand(
                     event.getFittingJobId()

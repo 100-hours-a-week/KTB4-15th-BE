@@ -8,16 +8,17 @@ import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingResultData;
 import com.ktb.lookddak.global.client.ai.fitting.exception.AiFittingException;
 import com.ktb.lookddak.global.storage.s3.S3PresignedUrlProvider;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.scheduling.annotation.Async;
 
 import java.util.List;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -39,21 +40,11 @@ class FittingGenerationEventListenerTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
-    @InjectMocks
     private FittingGenerationEventListener listener;
 
-    @Test
-    @DisplayName("가상피팅 전용 Executor에서 AI 생성을 실행한다")
-    void useFittingTaskExecutor() throws NoSuchMethodException {
-        Async async = FittingGenerationEventListener.class
-                .getDeclaredMethod(
-                        "handle",
-                        FittingGenerationRequestedEvent.class
-                )
-                .getAnnotation(Async.class);
-
-        assertThat(async).isNotNull();
-        assertThat(async.value()).isEqualTo("fittingTaskExecutor");
+    @BeforeEach
+    void setUp() {
+        listener = createListener(Runnable::run);
     }
 
     @Test
@@ -127,6 +118,35 @@ class FittingGenerationEventListenerTest {
         verify(eventPublisher).publishEvent(eventCaptor.capture());
         assertThat(eventCaptor.getValue().getCode())
                 .isEqualTo("AI_UNEXPECTED_ERROR");
+    }
+
+    @Test
+    @DisplayName("가상피팅 Executor가 작업을 거절하면 생성 실패 이벤트를 발행한다")
+    void publishFailedEventWhenTaskRejected() {
+        listener = createListener(command -> {
+            throw new RejectedExecutionException("queue full");
+        });
+
+        listener.handle(new FittingGenerationRequestedEvent(100L));
+
+        ArgumentCaptor<FittingGenerationFailedEvent> eventCaptor =
+                ArgumentCaptor.forClass(FittingGenerationFailedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getFittingJobId()).isEqualTo(100L);
+        assertThat(eventCaptor.getValue().getCode())
+                .isEqualTo("AI_TASK_REJECTED");
+    }
+
+    private FittingGenerationEventListener createListener(
+            Executor executor
+    ) {
+        return new FittingGenerationEventListener(
+                queryService,
+                presignedUrlProvider,
+                aiFittingClient,
+                eventPublisher,
+                executor
+        );
     }
 
     private FittingGenerationCommand command() {

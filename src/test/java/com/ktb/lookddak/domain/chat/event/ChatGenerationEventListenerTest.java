@@ -6,16 +6,16 @@ import com.ktb.lookddak.global.client.ai.dto.AiChatDoneResponse;
 import com.ktb.lookddak.global.client.ai.dto.AiChatRequest;
 import com.ktb.lookddak.global.client.ai.exception.AiChatException;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.scheduling.annotation.Async;
 
 import java.util.List;
+import java.util.concurrent.RejectedExecutionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,21 +31,15 @@ class ChatGenerationEventListenerTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
-    @InjectMocks
     private ChatGenerationEventListener listener;
 
-    @Test
-    @DisplayName("채팅 전용 Executor에서 AI 응답 생성을 실행한다")
-    void useChatTaskExecutor() throws NoSuchMethodException {
-        Async async = ChatGenerationEventListener.class
-                .getDeclaredMethod(
-                        "handle",
-                        ChatGenerationRequestedEvent.class
-                )
-                .getAnnotation(Async.class);
-
-        assertThat(async).isNotNull();
-        assertThat(async.value()).isEqualTo("chatTaskExecutor");
+    @BeforeEach
+    void setUp() {
+        listener = new ChatGenerationEventListener(
+                aiChatClient,
+                eventPublisher,
+                Runnable::run
+        );
     }
 
     @Test
@@ -103,6 +97,27 @@ class ChatGenerationEventListenerTest {
         verify(eventPublisher).publishEvent(captor.capture());
         assertThat(captor.getValue().getCode())
                 .isEqualTo("AI_UNEXPECTED_ERROR");
+    }
+
+    @Test
+    @DisplayName("채팅 Executor가 작업을 거절하면 생성 실패 이벤트를 발행한다")
+    void publishFailedEventWhenTaskRejected() {
+        listener = new ChatGenerationEventListener(
+                aiChatClient,
+                eventPublisher,
+                command -> {
+                    throw new RejectedExecutionException("queue full");
+                }
+        );
+
+        listener.handle(requestedEvent());
+
+        ArgumentCaptor<ChatGenerationFailedEvent> captor =
+                ArgumentCaptor.forClass(ChatGenerationFailedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().getUserMessageId()).isEqualTo(501L);
+        assertThat(captor.getValue().getCode())
+                .isEqualTo("AI_TASK_REJECTED");
     }
 
     @Test
