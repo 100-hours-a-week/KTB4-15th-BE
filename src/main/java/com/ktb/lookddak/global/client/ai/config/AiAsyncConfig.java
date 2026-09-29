@@ -6,23 +6,66 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
+import java.time.Duration;
 import java.util.concurrent.Executor;
 
 @EnableAsync
 @Configuration
-@EnableConfigurationProperties(AiTaskProperties.class)
+@EnableConfigurationProperties({
+        AiTaskProperties.class,
+        AiChatTaskProperties.class,
+        AiFittingTaskProperties.class
+})
 public class AiAsyncConfig {
 
     @Bean(name = "aiTaskExecutor")
     public Executor aiTaskExecutor(AiTaskProperties properties) {
+        return createExecutor(
+                properties.getCorePoolSize(),
+                properties.getMaxPoolSize(),
+                properties.getQueueCapacity(),
+                properties.getAwaitTermination(),
+                "ai-legacy-"
+        );
+    }
+
+    @Bean(name = "chatTaskExecutor")
+    public Executor chatTaskExecutor(AiChatTaskProperties properties) {
+        return createExecutor(
+                properties.getCorePoolSize(),
+                properties.getMaxPoolSize(),
+                properties.getQueueCapacity(),
+                properties.getAwaitTermination(),
+                "ai-chat-"
+        );
+    }
+
+    @Bean(name = "fittingTaskExecutor")
+    public Executor fittingTaskExecutor(AiFittingTaskProperties properties) {
+        return createExecutor(
+                properties.getCorePoolSize(),
+                properties.getMaxPoolSize(),
+                properties.getQueueCapacity(),
+                properties.getAwaitTermination(),
+                "ai-fitting-"
+        );
+    }
+
+    private Executor createExecutor(
+            int corePoolSize,
+            int maxPoolSize,
+            int queueCapacity,
+            Duration awaitTermination,
+            String threadNamePrefix
+    ) {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(properties.getCorePoolSize());
-        executor.setMaxPoolSize(properties.getMaxPoolSize());
-        executor.setQueueCapacity(properties.getQueueCapacity());
-        executor.setThreadNamePrefix("ai-chat-");
+        executor.setCorePoolSize(corePoolSize);
+        executor.setMaxPoolSize(maxPoolSize);
+        executor.setQueueCapacity(queueCapacity);
+        executor.setThreadNamePrefix(threadNamePrefix);
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationMillis(
-                properties.getAwaitTermination().toMillis()
+                awaitTermination.toMillis()
         );
         executor.initialize();
         return executor;

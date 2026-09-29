@@ -12,9 +12,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AiAsyncConfigTest {
 
     @Test
-    @DisplayName("AI 작업 전용 스레드 풀을 설정값으로 생성한다")
-    void createAiTaskExecutor() {
-        AiTaskProperties properties = new AiTaskProperties(
+    @DisplayName("채팅 AI 작업 전용 스레드 풀을 설정값으로 생성한다")
+    void createChatTaskExecutor() {
+        AiChatTaskProperties properties = new AiChatTaskProperties(
                 2,
                 4,
                 20,
@@ -22,15 +22,58 @@ class AiAsyncConfigTest {
         );
         AiAsyncConfig config = new AiAsyncConfig();
 
-        Executor executor = config.aiTaskExecutor(properties);
+        Executor executor = config.chatTaskExecutor(properties);
 
+        assertExecutor(
+                executor,
+                2,
+                4,
+                20,
+                "ai-chat-"
+        );
+    }
+
+    @Test
+    @DisplayName("가상피팅 AI 작업 전용 스레드 풀을 설정값으로 생성한다")
+    void createFittingTaskExecutor() {
+        AiFittingTaskProperties properties = new AiFittingTaskProperties(
+                1,
+                1,
+                5,
+                Duration.ofSeconds(120)
+        );
+        AiAsyncConfig config = new AiAsyncConfig();
+
+        Executor executor = config.fittingTaskExecutor(properties);
+
+        assertExecutor(
+                executor,
+                1,
+                1,
+                5,
+                "ai-fitting-"
+        );
+    }
+
+    private void assertExecutor(
+            Executor executor,
+            int corePoolSize,
+            int maxPoolSize,
+            int queueCapacity,
+            String threadNamePrefix
+    ) {
         assertThat(executor).isInstanceOfSatisfying(
                 ThreadPoolTaskExecutor.class,
                 taskExecutor -> {
-                    assertThat(taskExecutor.getCorePoolSize()).isEqualTo(2);
-                    assertThat(taskExecutor.getMaxPoolSize()).isEqualTo(4);
+                    assertThat(taskExecutor.getCorePoolSize())
+                            .isEqualTo(corePoolSize);
+                    assertThat(taskExecutor.getMaxPoolSize())
+                            .isEqualTo(maxPoolSize);
                     assertThat(taskExecutor.getThreadNamePrefix())
-                            .isEqualTo("ai-chat-");
+                            .isEqualTo(threadNamePrefix);
+                    assertThat(taskExecutor.getThreadPoolExecutor()
+                            .getQueue().remainingCapacity())
+                            .isEqualTo(queueCapacity);
                     taskExecutor.shutdown();
                 }
         );
