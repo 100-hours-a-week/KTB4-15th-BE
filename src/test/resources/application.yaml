@@ -47,3 +47,8 @@ aws:
     bucket: lookddak-test-images
     region: ap-northeast-2
     presigned-url-expiration: 10m
+
+sentry:
+  dsn: ""
+  logging:
+    enabled: false
