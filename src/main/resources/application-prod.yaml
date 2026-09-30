@@ -19,3 +19,6 @@ spring:
 cors:
   allowed-origins:
     - https://lookddak.com
+
+sentry:
+  environment: ${SENTRY_ENVIRONMENT:production}

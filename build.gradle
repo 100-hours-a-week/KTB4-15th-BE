@@ -25,6 +25,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webclient'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'io.sentry:sentry-spring-boot-4-starter:8.58.0'
 	implementation 'software.amazon.awssdk:s3'
 	implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
 	compileOnly 'org.projectlombok:lombok'

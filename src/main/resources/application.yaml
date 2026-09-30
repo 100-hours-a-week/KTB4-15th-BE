@@ -54,3 +54,14 @@ management:
   endpoint:
     health:
       show-details: never
+
+sentry:
+  dsn: ${SENTRY_DSN:}
+  environment: ${SENTRY_ENVIRONMENT:local}
+  send-default-pii: false
+  sample-rate: ${SENTRY_SAMPLE_RATE:1.0}
+  traces-sample-rate: ${SENTRY_TRACES_SAMPLE_RATE:0.0}
+  logging:
+    enabled: true
+    minimum-event-level: error
+    minimum-breadcrumb-level: info
