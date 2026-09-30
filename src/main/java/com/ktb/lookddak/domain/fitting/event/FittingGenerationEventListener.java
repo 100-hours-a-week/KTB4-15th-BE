@@ -3,10 +3,10 @@ package com.ktb.lookddak.domain.fitting.event;
 import com.ktb.lookddak.domain.fitting.command.FittingGenerationCommand;
 import com.ktb.lookddak.domain.fitting.service.FittingGenerationQueryService;
 import com.ktb.lookddak.global.client.ai.fitting.AiFittingClient;
+import com.ktb.lookddak.global.client.ai.exception.AiClientException;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingProductRequest;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingRequest;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingResultData;
-import com.ktb.lookddak.global.client.ai.fitting.exception.AiFittingException;
 import com.ktb.lookddak.global.storage.s3.S3PresignedUrlProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,7 +47,7 @@ public class FittingGenerationEventListener {
                             result
                     )
             );
-        } catch (AiFittingException exception) {
+        } catch (AiClientException exception) {
             log.warn(
                     "AI fitting generation failed. fittingJobId={}, code={}",
                     event.getFittingJobId(),

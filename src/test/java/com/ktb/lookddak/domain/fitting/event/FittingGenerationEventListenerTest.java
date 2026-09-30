@@ -5,7 +5,7 @@ import com.ktb.lookddak.domain.fitting.service.FittingGenerationQueryService;
 import com.ktb.lookddak.global.client.ai.fitting.AiFittingClient;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingRequest;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingResultData;
-import com.ktb.lookddak.global.client.ai.fitting.exception.AiFittingException;
+import com.ktb.lookddak.global.client.ai.exception.AiClientException;
 import com.ktb.lookddak.global.storage.s3.S3PresignedUrlProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -83,7 +83,7 @@ class FittingGenerationEventListenerTest {
         given(presignedUrlProvider.createGetUrl("profiles/member-1.png"))
                 .willReturn("https://presigned.example.com/member-1.png");
         given(aiFittingClient.requestFitting(any(AiFittingRequest.class)))
-                .willThrow(new AiFittingException(
+                .willThrow(new AiClientException(
                         "AI_RESPONSE_TIMEOUT",
                         "AI 가상피팅 응답 시간을 초과했습니다.",
                         null

@@ -1,14 +1,14 @@
-package com.ktb.lookddak.global.client.ai.bodyimage.exception;
+package com.ktb.lookddak.global.client.ai.exception;
 
 import lombok.Getter;
 
 @Getter
-public class AiBodyImageValidationException extends RuntimeException {
+public class AiClientException extends RuntimeException {
 
     private final String code;
     private final Integer httpStatus;
 
-    public AiBodyImageValidationException(
+    public AiClientException(
             String code,
             String message,
             Integer httpStatus
@@ -16,7 +16,7 @@ public class AiBodyImageValidationException extends RuntimeException {
         this(code, message, httpStatus, null);
     }
 
-    public AiBodyImageValidationException(
+    public AiClientException(
             String code,
             String message,
             Integer httpStatus,

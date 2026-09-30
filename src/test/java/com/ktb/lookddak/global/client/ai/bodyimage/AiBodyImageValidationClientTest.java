@@ -1,6 +1,6 @@
 package com.ktb.lookddak.global.client.ai.bodyimage;
 
-import com.ktb.lookddak.global.client.ai.bodyimage.exception.AiBodyImageValidationException;
+import com.ktb.lookddak.global.client.ai.exception.AiClientException;
 import com.ktb.lookddak.global.client.ai.config.AiClientProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -78,7 +78,7 @@ class AiBodyImageValidationClientTest {
 
         assertThatThrownBy(() -> client.validate(7L, image()))
                 .isInstanceOfSatisfying(
-                        AiBodyImageValidationException.class,
+                        AiClientException.class,
                         exception -> {
                             assertThat(exception.getHttpStatus()).isEqualTo(422);
                             assertThat(exception.getCode())
@@ -105,7 +105,7 @@ class AiBodyImageValidationClientTest {
 
         assertThatThrownBy(() -> client.validate(7L, image()))
                 .isInstanceOfSatisfying(
-                        AiBodyImageValidationException.class,
+                        AiClientException.class,
                         exception -> {
                             assertThat(exception.getCode())
                                     .isEqualTo("SERVER_BUSY");
@@ -168,7 +168,7 @@ class AiBodyImageValidationClientTest {
     ) {
         assertThatThrownBy(() -> client.validate(7L, image()))
                 .isInstanceOfSatisfying(
-                        AiBodyImageValidationException.class,
+                        AiClientException.class,
                         exception -> assertThat(exception.getCode())
                                 .isEqualTo(expectedCode)
                 );

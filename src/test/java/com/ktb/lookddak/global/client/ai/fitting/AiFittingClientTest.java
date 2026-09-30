@@ -4,7 +4,7 @@ import com.ktb.lookddak.global.client.ai.config.AiClientProperties;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingProductRequest;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingRequest;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingResultData;
-import com.ktb.lookddak.global.client.ai.fitting.exception.AiFittingException;
+import com.ktb.lookddak.global.client.ai.exception.AiClientException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -57,7 +57,7 @@ class AiFittingClientTest {
         );
 
         assertThatThrownBy(() -> client.requestFitting(request()))
-                .isInstanceOfSatisfying(AiFittingException.class, exception -> {
+                .isInstanceOfSatisfying(AiClientException.class, exception -> {
                     assertThat(exception.getCode())
                             .isEqualTo("PRODUCT_NOT_FOUND");
                     assertThat(exception.getHttpStatus()).isEqualTo(404);
@@ -102,7 +102,7 @@ class AiFittingClientTest {
     ) {
         assertThatThrownBy(() -> client.requestFitting(request()))
                 .isInstanceOfSatisfying(
-                        AiFittingException.class,
+                        AiClientException.class,
                         exception -> assertThat(exception.getCode())
                                 .isEqualTo(expectedCode)
                 );

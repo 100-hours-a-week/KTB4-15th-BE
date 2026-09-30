@@ -8,7 +8,7 @@ import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
 import com.ktb.lookddak.global.client.ai.bodyimage.AiBodyImageValidationClient;
 import com.ktb.lookddak.global.client.ai.bodyimage.AiBodyImageValidationErrorMapper;
-import com.ktb.lookddak.global.client.ai.bodyimage.exception.AiBodyImageValidationException;
+import com.ktb.lookddak.global.client.ai.exception.AiClientException;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import com.ktb.lookddak.global.storage.s3.S3PresignedUrlProvider;
@@ -56,7 +56,7 @@ public class FullBodyImageValidationService {
     ) {
         try {
             return aiClient.validate(memberId, image);
-        } catch (AiBodyImageValidationException exception) {
+        } catch (AiClientException exception) {
             throw errorMapper.map(exception);
         }
     }

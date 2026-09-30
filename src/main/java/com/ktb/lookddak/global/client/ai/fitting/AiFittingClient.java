@@ -2,10 +2,10 @@ package com.ktb.lookddak.global.client.ai.fitting;
 
 import com.ktb.lookddak.global.client.ai.config.AiClientProperties;
 import com.ktb.lookddak.global.client.ai.dto.AiErrorResponse;
+import com.ktb.lookddak.global.client.ai.exception.AiClientException;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingRequest;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingResponse;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingResultData;
-import com.ktb.lookddak.global.client.ai.fitting.exception.AiFittingException;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -60,7 +60,7 @@ public class AiFittingClient {
                         this::createRequestException
                 )
                 .onErrorMap(
-                        exception -> !(exception instanceof AiFittingException),
+                        exception -> !(exception instanceof AiClientException),
                         this::createInvalidResponseException
                 )
                 .block();
@@ -68,12 +68,12 @@ public class AiFittingClient {
         return validateSuccessResponse(response);
     }
 
-    private AiFittingException parseErrorResponse(
+    private AiClientException parseErrorResponse(
             int httpStatus,
             String body
     ) {
         if (!StringUtils.hasText(body)) {
-            return new AiFittingException(
+            return new AiClientException(
                     "AI_HTTP_ERROR",
                     "AI 가상피팅 서버가 오류를 반환했습니다.",
                     httpStatus
@@ -88,13 +88,13 @@ public class AiFittingClient {
             String code = StringUtils.hasText(response.getCode())
                     ? response.getCode()
                     : "AI_HTTP_ERROR";
-            return new AiFittingException(
+            return new AiClientException(
                     code,
                     response.getMessage(),
                     httpStatus
             );
         } catch (JacksonException exception) {
-            return new AiFittingException(
+            return new AiClientException(
                     "AI_INVALID_RESPONSE",
                     "AI 가상피팅 오류 응답을 해석할 수 없습니다.",
                     httpStatus,
@@ -115,7 +115,7 @@ public class AiFittingClient {
                 || !StringUtils.hasText(data.getResultImageKey())
                 || !StringUtils.hasText(data.getLlmTitle())
                 || !StringUtils.hasText(data.getLlmComment())) {
-            throw new AiFittingException(
+            throw new AiClientException(
                     "AI_INVALID_RESPONSE",
                     "AI 가상피팅 성공 응답이 올바르지 않습니다.",
                     null
@@ -124,8 +124,8 @@ public class AiFittingClient {
         return data;
     }
 
-    private AiFittingException createTimeoutException(Throwable exception) {
-        return new AiFittingException(
+    private AiClientException createTimeoutException(Throwable exception) {
+        return new AiClientException(
                 "AI_RESPONSE_TIMEOUT",
                 "AI 가상피팅 응답 시간을 초과했습니다.",
                 null,
@@ -133,13 +133,13 @@ public class AiFittingClient {
         );
     }
 
-    private AiFittingException createRequestException(
+    private AiClientException createRequestException(
             WebClientRequestException exception
     ) {
         if (isTimeout(exception)) {
             return createTimeoutException(exception);
         }
-        return new AiFittingException(
+        return new AiClientException(
                 "AI_SERVER_UNAVAILABLE",
                 "AI 가상피팅 서버에 연결할 수 없습니다.",
                 null,
@@ -147,10 +147,10 @@ public class AiFittingClient {
         );
     }
 
-    private AiFittingException createInvalidResponseException(
+    private AiClientException createInvalidResponseException(
             Throwable exception
     ) {
-        return new AiFittingException(
+        return new AiClientException(
                 "AI_INVALID_RESPONSE",
                 "AI 가상피팅 응답을 처리할 수 없습니다.",
                 null,

@@ -1,7 +1,7 @@
 package com.ktb.lookddak.global.client.ai.bodyimage;
 
 import com.ktb.lookddak.domain.image.exception.BodyImageValidationException;
-import com.ktb.lookddak.global.client.ai.bodyimage.exception.AiBodyImageValidationException;
+import com.ktb.lookddak.global.client.ai.exception.AiClientException;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import com.ktb.lookddak.global.exception.ExternalApiException;
@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class AiBodyImageValidationErrorMapper {
 
-    public RuntimeException map(AiBodyImageValidationException exception) {
+    public RuntimeException map(AiClientException exception) {
         if ("AI_RESPONSE_TIMEOUT".equals(exception.getCode())) {
             return new ExternalApiException(
                     ErrorCode.BODY_IMAGE_VALIDATION_TIMEOUT,
@@ -42,7 +42,7 @@ public class AiBodyImageValidationErrorMapper {
     }
 
     private boolean isUserValidationError(
-            AiBodyImageValidationException exception
+            AiClientException exception
     ) {
         Integer status = exception.getHttpStatus();
         return status != null

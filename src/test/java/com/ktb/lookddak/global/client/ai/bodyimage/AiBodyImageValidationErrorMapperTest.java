@@ -1,7 +1,7 @@
 package com.ktb.lookddak.global.client.ai.bodyimage;
 
 import com.ktb.lookddak.domain.image.exception.BodyImageValidationException;
-import com.ktb.lookddak.global.client.ai.bodyimage.exception.AiBodyImageValidationException;
+import com.ktb.lookddak.global.client.ai.exception.AiClientException;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import com.ktb.lookddak.global.exception.ExternalApiException;
@@ -18,7 +18,7 @@ class AiBodyImageValidationErrorMapperTest {
     @Test
     @DisplayName("AI 사용자 검증 코드와 메시지를 별도 변환 없이 보존한다")
     void preserveUserValidationError() {
-        RuntimeException mapped = mapper.map(new AiBodyImageValidationException(
+        RuntimeException mapped = mapper.map(new AiClientException(
                 "NEW_BODY_IMAGE_REASON",
                 "새롭게 추가된 사용자 안내 메시지입니다.",
                 422
@@ -52,7 +52,7 @@ class AiBodyImageValidationErrorMapperTest {
     @DisplayName("AI 처리량 초과를 429 비즈니스 오류로 변환한다")
     void mapServerBusy() {
         RuntimeException mapped = mapper.map(
-                new AiBodyImageValidationException(
+                new AiClientException(
                         "SERVER_BUSY",
                         "현재 이미지 처리 요청이 많습니다. 잠시 후 다시 시도해주세요.",
                         429
@@ -70,7 +70,7 @@ class AiBodyImageValidationErrorMapperTest {
     @DisplayName("AI 내부 오류와 불완전한 검증 오류는 공통 시스템 오류로 변환한다")
     void mapInternalErrorToSystemError() {
         assertExternalApiError(
-                mapper.map(new AiBodyImageValidationException(
+                mapper.map(new AiClientException(
                         "BODY_IMAGE_SYSTEM_FAILED",
                         "AI system error",
                         500
@@ -89,13 +89,13 @@ class AiBodyImageValidationErrorMapperTest {
                     assertThat(exception.getErrorCode())
                             .isEqualTo(expectedErrorCode);
                     assertThat(exception.getCause())
-                            .isInstanceOf(AiBodyImageValidationException.class);
+                            .isInstanceOf(AiClientException.class);
                 }
         );
     }
 
-    private AiBodyImageValidationException exception(String code) {
-        return new AiBodyImageValidationException(
+    private AiClientException exception(String code) {
+        return new AiClientException(
                 code,
                 "AI error",
                 null
