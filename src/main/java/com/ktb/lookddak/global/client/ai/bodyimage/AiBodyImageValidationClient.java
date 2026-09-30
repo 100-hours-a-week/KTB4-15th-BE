@@ -1,11 +1,10 @@
 package com.ktb.lookddak.global.client.ai.bodyimage;
 
 import com.ktb.lookddak.global.client.ai.bodyimage.dto.AiBodyImageValidationData;
-import com.ktb.lookddak.global.client.ai.bodyimage.dto.AiBodyImageValidationErrorData;
-import com.ktb.lookddak.global.client.ai.bodyimage.dto.AiBodyImageValidationErrorResponse;
 import com.ktb.lookddak.global.client.ai.bodyimage.dto.AiBodyImageValidationResponse;
-import com.ktb.lookddak.global.client.ai.bodyimage.exception.AiBodyImageValidationException;
 import com.ktb.lookddak.global.client.ai.config.AiClientProperties;
+import com.ktb.lookddak.global.client.ai.dto.AiErrorResponse;
+import com.ktb.lookddak.global.client.ai.exception.AiClientException;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.MediaType;
@@ -28,6 +27,8 @@ public class AiBodyImageValidationClient {
 
     private static final String VALIDATION_PATH =
             "/api/v1/validation/body-image";
+    private static final String VALIDATION_SUCCESS_CODE =
+            "BODY_IMAGE_UPLOAD_SUCCESS";
 
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
@@ -95,41 +96,33 @@ public class AiBodyImageValidationClient {
                 : MediaType.APPLICATION_OCTET_STREAM;
     }
 
-    private AiBodyImageValidationException parseErrorResponse(
+    private AiClientException parseErrorResponse(
             int httpStatus,
             String body
     ) {
         if (!StringUtils.hasText(body)) {
-            return new AiBodyImageValidationException(
+            return new AiClientException(
                     "AI_HTTP_ERROR",
                     "AI 서버가 오류를 반환했습니다.",
-                    httpStatus,
-                    null,
-                    null
+                    httpStatus
             );
         }
 
         try {
-            AiBodyImageValidationErrorResponse response =
-                    objectMapper.readValue(
-                            body,
-                            AiBodyImageValidationErrorResponse.class
-                    );
-            AiBodyImageValidationErrorData data = response.getData();
-            return new AiBodyImageValidationException(
+            AiErrorResponse response = objectMapper.readValue(
+                    body,
+                    AiErrorResponse.class
+            );
+            return new AiClientException(
+                    response.getCode(),
                     response.getMessage(),
-                    "AI 전신사진 검증 요청이 실패했습니다.",
-                    httpStatus,
-                    data == null ? null : data.getReasonCode(),
-                    data == null ? null : data.getReason()
+                    httpStatus
             );
         } catch (JacksonException exception) {
-            return new AiBodyImageValidationException(
+            return new AiClientException(
                     "AI_INVALID_RESPONSE",
                     "AI 오류 응답 형식을 해석할 수 없습니다.",
                     httpStatus,
-                    null,
-                    null,
                     exception
             );
         }
@@ -139,42 +132,39 @@ public class AiBodyImageValidationClient {
         AiBodyImageValidationData data = response == null
                 ? null
                 : response.getData();
-        if (data == null || !StringUtils.hasText(data.getS3Key())) {
-            throw new AiBodyImageValidationException(
+        if (response == null
+                || !VALIDATION_SUCCESS_CODE.equals(response.getCode())
+                || data == null
+                || !StringUtils.hasText(data.getS3Key())) {
+            throw new AiClientException(
                     "AI_INVALID_RESPONSE",
                     "AI 응답에 S3 객체 Key가 없습니다.",
-                    null,
-                    null,
                     null
             );
         }
         return data.getS3Key();
     }
 
-    private AiBodyImageValidationException createTimeoutException(
+    private AiClientException createTimeoutException(
             Throwable exception
     ) {
-        return new AiBodyImageValidationException(
+        return new AiClientException(
                 "AI_RESPONSE_TIMEOUT",
                 "AI 전신사진 검증 응답 시간을 초과했습니다.",
-                null,
-                null,
                 null,
                 exception
         );
     }
 
-    private AiBodyImageValidationException createRequestException(
+    private AiClientException createRequestException(
             WebClientRequestException exception
     ) {
         if (isTimeout(exception)) {
             return createTimeoutException(exception);
         }
-        return new AiBodyImageValidationException(
+        return new AiClientException(
                 "AI_SERVER_UNAVAILABLE",
                 "AI 서버에 연결할 수 없습니다.",
-                null,
-                null,
                 null,
                 exception
         );

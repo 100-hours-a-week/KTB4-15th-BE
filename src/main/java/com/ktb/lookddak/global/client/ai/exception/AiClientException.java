@@ -1,14 +1,14 @@
-package com.ktb.lookddak.global.client.ai.fitting.exception;
+package com.ktb.lookddak.global.client.ai.exception;
 
 import lombok.Getter;
 
 @Getter
-public class AiFittingException extends RuntimeException {
+public class AiClientException extends RuntimeException {
 
     private final String code;
     private final Integer httpStatus;
 
-    public AiFittingException(
+    public AiClientException(
             String code,
             String message,
             Integer httpStatus
@@ -16,7 +16,7 @@ public class AiFittingException extends RuntimeException {
         this(code, message, httpStatus, null);
     }
 
-    public AiFittingException(
+    public AiClientException(
             String code,
             String message,
             Integer httpStatus,

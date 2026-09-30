@@ -4,6 +4,7 @@ import com.ktb.lookddak.global.client.ai.config.AiClientProperties;
 import com.ktb.lookddak.global.client.ai.dto.AiChatDoneResponse;
 import com.ktb.lookddak.global.client.ai.dto.AiChatErrorResponse;
 import com.ktb.lookddak.global.client.ai.dto.AiChatRequest;
+import com.ktb.lookddak.global.client.ai.dto.AiErrorResponse;
 import com.ktb.lookddak.global.client.ai.exception.AiChatException;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
@@ -49,12 +50,8 @@ public class AiChatClient {
                 .onStatus(status -> status.isError(), response ->
                         response.bodyToMono(String.class)
                                 .defaultIfEmpty("")
-                                .map(body -> new AiChatException(
-                                        "AI_HTTP_ERROR",
-                                        "AI 서버가 HTTP "
-                                                + response.statusCode().value()
-                                                + " 오류를 반환했습니다. "
-                                                + body,
+                                .map(body -> parseHttpError(
+                                        body,
                                         request.getChatId()
                                 ))
                 )
@@ -89,6 +86,35 @@ public class AiChatClient {
                         )
                 )
                 .block();
+    }
+
+    private AiChatException parseHttpError(String body, Long chatId) {
+        if (body == null || body.isBlank()) {
+            return new AiChatException(
+                    "AI_HTTP_ERROR",
+                    "AI 서버가 오류를 반환했습니다.",
+                    chatId
+            );
+        }
+
+        try {
+            AiErrorResponse response = objectMapper.readValue(
+                    body,
+                    AiErrorResponse.class
+            );
+            return new AiChatException(
+                    response.getCode(),
+                    response.getMessage(),
+                    chatId
+            );
+        } catch (JacksonException exception) {
+            return new AiChatException(
+                    "AI_INVALID_RESPONSE",
+                    "AI 오류 응답 형식을 해석할 수 없습니다.",
+                    chatId,
+                    exception
+            );
+        }
     }
 
     private AiChatDoneResponse parseDoneEvent(
