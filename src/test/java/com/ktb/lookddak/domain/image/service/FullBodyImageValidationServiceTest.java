@@ -8,7 +8,7 @@ import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
 import com.ktb.lookddak.global.client.ai.bodyimage.AiBodyImageValidationClient;
 import com.ktb.lookddak.global.client.ai.bodyimage.AiBodyImageValidationErrorMapper;
-import com.ktb.lookddak.global.client.ai.bodyimage.exception.AiBodyImageValidationException;
+import com.ktb.lookddak.global.client.ai.exception.AiClientException;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import com.ktb.lookddak.global.exception.ExternalApiException;
@@ -99,12 +99,10 @@ class FullBodyImageValidationServiceTest {
         Long memberId = 1L;
         MockMultipartFile image = image();
         Member member = Member.create("member@test.com", "encoded-password");
-        AiBodyImageValidationException aiException =
-                new AiBodyImageValidationException(
+        AiClientException aiException =
+                new AiClientException(
                         "AI_SERVER_UNAVAILABLE",
                         "AI server unavailable",
-                        null,
-                        null,
                         null
                 );
         ExternalApiException mappedException = new ExternalApiException(

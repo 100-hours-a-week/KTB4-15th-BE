@@ -124,7 +124,8 @@ class AiChatClientTest {
                                 "Content-Type",
                                 MediaType.APPLICATION_JSON_VALUE
                         )
-                        .body("{\"code\":401,\"message\":\"unauthorized\",\"data\":null}")
+                        .body("{\"code\":\"UNAUTHORIZED\",\"data\":null,"
+                                + "\"message\":\"인증에 실패했습니다.\"}")
                         .build()
         );
         AiChatClient client = createClient(
@@ -132,7 +133,7 @@ class AiChatClientTest {
                 Duration.ofSeconds(1)
         );
 
-        assertExceptionCode(client, "AI_HTTP_ERROR");
+        assertExceptionCode(client, "UNAUTHORIZED");
     }
 
     @Test

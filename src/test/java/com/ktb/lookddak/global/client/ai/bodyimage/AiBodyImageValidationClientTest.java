@@ -1,6 +1,6 @@
 package com.ktb.lookddak.global.client.ai.bodyimage;
 
-import com.ktb.lookddak.global.client.ai.bodyimage.exception.AiBodyImageValidationException;
+import com.ktb.lookddak.global.client.ai.exception.AiClientException;
 import com.ktb.lookddak.global.client.ai.config.AiClientProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -63,17 +63,14 @@ class AiBodyImageValidationClientTest {
     }
 
     @Test
-    @DisplayName("AI 사용자 검증 실패의 reasonCode와 reason을 보존한다")
+    @DisplayName("AI 사용자 검증 실패의 code와 message를 보존한다")
     void preserveAiValidationError() {
         AiBodyImageValidationClient client = createClient(
                 jsonResponse(HttpStatus.UNPROCESSABLE_CONTENT, """
                         {
-                          "code": 422,
-                          "message": "body_image_validation_failed",
-                          "data": {
-                            "reason_code": "FULL_BODY_NOT_VISIBLE",
-                            "reason": "머리부터 발끝까지 모두 나오도록 전신을 촬영해주세요."
-                          }
+                          "code": "FULL_BODY_NOT_VISIBLE",
+                          "data": null,
+                          "message": "머리부터 발끝까지 모두 나오도록 전신을 촬영해주세요."
                         }
                         """),
                 Duration.ofSeconds(1)
@@ -81,15 +78,39 @@ class AiBodyImageValidationClientTest {
 
         assertThatThrownBy(() -> client.validate(7L, image()))
                 .isInstanceOfSatisfying(
-                        AiBodyImageValidationException.class,
+                        AiClientException.class,
                         exception -> {
                             assertThat(exception.getHttpStatus()).isEqualTo(422);
                             assertThat(exception.getCode())
-                                    .isEqualTo("body_image_validation_failed");
-                            assertThat(exception.getReasonCode())
                                     .isEqualTo("FULL_BODY_NOT_VISIBLE");
-                            assertThat(exception.getReason())
+                            assertThat(exception.getMessage())
                                     .isEqualTo("머리부터 발끝까지 모두 나오도록 전신을 촬영해주세요.");
+                        }
+                );
+    }
+
+    @Test
+    @DisplayName("AI 서버 처리량 초과의 code와 HTTP 상태를 보존한다")
+    void preserveServerBusyError() {
+        AiBodyImageValidationClient client = createClient(
+                jsonResponse(HttpStatus.TOO_MANY_REQUESTS, """
+                        {
+                          "code": "SERVER_BUSY",
+                          "data": null,
+                          "message": "현재 이미지 처리 요청이 많습니다. 잠시 후 다시 시도해주세요."
+                        }
+                        """),
+                Duration.ofSeconds(1)
+        );
+
+        assertThatThrownBy(() -> client.validate(7L, image()))
+                .isInstanceOfSatisfying(
+                        AiClientException.class,
+                        exception -> {
+                            assertThat(exception.getCode())
+                                    .isEqualTo("SERVER_BUSY");
+                            assertThat(exception.getHttpStatus())
+                                    .isEqualTo(429);
                         }
                 );
     }
@@ -100,9 +121,28 @@ class AiBodyImageValidationClientTest {
         AiBodyImageValidationClient client = createClient(
                 jsonResponse(HttpStatus.OK, """
                         {
-                          "code": 200,
-                          "message": "body_image_validation_success",
-                          "data": {"s3_key": "", "warnings": []}
+                          "code": "BODY_IMAGE_UPLOAD_SUCCESS",
+                          "data": {"s3_key": ""},
+                          "message": "전신 사진 검증에 성공했습니다."
+                        }
+                        """),
+                Duration.ofSeconds(1)
+        );
+
+        assertExceptionCode(client, "AI_INVALID_RESPONSE");
+    }
+
+    @Test
+    @DisplayName("성공 응답의 애플리케이션 코드가 다르면 거부한다")
+    void rejectUnexpectedSuccessCode() {
+        AiBodyImageValidationClient client = createClient(
+                jsonResponse(HttpStatus.OK, """
+                        {
+                          "code": "UNEXPECTED_CODE",
+                          "data": {
+                            "s3_key": "users/7/body-images/example.png"
+                          },
+                          "message": "예상하지 못한 응답"
                         }
                         """),
                 Duration.ofSeconds(1)
@@ -128,7 +168,7 @@ class AiBodyImageValidationClientTest {
     ) {
         assertThatThrownBy(() -> client.validate(7L, image()))
                 .isInstanceOfSatisfying(
-                        AiBodyImageValidationException.class,
+                        AiClientException.class,
                         exception -> assertThat(exception.getCode())
                                 .isEqualTo(expectedCode)
                 );
@@ -174,12 +214,11 @@ class AiBodyImageValidationClientTest {
     private String successBody() {
         return """
                 {
-                  "code": 200,
-                  "message": "body_image_validation_success",
+                  "code": "BODY_IMAGE_UPLOAD_SUCCESS",
                   "data": {
-                    "s3_key": "users/7/body-images/example.png",
-                    "warnings": []
-                  }
+                    "s3_key": "users/7/body-images/example.png"
+                  },
+                  "message": "전신 사진 검증에 성공했습니다."
                 }
                 """;
     }

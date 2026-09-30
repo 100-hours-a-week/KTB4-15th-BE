@@ -40,20 +40,21 @@ class AiFittingDtoTest {
         AiFittingResponse response = objectMapper.readValue(
                 """
                         {
-                          "code": 200,
-                          "message": "fitting_succeeded",
+                          "code": "FITTING_SUCCESS",
                           "data": {
                             "result_image_key": "virtual-fitting/results/result.png",
                             "llm_title": "차분한 미니멀 데이트룩",
                             "llm_comment": "깔끔한 색감이 어우러지는 코디입니다."
-                          }
+                          },
+                          "message": "가상 피팅이 완료되었습니다."
                         }
                         """,
                 AiFittingResponse.class
         );
 
-        assertThat(response.getCode()).isEqualTo(200);
-        assertThat(response.getMessage()).isEqualTo("fitting_succeeded");
+        assertThat(response.getCode()).isEqualTo("FITTING_SUCCESS");
+        assertThat(response.getMessage())
+                .isEqualTo("가상 피팅이 완료되었습니다.");
         assertThat(response.getData().getResultImageKey())
                 .isEqualTo("virtual-fitting/results/result.png");
         assertThat(response.getData().getLlmTitle())
@@ -68,16 +69,17 @@ class AiFittingDtoTest {
         AiFittingResponse response = objectMapper.readValue(
                 """
                         {
-                          "code": 500,
-                          "message": "internal_server_error",
-                          "data": null
+                          "code": "INTERNAL_SERVER_ERROR",
+                          "data": null,
+                          "message": "서버 내부 오류가 발생했습니다."
                         }
                         """,
                 AiFittingResponse.class
         );
 
-        assertThat(response.getCode()).isEqualTo(500);
-        assertThat(response.getMessage()).isEqualTo("internal_server_error");
+        assertThat(response.getCode()).isEqualTo("INTERNAL_SERVER_ERROR");
+        assertThat(response.getMessage())
+                .isEqualTo("서버 내부 오류가 발생했습니다.");
         assertThat(response.getData()).isNull();
     }
 }

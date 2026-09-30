@@ -4,10 +4,10 @@ import com.ktb.lookddak.domain.fitting.command.FittingGenerationCommand;
 import com.ktb.lookddak.domain.fitting.service.FittingGenerationQueryService;
 import com.ktb.lookddak.global.client.ai.config.AiTaskExecutorMonitor;
 import com.ktb.lookddak.global.client.ai.fitting.AiFittingClient;
+import com.ktb.lookddak.global.client.ai.exception.AiClientException;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingProductRequest;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingRequest;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingResultData;
-import com.ktb.lookddak.global.client.ai.fitting.exception.AiFittingException;
 import com.ktb.lookddak.global.storage.s3.S3PresignedUrlProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -102,7 +102,7 @@ public class FittingGenerationEventListener {
                     elapsedMillis(startedAtNanos, System.nanoTime()),
                     elapsedMillis(submittedAtNanos, System.nanoTime())
             );
-        } catch (AiFittingException exception) {
+        } catch (AiClientException exception) {
             log.warn(
                     "AI_FITTING_FAILED fittingJobId={} code={} elapsedMs={}",
                     event.getFittingJobId(),
