@@ -21,7 +21,7 @@ import java.math.BigDecimal;
 public class MemberProfileCreateRequest {
 
     private static final String NAME_PATTERN =
-            "^[가-힣A-Za-z]+(?: [가-힣A-Za-z]+)*$";
+            "^[가-힣A-Za-z0-9]+(?: [가-힣A-Za-z0-9]+)*$";
 
     @NotBlank
     @Size(max = 10)

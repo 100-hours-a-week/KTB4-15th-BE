@@ -22,10 +22,10 @@ class MemberProfileCreateRequestTest {
     }
 
     @Test
-    @DisplayName("한글·영문·중간 공백과 소수점 한 자리의 기본정보를 허용한다")
+    @DisplayName("한글·영문·숫자·중간 공백과 소수점 한 자리의 기본정보를 허용한다")
     void acceptValidRequest() {
         MemberProfileCreateRequest request = createRequest(
-                "John Doe",
+                "John Do123",
                 new BigDecimal("175.5"),
                 new BigDecimal("70.3")
         );
@@ -37,10 +37,10 @@ class MemberProfileCreateRequestTest {
     }
 
     @Test
-    @DisplayName("이름에 숫자나 연속된 공백이 있으면 거부한다")
+    @DisplayName("이름에 연속된 공백이 있으면 거부한다")
     void rejectInvalidName() {
         MemberProfileCreateRequest request = createRequest(
-                "John  1",
+                "John  Doe123",
                 new BigDecimal("175.5"),
                 new BigDecimal("70.3")
         );
