@@ -4,6 +4,7 @@ import com.ktb.lookddak.global.client.ai.chat.AiChatClient;
 import com.ktb.lookddak.global.client.ai.config.AiTaskExecutorMonitor;
 import com.ktb.lookddak.global.client.ai.dto.AiChatDoneResponse;
 import com.ktb.lookddak.global.client.ai.exception.AiChatException;
+import com.ktb.lookddak.global.client.ai.exception.AiFailureClassifier;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationEventPublisher;
@@ -86,14 +87,7 @@ public class ChatGenerationEventListener {
                     elapsedMillis(submittedAtNanos, System.nanoTime())
             );
         } catch (AiChatException exception) {
-            log.warn(
-                    "AI_CHAT_FAILED chatRoomId={} userMessageId={} code={} elapsedMs={}",
-                    event.getChatRoomId(),
-                    event.getUserMessageId(),
-                    exception.getCode(),
-                    elapsedMillis(startedAtNanos, System.nanoTime()),
-                    exception
-            );
+            logAiFailure(event, exception, startedAtNanos);
             publishFailure(event, exception.getCode(), exception.getMessage());
         } catch (Exception exception) {
             log.error(
@@ -112,6 +106,33 @@ public class ChatGenerationEventListener {
         } finally {
             executorMonitor.logStatus("chat", chatTaskExecutor);
         }
+    }
+
+    private void logAiFailure(
+            ChatGenerationRequestedEvent event,
+            AiChatException exception,
+            long startedAtNanos
+    ) {
+        if (AiFailureClassifier.requiresIncidentAlert(exception.getCode())) {
+            log.error(
+                    "AI_CHAT_FAILED chatRoomId={} userMessageId={} code={} elapsedMs={}",
+                    event.getChatRoomId(),
+                    event.getUserMessageId(),
+                    exception.getCode(),
+                    elapsedMillis(startedAtNanos, System.nanoTime()),
+                    exception
+            );
+            return;
+        }
+
+        log.warn(
+                "AI_CHAT_FAILED chatRoomId={} userMessageId={} code={} elapsedMs={}",
+                event.getChatRoomId(),
+                event.getUserMessageId(),
+                exception.getCode(),
+                elapsedMillis(startedAtNanos, System.nanoTime()),
+                exception
+        );
     }
 
     private long elapsedMillis(long startNanos, long endNanos) {

@@ -5,6 +5,7 @@ import com.ktb.lookddak.domain.fitting.service.FittingGenerationQueryService;
 import com.ktb.lookddak.global.client.ai.config.AiTaskExecutorMonitor;
 import com.ktb.lookddak.global.client.ai.fitting.AiFittingClient;
 import com.ktb.lookddak.global.client.ai.exception.AiClientException;
+import com.ktb.lookddak.global.client.ai.exception.AiFailureClassifier;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingProductRequest;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingRequest;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingResultData;
@@ -103,13 +104,7 @@ public class FittingGenerationEventListener {
                     elapsedMillis(submittedAtNanos, System.nanoTime())
             );
         } catch (AiClientException exception) {
-            log.warn(
-                    "AI_FITTING_FAILED fittingJobId={} code={} elapsedMs={}",
-                    event.getFittingJobId(),
-                    exception.getCode(),
-                    elapsedMillis(startedAtNanos, System.nanoTime()),
-                    exception
-            );
+            logAiFailure(event, exception, startedAtNanos);
             publishFailure(
                     event.getFittingJobId(),
                     exception.getCode(),
@@ -131,6 +126,31 @@ public class FittingGenerationEventListener {
         } finally {
             executorMonitor.logStatus("fitting", fittingTaskExecutor);
         }
+    }
+
+    private void logAiFailure(
+            FittingGenerationRequestedEvent event,
+            AiClientException exception,
+            long startedAtNanos
+    ) {
+        if (AiFailureClassifier.requiresIncidentAlert(exception.getCode())) {
+            log.error(
+                    "AI_FITTING_FAILED fittingJobId={} code={} elapsedMs={}",
+                    event.getFittingJobId(),
+                    exception.getCode(),
+                    elapsedMillis(startedAtNanos, System.nanoTime()),
+                    exception
+            );
+            return;
+        }
+
+        log.warn(
+                "AI_FITTING_FAILED fittingJobId={} code={} elapsedMs={}",
+                event.getFittingJobId(),
+                exception.getCode(),
+                elapsedMillis(startedAtNanos, System.nanoTime()),
+                exception
+        );
     }
 
     private long elapsedMillis(long startNanos, long endNanos) {
