@@ -68,12 +68,12 @@ public class ChatGenerationResultService {
 
     @Transactional
     public void fail(Long userMessageId) {
-        ChatMessage userMessage = getUserMessageForUpdate(userMessageId);
-        if (!isGenerating(userMessage)) {
-            return;
-        }
-
-        userMessage.failGeneration();
+        chatMessageRepository.updateGenerationStatusIfCurrent(
+                userMessageId,
+                ChatSenderType.USER,
+                ChatGenerationStatus.GENERATING,
+                ChatGenerationStatus.FAILED
+        );
     }
 
     private void saveRecommendation(

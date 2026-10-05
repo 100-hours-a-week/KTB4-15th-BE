@@ -38,12 +38,11 @@ public class FittingGenerationResultService {
 
     @Transactional
     public void fail(Long fittingJobId) {
-        FittingJob fittingJob = getFittingJobForUpdate(fittingJobId);
-        if (!isGenerating(fittingJob)) {
-            return;
-        }
-
-        fittingJob.failGeneration();
+        fittingJobRepository.updateStatusIfCurrent(
+                fittingJobId,
+                FittingJobStatus.GENERATING,
+                FittingJobStatus.FAILED
+        );
     }
 
     private FittingJob getFittingJobForUpdate(Long fittingJobId) {

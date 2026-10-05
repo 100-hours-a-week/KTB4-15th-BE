@@ -74,6 +74,38 @@ class FittingJobRepositoryTest {
     }
 
     @Test
+    @DisplayName("생성 중인 가상피팅 작업만 조건부로 실패 상태로 변경한다")
+    void updateStatusOnlyWhenGenerating() {
+        FittingJob generatingJob = fittingJobRepository.saveAndFlush(
+                FittingJob.create(member)
+        );
+        FittingJob completedJob = FittingJob.create(member);
+        completedJob.completeGeneration();
+        fittingJobRepository.saveAndFlush(completedJob);
+        entityManager.clear();
+
+        int updatedGenerating = fittingJobRepository.updateStatusIfCurrent(
+                generatingJob.getId(),
+                FittingJobStatus.GENERATING,
+                FittingJobStatus.FAILED
+        );
+        int updatedCompleted = fittingJobRepository.updateStatusIfCurrent(
+                completedJob.getId(),
+                FittingJobStatus.GENERATING,
+                FittingJobStatus.FAILED
+        );
+
+        assertThat(updatedGenerating).isEqualTo(1);
+        assertThat(updatedCompleted).isZero();
+        assertThat(fittingJobRepository.findById(generatingJob.getId())
+                .orElseThrow()
+                .getStatus()).isEqualTo(FittingJobStatus.FAILED);
+        assertThat(fittingJobRepository.findById(completedJob.getId())
+                .orElseThrow()
+                .getStatus()).isEqualTo(FittingJobStatus.COMPLETED);
+    }
+
+    @Test
     @DisplayName("가상피팅 작업과 소유 회원을 함께 조회한다")
     void findFittingJobWithMember() {
         FittingJob savedJob = fittingJobRepository.saveAndFlush(

@@ -19,6 +19,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -67,16 +68,14 @@ class FittingGenerationResultServiceTest {
     @Test
     @DisplayName("AI 생성 실패 시 가상피팅 작업을 실패 처리한다")
     void failGeneration() {
-        FittingJob fittingJob = FittingJob.create(Member.create(
-                "fitting-failed@lookddak.com",
-                "encoded-password"
-        ));
-        given(fittingJobRepository.findByIdForGenerationUpdate(100L))
-                .willReturn(Optional.of(fittingJob));
-
         resultService.fail(100L);
 
-        assertThat(fittingJob.getStatus()).isEqualTo(FittingJobStatus.FAILED);
+        then(fittingJobRepository).should()
+                .updateStatusIfCurrent(
+                        100L,
+                        FittingJobStatus.GENERATING,
+                        FittingJobStatus.FAILED
+                );
         verify(fittingTempResultRepository, never()).save(
                 org.mockito.ArgumentMatchers.any()
         );
