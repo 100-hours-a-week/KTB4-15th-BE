@@ -54,6 +54,38 @@ class ProductRepositoryTest {
         ).isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    @Test
+    @DisplayName("구매 링크 클릭 수를 원자적으로 1 증가시킨다")
+    void incrementClickCount() {
+        Product product = productRepository.saveAndFlush(
+                createProduct("0000001")
+        );
+        entityManager.clear();
+
+        int firstUpdatedRowCount = productRepository.incrementClickCount(
+                product.getId()
+        );
+        int secondUpdatedRowCount = productRepository.incrementClickCount(
+                product.getId()
+        );
+        entityManager.flush();
+        entityManager.clear();
+
+        Product updatedProduct = productRepository.findById(product.getId())
+                .orElseThrow();
+        assertThat(firstUpdatedRowCount).isEqualTo(1);
+        assertThat(secondUpdatedRowCount).isEqualTo(1);
+        assertThat(updatedProduct.getClickCount()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 상품의 클릭 수는 증가시키지 않는다")
+    void doNotIncrementMissingProduct() {
+        int updatedRowCount = productRepository.incrementClickCount(999L);
+
+        assertThat(updatedRowCount).isZero();
+    }
+
     private Product createProduct(String productCode) {
         return Product.create(
                 productCode,

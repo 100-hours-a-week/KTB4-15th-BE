@@ -44,6 +44,9 @@ public class Product {
     @Column(name = "purchase_url", nullable = false, length = 2048)
     private String purchaseUrl;
 
+    @Column(name = "click_count", nullable = false)
+    private Long clickCount = 0L;
+
     private Product(
             String productCode,
             String name,

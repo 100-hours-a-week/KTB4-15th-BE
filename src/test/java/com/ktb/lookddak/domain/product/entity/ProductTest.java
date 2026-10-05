@@ -29,5 +29,6 @@ class ProductTest {
         assertThat(product.getItemType()).isEqualTo(ProductItemType.TOP);
         assertThat(product.getPurchaseUrl())
                 .isEqualTo("https://shop.lookddak.com/products/1");
+        assertThat(product.getClickCount()).isZero();
     }
 }
