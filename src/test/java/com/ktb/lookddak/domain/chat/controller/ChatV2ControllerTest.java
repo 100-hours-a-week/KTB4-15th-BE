@@ -3,6 +3,7 @@ package com.ktb.lookddak.domain.chat.controller;
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
 import com.ktb.lookddak.domain.chat.service.ChatV2Service;
+import com.ktb.lookddak.domain.chat.service.ChatSseService;
 import com.ktb.lookddak.global.exception.GlobalExceptionHandler;
 import com.ktb.lookddak.global.security.principal.MemberPrincipal;
 import org.junit.jupiter.api.AfterEach;
@@ -27,6 +28,8 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -37,6 +40,9 @@ class ChatV2ControllerTest {
     private ChatV2Service chatV2Service;
 
     @Mock
+    private ChatSseService chatSseService;
+
+    @Mock
     private MemberPrincipal principal;
 
     private MockMvc mockMvc;
@@ -44,7 +50,7 @@ class ChatV2ControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new ChatV2Controller(chatV2Service))
+                .standaloneSetup(new ChatV2Controller(chatV2Service, chatSseService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(
                         new AuthenticationPrincipalArgumentResolver()
@@ -114,5 +120,19 @@ class ChatV2ControllerTest {
                 .andExpect(jsonPath("$.data.messageId").value(101));
 
         verify(chatV2Service).createMessage(eq(1L), eq(10L), any());
+    }
+
+    @Test
+    @DisplayName("V2 SSE 연결 요청은 채팅 메시지 연결 서비스를 호출한다")
+    void connectStream() throws Exception {
+        given(chatSseService.connect(1L, 10L, 100L))
+                .willReturn(new org.springframework.web.servlet.mvc.method.annotation.SseEmitter());
+
+        mockMvc.perform(get("/api/v2/chat-rooms/10/messages/100/stream")
+                        .accept("text/event-stream"))
+                .andExpect(request().asyncStarted())
+                .andExpect(status().isOk());
+
+        verify(chatSseService).connect(1L, 10L, 100L);
     }
 }

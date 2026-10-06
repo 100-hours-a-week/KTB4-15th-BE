@@ -1,0 +1,97 @@
+package com.ktb.lookddak.domain.chat.service;
+
+import com.ktb.lookddak.domain.chat.dto.ChatSseConnectedResponse;
+import com.ktb.lookddak.domain.chat.entity.ChatMessage;
+import com.ktb.lookddak.domain.chat.entity.ChatSenderType;
+import com.ktb.lookddak.domain.chat.entity.ChatRoom;
+import com.ktb.lookddak.domain.chat.repository.ChatMessageRepository;
+import com.ktb.lookddak.domain.chat.repository.ChatRoomRepository;
+import com.ktb.lookddak.global.exception.BusinessException;
+import com.ktb.lookddak.global.exception.ErrorCode;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.io.IOException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+@Service
+@RequiredArgsConstructor
+public class ChatSseService {
+
+    private static final long SSE_TIMEOUT_MILLIS = 5 * 60 * 1000L;
+
+    private final ChatRoomRepository chatRoomRepository;
+    private final ChatMessageRepository chatMessageRepository;
+    private final ConcurrentMap<Long, SseEmitter> emitters = new ConcurrentHashMap<>();
+
+    /**
+     * SSE 연결을 생성하고, 현재 로그인한 회원이 요청한 메시지를 조회할 권한이 있는지 확인한다.
+     * 연결을 보관하는 동안에는 DB 트랜잭션이나 DB 커넥션을 유지하지 않는다.
+     */
+    public SseEmitter connect(
+            Long memberId,
+            Long chatRoomId,
+            Long userMessageId
+    ) {
+        validateMessageAccess(memberId, chatRoomId, userMessageId);
+
+        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MILLIS);
+        register(userMessageId, emitter);
+        sendConnectedEvent(userMessageId, emitter);
+
+        return emitter;
+    }
+
+    private void validateMessageAccess(
+            Long memberId,
+            Long chatRoomId,
+            Long userMessageId
+    ) {
+        ChatRoom chatRoom = chatRoomRepository.findActiveById(chatRoomId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.CHAT_ROOM_NOT_FOUND
+                ));
+
+        if (!chatRoom.isOwnedBy(memberId)) {
+            throw new BusinessException(ErrorCode.CHAT_ROOM_ACCESS_DENIED);
+        }
+
+        ChatMessage message = chatMessageRepository
+                .findByIdAndChatRoomId(userMessageId, chatRoomId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.CHAT_MESSAGE_NOT_FOUND
+                ));
+
+        if (message.getSenderType() != ChatSenderType.USER) {
+            throw new BusinessException(ErrorCode.CHAT_MESSAGE_NOT_FOUND);
+        }
+    }
+
+    private void register(Long userMessageId, SseEmitter emitter) {
+        SseEmitter previousEmitter = emitters.put(userMessageId, emitter);
+        if (previousEmitter != null) {
+            previousEmitter.complete();
+        }
+
+        emitter.onCompletion(() -> emitters.remove(userMessageId, emitter));
+        emitter.onTimeout(() -> emitters.remove(userMessageId, emitter));
+        emitter.onError(exception -> emitters.remove(userMessageId, emitter));
+    }
+
+    private void sendConnectedEvent(Long userMessageId, SseEmitter emitter) {
+        try {
+            emitter.send(SseEmitter.event()
+                    .name("connected")
+                    .data(new ChatSseConnectedResponse(userMessageId)));
+        } catch (IOException exception) {
+            emitters.remove(userMessageId, emitter);
+            emitter.completeWithError(exception);
+        }
+    }
+
+    boolean hasConnection(Long userMessageId) {
+        return emitters.containsKey(userMessageId);
+    }
+}
