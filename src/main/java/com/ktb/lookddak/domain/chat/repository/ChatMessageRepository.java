@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,6 +21,12 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             Long chatRoomId,
             ChatSenderType senderType,
             ChatGenerationStatus generationStatus
+    );
+
+    boolean existsByChatRoomIdAndSenderTypeAndGenerationStatusIn(
+            Long chatRoomId,
+            ChatSenderType senderType,
+            Collection<ChatGenerationStatus> generationStatuses
     );
 
     boolean existsByIdAndChatRoomId(Long messageId, Long chatRoomId);
