@@ -59,9 +59,10 @@ public class FittingGenerationEventListener {
             );
             executorMonitor.logStatus("fitting", fittingTaskExecutor);
         } catch (RejectedExecutionException exception) {
-            log.warn(
-                    "AI fitting task rejected. fittingJobId={}",
-                    event.getFittingJobId()
+            log.error(
+                    "AI_FITTING_TASK_REJECTED fittingJobId={}",
+                    event.getFittingJobId(),
+                    exception
             );
             executorMonitor.logStatus("fitting", fittingTaskExecutor);
             publishFailure(

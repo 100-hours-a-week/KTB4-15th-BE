@@ -46,10 +46,11 @@ public class ChatGenerationEventListener {
             );
             executorMonitor.logStatus("chat", chatTaskExecutor);
         } catch (RejectedExecutionException exception) {
-            log.warn(
-                    "AI chat task rejected. chatRoomId={}, userMessageId={}",
+            log.error(
+                    "AI_CHAT_TASK_REJECTED chatRoomId={} userMessageId={}",
                     event.getChatRoomId(),
-                    event.getUserMessageId()
+                    event.getUserMessageId(),
+                    exception
             );
             executorMonitor.logStatus("chat", chatTaskExecutor);
             publishFailure(

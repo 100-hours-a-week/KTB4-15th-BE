@@ -41,6 +41,11 @@ ai:
     max-pool-size: 1
     queue-capacity: 5
     await-termination: 5s
+  result-persistence-task:
+    core-pool-size: 1
+    max-pool-size: 1
+    queue-capacity: 50
+    await-termination: 5s
 
 aws:
   s3:
