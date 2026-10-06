@@ -13,7 +13,8 @@ import java.util.concurrent.Executor;
 @Configuration
 @EnableConfigurationProperties({
         AiChatTaskProperties.class,
-        AiFittingTaskProperties.class
+        AiFittingTaskProperties.class,
+        AiResultPersistenceTaskProperties.class
 })
 public class AiAsyncConfig {
 
@@ -36,6 +37,19 @@ public class AiAsyncConfig {
                 properties.getQueueCapacity(),
                 properties.getAwaitTermination(),
                 "ai-fitting-"
+        );
+    }
+
+    @Bean(name = "aiResultPersistenceExecutor")
+    public Executor aiResultPersistenceExecutor(
+            AiResultPersistenceTaskProperties properties
+    ) {
+        return createExecutor(
+                properties.getCorePoolSize(),
+                properties.getMaxPoolSize(),
+                properties.getQueueCapacity(),
+                properties.getAwaitTermination(),
+                "ai-result-persistence-"
         );
     }
 

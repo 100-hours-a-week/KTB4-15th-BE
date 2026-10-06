@@ -28,7 +28,11 @@ class AiExecutorPropertiesBindingTest {
                         "ai.fitting-task.core-pool-size=1",
                         "ai.fitting-task.max-pool-size=1",
                         "ai.fitting-task.queue-capacity=5",
-                        "ai.fitting-task.await-termination=120s"
+                        "ai.fitting-task.await-termination=120s",
+                        "ai.result-persistence-task.core-pool-size=1",
+                        "ai.result-persistence-task.max-pool-size=1",
+                        "ai.result-persistence-task.queue-capacity=50",
+                        "ai.result-persistence-task.await-termination=30s"
                 )
                 .run(context -> {
                     assertThat(context).hasNotFailed();
@@ -50,6 +54,19 @@ class AiExecutorPropertiesBindingTest {
                     assertThat(fittingProperties.getQueueCapacity()).isEqualTo(5);
                     assertThat(fittingProperties.getAwaitTermination())
                             .isEqualTo(Duration.ofSeconds(120));
+
+                    AiResultPersistenceTaskProperties resultProperties =
+                            context.getBean(
+                                    AiResultPersistenceTaskProperties.class
+                            );
+                    assertThat(resultProperties.getCorePoolSize())
+                            .isEqualTo(1);
+                    assertThat(resultProperties.getMaxPoolSize())
+                            .isEqualTo(1);
+                    assertThat(resultProperties.getQueueCapacity())
+                            .isEqualTo(50);
+                    assertThat(resultProperties.getAwaitTermination())
+                            .isEqualTo(Duration.ofSeconds(30));
                 });
     }
 
@@ -65,7 +82,11 @@ class AiExecutorPropertiesBindingTest {
                         "ai.fitting-task.core-pool-size=1",
                         "ai.fitting-task.max-pool-size=1",
                         "ai.fitting-task.queue-capacity=5",
-                        "ai.fitting-task.await-termination=120s"
+                        "ai.fitting-task.await-termination=120s",
+                        "ai.result-persistence-task.core-pool-size=1",
+                        "ai.result-persistence-task.max-pool-size=1",
+                        "ai.result-persistence-task.queue-capacity=50",
+                        "ai.result-persistence-task.await-termination=30s"
                 )
                 .run(context -> assertThat(context).hasFailed());
     }
@@ -73,7 +94,8 @@ class AiExecutorPropertiesBindingTest {
     @Configuration(proxyBeanMethods = false)
     @EnableConfigurationProperties({
             AiChatTaskProperties.class,
-            AiFittingTaskProperties.class
+            AiFittingTaskProperties.class,
+            AiResultPersistenceTaskProperties.class
     })
     static class PropertiesTestConfig {
     }
