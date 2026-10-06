@@ -30,6 +30,48 @@ class ChatMessageTest {
     }
 
     @Test
+    @DisplayName("V2 사용자 텍스트 메시지는 AI 응답 대기 상태로 생성한다")
+    void createPendingUserTextMessage() {
+        ChatRoom chatRoom = createChatRoom();
+
+        ChatMessage message = ChatMessage.createPendingUserText(
+                chatRoom,
+                "가을 아우터를 추천해줘"
+        );
+
+        assertThat(message.getSenderType()).isEqualTo(ChatSenderType.USER);
+        assertThat(message.getMessageType()).isEqualTo(ChatMessageType.TEXT);
+        assertThat(message.getGenerationStatus())
+                .isEqualTo(ChatGenerationStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("대기 중인 사용자 메시지는 AI 응답 생성 상태로 전환한다")
+    void startPendingUserMessageGeneration() {
+        ChatMessage message = ChatMessage.createPendingUserText(
+                createChatRoom(),
+                "가을 아우터를 추천해줘"
+        );
+
+        message.startGeneration();
+
+        assertThat(message.getGenerationStatus())
+                .isEqualTo(ChatGenerationStatus.GENERATING);
+    }
+
+    @Test
+    @DisplayName("생성 중인 사용자 메시지는 다시 생성 시작 상태로 전환할 수 없다")
+    void rejectStartingAlreadyGeneratingMessage() {
+        ChatMessage message = ChatMessage.createUserText(
+                createChatRoom(),
+                "가을 아우터를 추천해줘"
+        );
+
+        assertThatThrownBy(message::startGeneration)
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
     @DisplayName("AI 일반 메시지는 생성 상태 없이 텍스트 유형으로 생성한다")
     void createAiTextMessage() {
         ChatRoom chatRoom = createChatRoom();
