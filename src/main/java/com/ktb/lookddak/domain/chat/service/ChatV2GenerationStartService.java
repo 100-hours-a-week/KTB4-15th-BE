@@ -2,7 +2,9 @@ package com.ktb.lookddak.domain.chat.service;
 
 import com.ktb.lookddak.domain.chat.entity.ChatGenerationStatus;
 import com.ktb.lookddak.domain.chat.entity.ChatMessage;
+import com.ktb.lookddak.domain.chat.entity.ChatRoom;
 import com.ktb.lookddak.domain.chat.entity.ChatSenderType;
+import com.ktb.lookddak.domain.chat.entity.ChatSourceType;
 import com.ktb.lookddak.domain.chat.event.ChatV2GenerationRequestedEvent;
 import com.ktb.lookddak.domain.chat.repository.ChatMessageRepository;
 import com.ktb.lookddak.domain.wishlist.repository.WishlistRepository;
@@ -32,10 +34,19 @@ public class ChatV2GenerationStartService {
      */
     @Transactional
     public void startIfPending(Long userMessageId) {
-        ChatMessage message = chatMessageRepository.findById(userMessageId)
+        ChatMessage message = chatMessageRepository
+                .findByIdWithChatRoomAndMember(userMessageId)
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.CHAT_MESSAGE_NOT_FOUND
                 ));
+
+        // 조건부 UPDATE는 clearAutomatically로 영속성 컨텍스트를 비운다.
+        // 따라서 LAZY 연관관계가 필요한 값은 UPDATE 전에 일반 값으로 추출한다.
+        ChatRoom chatRoom = message.getChatRoom();
+        Long memberId = chatRoom.getMember().getId();
+        Long chatRoomId = chatRoom.getId();
+        String content = message.getContent();
+        ChatSourceType sourceType = chatRoom.getSourceType();
 
         int updatedCount = chatMessageRepository.updateGenerationStatusIfCurrent(
                 userMessageId,
@@ -48,26 +59,25 @@ public class ChatV2GenerationStartService {
             return;
         }
 
-        Long memberId = message.getChatRoom().getMember().getId();
         List<String> productIds = getAiProductIds(
                 memberId,
-                message.getChatRoom().getSourceType()
+                sourceType
         );
         eventPublisher.publishEvent(new ChatV2GenerationRequestedEvent(
                 memberId,
-                message.getChatRoom().getId(),
+                chatRoomId,
                 message.getId(),
-                message.getContent(),
-                message.getChatRoom().getSourceType(),
+                content,
+                sourceType,
                 productIds
         ));
     }
 
     private List<String> getAiProductIds(
             Long memberId,
-            com.ktb.lookddak.domain.chat.entity.ChatSourceType sourceType
+            ChatSourceType sourceType
     ) {
-        if (sourceType != com.ktb.lookddak.domain.chat.entity.ChatSourceType.WISHLIST) {
+        if (sourceType != ChatSourceType.WISHLIST) {
             return List.of();
         }
 

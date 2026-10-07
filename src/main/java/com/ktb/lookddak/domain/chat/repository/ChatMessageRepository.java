@@ -36,6 +36,17 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             Long chatRoomId
     );
 
+    @Query("""
+            select message
+            from ChatMessage message
+            join fetch message.chatRoom chatRoom
+            join fetch chatRoom.member
+            where message.id = :messageId
+            """)
+    Optional<ChatMessage> findByIdWithChatRoomAndMember(
+            @Param("messageId") Long messageId
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select message

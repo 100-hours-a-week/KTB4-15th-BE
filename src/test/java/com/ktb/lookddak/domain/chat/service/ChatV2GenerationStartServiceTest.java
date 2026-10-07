@@ -56,7 +56,7 @@ class ChatV2GenerationStartServiceTest {
     @DisplayName("대기 중인 V2 사용자 메시지만 생성 중으로 변경하고 생성 이벤트를 발행한다")
     void startPendingGeneration() {
         ChatMessage message = createPendingMessage();
-        given(chatMessageRepository.findById(100L))
+        given(chatMessageRepository.findByIdWithChatRoomAndMember(100L))
                 .willReturn(Optional.of(message));
         given(chatMessageRepository.updateGenerationStatusIfCurrent(
                 100L,
@@ -79,7 +79,7 @@ class ChatV2GenerationStartServiceTest {
     @DisplayName("이미 생성 중인 메시지는 AI 생성 이벤트를 중복 발행하지 않는다")
     void doNotStartGenerationTwice() {
         ChatMessage message = createPendingMessage();
-        given(chatMessageRepository.findById(100L))
+        given(chatMessageRepository.findByIdWithChatRoomAndMember(100L))
                 .willReturn(Optional.of(message));
         given(chatMessageRepository.updateGenerationStatusIfCurrent(
                 any(),
