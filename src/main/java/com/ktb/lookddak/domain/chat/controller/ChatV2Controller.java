@@ -5,6 +5,7 @@ import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
 import com.ktb.lookddak.domain.chat.service.ChatSseService;
+import com.ktb.lookddak.domain.chat.service.ChatV2GenerationStartService;
 import com.ktb.lookddak.domain.chat.service.ChatV2Service;
 import com.ktb.lookddak.global.response.ApiResponse;
 import com.ktb.lookddak.global.response.SuccessCode;
@@ -32,6 +33,7 @@ public class ChatV2Controller {
 
     private final ChatV2Service chatV2Service;
     private final ChatSseService chatSseService;
+    private final ChatV2GenerationStartService chatV2GenerationStartService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<ChatRoomCreateResponse>> createChatRoom(
@@ -74,10 +76,13 @@ public class ChatV2Controller {
             @Positive @PathVariable Long chatRoomId,
             @Positive @PathVariable Long userMessageId
     ) {
-        return chatSseService.connect(
+        SseEmitter emitter = chatSseService.connect(
                 principal.getMemberId(),
                 chatRoomId,
                 userMessageId
         );
+        chatV2GenerationStartService.startIfPending(userMessageId);
+
+        return emitter;
     }
 }

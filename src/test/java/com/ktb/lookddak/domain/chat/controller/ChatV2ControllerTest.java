@@ -4,6 +4,7 @@ import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
 import com.ktb.lookddak.domain.chat.service.ChatV2Service;
 import com.ktb.lookddak.domain.chat.service.ChatSseService;
+import com.ktb.lookddak.domain.chat.service.ChatV2GenerationStartService;
 import com.ktb.lookddak.global.exception.GlobalExceptionHandler;
 import com.ktb.lookddak.global.security.principal.MemberPrincipal;
 import org.junit.jupiter.api.AfterEach;
@@ -43,6 +44,9 @@ class ChatV2ControllerTest {
     private ChatSseService chatSseService;
 
     @Mock
+    private ChatV2GenerationStartService chatV2GenerationStartService;
+
+    @Mock
     private MemberPrincipal principal;
 
     private MockMvc mockMvc;
@@ -50,7 +54,11 @@ class ChatV2ControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new ChatV2Controller(chatV2Service, chatSseService))
+                .standaloneSetup(new ChatV2Controller(
+                        chatV2Service,
+                        chatSseService,
+                        chatV2GenerationStartService
+                ))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(
                         new AuthenticationPrincipalArgumentResolver()
@@ -134,5 +142,6 @@ class ChatV2ControllerTest {
                 .andExpect(status().isOk());
 
         verify(chatSseService).connect(1L, 10L, 100L);
+        verify(chatV2GenerationStartService).startIfPending(100L);
     }
 }

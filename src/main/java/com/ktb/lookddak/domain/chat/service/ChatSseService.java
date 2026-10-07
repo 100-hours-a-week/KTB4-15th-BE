@@ -91,6 +91,31 @@ public class ChatSseService {
         }
     }
 
+    /**
+     * 현재 연결된 프런트에 AI 이벤트를 전달한다.
+     * 연결이 이미 끊긴 경우 AI 작업은 중단하지 않고 이벤트만 전달하지 않는다.
+     */
+    public void send(Long userMessageId, String eventName, Object data) {
+        SseEmitter emitter = emitters.get(userMessageId);
+        if (emitter == null) {
+            return;
+        }
+
+        try {
+            emitter.send(SseEmitter.event().name(eventName).data(data));
+        } catch (IOException exception) {
+            emitters.remove(userMessageId, emitter);
+            emitter.completeWithError(exception);
+        }
+    }
+
+    public void complete(Long userMessageId) {
+        SseEmitter emitter = emitters.remove(userMessageId);
+        if (emitter != null) {
+            emitter.complete();
+        }
+    }
+
     boolean hasConnection(Long userMessageId) {
         return emitters.containsKey(userMessageId);
     }
