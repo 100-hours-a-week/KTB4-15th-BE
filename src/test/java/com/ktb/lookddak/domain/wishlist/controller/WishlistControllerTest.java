@@ -99,11 +99,12 @@ class WishlistControllerTest {
 
         mockMvc.perform(get("/api/v1/wishlists"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("WISHLIST_GET_SUCCESS"))
+                .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.totalCount").value(3))
                 .andExpect(jsonPath("$.data.items").isEmpty())
                 .andExpect(jsonPath("$.data.hasNext").value(false))
-                .andExpect(jsonPath("$.message").value("찜 목록을 조회했습니다."));
+                .andExpect(jsonPath("$.message")
+                        .value("요청이 성공적으로 처리되었습니다."));
 
         verify(wishlistService).getWishlists(1L, null, null);
     }
