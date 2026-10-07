@@ -125,6 +125,49 @@ class ChatRepositoryTest {
     }
 
     @Test
+    @DisplayName("생성 중인 사용자 메시지만 조건부로 실패 상태로 변경한다")
+    void updateGenerationStatusOnlyWhenGenerating() {
+        Member member = saveMember("conditional-update@lookddak.com");
+        ChatRoom chatRoom = chatRoomRepository.saveAndFlush(
+                createChatRoom(member, ChatSourceType.GENERAL)
+        );
+        ChatMessage generatingMessage = chatMessageRepository.saveAndFlush(
+                ChatMessage.createUserText(chatRoom, "추천해줘")
+        );
+        ChatMessage completedMessage = ChatMessage.createUserText(
+                chatRoom,
+                "이미 완료된 메시지"
+        );
+        completedMessage.completeGeneration();
+        chatMessageRepository.saveAndFlush(completedMessage);
+
+        int updatedGenerating = chatMessageRepository
+                .updateGenerationStatusIfCurrent(
+                        generatingMessage.getId(),
+                        ChatSenderType.USER,
+                        ChatGenerationStatus.GENERATING,
+                        ChatGenerationStatus.FAILED
+                );
+        int updatedCompleted = chatMessageRepository
+                .updateGenerationStatusIfCurrent(
+                        completedMessage.getId(),
+                        ChatSenderType.USER,
+                        ChatGenerationStatus.GENERATING,
+                        ChatGenerationStatus.FAILED
+                );
+
+        assertThat(updatedGenerating).isEqualTo(1);
+        assertThat(updatedCompleted).isZero();
+        assertThat(chatMessageRepository.findById(generatingMessage.getId())
+                .orElseThrow()
+                .getGenerationStatus()).isEqualTo(ChatGenerationStatus.FAILED);
+        assertThat(chatMessageRepository.findById(completedMessage.getId())
+                .orElseThrow()
+                .getGenerationStatus())
+                .isEqualTo(ChatGenerationStatus.COMPLETED);
+    }
+
+    @Test
     @DisplayName("메시지 전송을 위해 활성 채팅방을 쓰기 락으로 조회한다")
     void findActiveChatRoomForUpdate() {
         Member member = saveMember("lock@lookddak.com");

@@ -8,9 +8,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,5 +52,19 @@ class ChatGenerationResultEventHandlerTest {
         ));
 
         verify(resultService).fail(501L);
+    }
+
+    @Test
+    @DisplayName("생성 실패 이벤트는 결과 저장 전용 Executor에서 비동기로 처리한다")
+    void handleFailedEventAsynchronously() throws NoSuchMethodException {
+        Async async = ChatGenerationResultEventHandler.class
+                .getMethod("handleFailed", ChatGenerationFailedEvent.class)
+                .getAnnotation(Async.class);
+
+        assertThat(async).isNotNull();
+        assertThat(async.value()).isEqualTo("aiResultPersistenceExecutor");
+        assertThat(ChatGenerationResultEventHandler.class
+                .getMethod("handleFailed", ChatGenerationFailedEvent.class)
+                .getAnnotation(Transactional.class)).isNull();
     }
 }

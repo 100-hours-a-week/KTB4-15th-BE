@@ -196,13 +196,33 @@ class ChatGenerationResultIntegrationTest {
     void failGeneration() {
         resultService.fail(userMessage.getId());
 
-        assertThat(userMessage.getGenerationStatus())
+        ChatMessage savedUserMessage = chatMessageRepository
+                .findById(userMessage.getId())
+                .orElseThrow();
+
+        assertThat(savedUserMessage.getGenerationStatus())
                 .isEqualTo(ChatGenerationStatus.FAILED);
         assertThat(chatMessageRepository
                 .findFirstByChatRoomIdAndIdGreaterThanOrderByIdAsc(
                         chatRoom.getId(),
                         userMessage.getId()
                 )).isEmpty();
+    }
+
+    @Test
+    @DisplayName("이미 완료된 사용자 메시지는 실패 상태로 변경하지 않는다")
+    void doesNotFailCompletedGeneration() {
+        userMessage.completeGeneration();
+        chatMessageRepository.saveAndFlush(userMessage);
+
+        resultService.fail(userMessage.getId());
+
+        ChatMessage savedUserMessage = chatMessageRepository
+                .findById(userMessage.getId())
+                .orElseThrow();
+
+        assertThat(savedUserMessage.getGenerationStatus())
+                .isEqualTo(ChatGenerationStatus.COMPLETED);
     }
 
     @Test

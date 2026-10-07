@@ -55,6 +55,29 @@ class AiAsyncConfigTest {
         );
     }
 
+    @Test
+    @DisplayName("AI 결과 저장 전용 스레드 풀을 설정값으로 생성한다")
+    void createResultPersistenceTaskExecutor() {
+        AiResultPersistenceTaskProperties properties =
+                new AiResultPersistenceTaskProperties(
+                        1,
+                        1,
+                        50,
+                        Duration.ofSeconds(30)
+                );
+        AiAsyncConfig config = new AiAsyncConfig();
+
+        Executor executor = config.aiResultPersistenceExecutor(properties);
+
+        assertExecutor(
+                executor,
+                1,
+                1,
+                50,
+                "ai-result-persistence-"
+        );
+    }
+
     private void assertExecutor(
             Executor executor,
             int corePoolSize,

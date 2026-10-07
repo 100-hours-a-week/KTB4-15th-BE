@@ -7,6 +7,7 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -38,6 +39,21 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             """)
     Optional<ChatMessage> findByIdForGenerationUpdate(
             @Param("messageId") Long messageId
+    );
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update ChatMessage message
+            set message.generationStatus = :targetStatus
+            where message.id = :messageId
+              and message.senderType = :senderType
+              and message.generationStatus = :currentStatus
+            """)
+    int updateGenerationStatusIfCurrent(
+            @Param("messageId") Long messageId,
+            @Param("senderType") ChatSenderType senderType,
+            @Param("currentStatus") ChatGenerationStatus currentStatus,
+            @Param("targetStatus") ChatGenerationStatus targetStatus
     );
 
     Optional<ChatMessage> findFirstByChatRoomIdAndIdGreaterThanOrderByIdAsc(

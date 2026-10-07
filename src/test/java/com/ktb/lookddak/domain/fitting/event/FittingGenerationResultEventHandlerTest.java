@@ -8,7 +8,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.transaction.annotation.Transactional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,5 +50,19 @@ class FittingGenerationResultEventHandlerTest {
         ));
 
         verify(resultService).fail(100L);
+    }
+
+    @Test
+    @DisplayName("가상피팅 실패 이벤트는 결과 저장 전용 Executor에서 비동기로 처리한다")
+    void handleFailedEventAsynchronously() throws NoSuchMethodException {
+        Async async = FittingGenerationResultEventHandler.class
+                .getMethod("handleFailed", FittingGenerationFailedEvent.class)
+                .getAnnotation(Async.class);
+
+        assertThat(async).isNotNull();
+        assertThat(async.value()).isEqualTo("aiResultPersistenceExecutor");
+        assertThat(FittingGenerationResultEventHandler.class
+                .getMethod("handleFailed", FittingGenerationFailedEvent.class)
+                .getAnnotation(Transactional.class)).isNull();
     }
 }
