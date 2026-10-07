@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
@@ -32,12 +33,16 @@ class ChatV2GenerationStreamListenerTest {
     @Mock
     private ChatSseService chatSseService;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     @Test
     @DisplayName("AI token과 done 이벤트를 프런트 SSE 이벤트로 전달한다")
     void forwardAiEventsToSse() {
         ChatV2GenerationStreamListener listener = new ChatV2GenerationStreamListener(
                 aiChatStreamingClient,
-                chatSseService
+                chatSseService,
+                eventPublisher
         );
         given(aiChatStreamingClient.stream(any(AiChatRequest.class)))
                 .willReturn(Flux.just(
@@ -57,8 +62,7 @@ class ChatV2GenerationStreamListenerTest {
                 "content",
                 "추천을 찾고 있어요."
         );
-        verify(chatSseService).send(eq(100L), eq("done"), any());
-        verify(chatSseService).complete(100L);
+        verify(eventPublisher).publishEvent(any(ChatV2GenerationSucceededEvent.class));
     }
 
     @Test
@@ -66,7 +70,8 @@ class ChatV2GenerationStreamListenerTest {
     void forwardAiErrorToSse() {
         ChatV2GenerationStreamListener listener = new ChatV2GenerationStreamListener(
                 aiChatStreamingClient,
-                chatSseService
+                chatSseService,
+                eventPublisher
         );
         given(aiChatStreamingClient.stream(any(AiChatRequest.class)))
                 .willReturn(Flux.error(new AiChatException(
@@ -77,8 +82,7 @@ class ChatV2GenerationStreamListenerTest {
 
         listener.handle(event());
 
-        verify(chatSseService).send(eq(100L), eq("error"), any());
-        verify(chatSseService).complete(100L);
+        verify(eventPublisher).publishEvent(any(ChatV2GenerationFailedEvent.class));
     }
 
     private ChatV2GenerationRequestedEvent event() {

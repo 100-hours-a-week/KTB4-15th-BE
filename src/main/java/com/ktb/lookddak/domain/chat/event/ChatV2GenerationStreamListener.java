@@ -1,7 +1,5 @@
 package com.ktb.lookddak.domain.chat.event;
 
-import com.ktb.lookddak.domain.chat.dto.ChatSseDoneResponse;
-import com.ktb.lookddak.domain.chat.dto.ChatSseErrorResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatSseProductResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatSseTokenResponse;
 import com.ktb.lookddak.domain.chat.service.ChatSseService;
@@ -11,6 +9,7 @@ import com.ktb.lookddak.global.client.ai.chat.AiChatStreamingClient;
 import com.ktb.lookddak.global.client.ai.exception.AiChatException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -22,6 +21,7 @@ public class ChatV2GenerationStreamListener {
 
     private final AiChatStreamingClient aiChatStreamingClient;
     private final ChatSseService chatSseService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * DB의 GENERATING 상태가 커밋된 이후에만 AI SSE 연결을 시작한다.
@@ -59,16 +59,10 @@ public class ChatV2GenerationStreamListener {
         }
 
         if (streamEvent.getType() == AiChatStreamEventType.DONE) {
-            chatSseService.send(
+            eventPublisher.publishEvent(new ChatV2GenerationSucceededEvent(
                     userMessageId,
-                    "done",
-                    new ChatSseDoneResponse(
-                            userMessageId,
-                            streamEvent.getDoneResponse().getContent(),
-                            streamEvent.getDoneResponse().getProducts()
-                    )
-            );
-            chatSseService.complete(userMessageId);
+                    streamEvent.getDoneResponse()
+            ));
         }
     }
 
@@ -80,28 +74,18 @@ public class ChatV2GenerationStreamListener {
                     exception.getCode(),
                     exception
             );
-            chatSseService.send(
+            eventPublisher.publishEvent(new ChatV2GenerationFailedEvent(
                     userMessageId,
-                    "error",
-                    new ChatSseErrorResponse(
-                            userMessageId,
-                            exception.getCode(),
-                            exception.getMessage()
-                    )
-            );
+                    exception.getCode(),
+                    exception.getMessage()
+            ));
         } else {
             log.error("V2 AI chat stream failed userMessageId={}", userMessageId, throwable);
-            chatSseService.send(
+            eventPublisher.publishEvent(new ChatV2GenerationFailedEvent(
                     userMessageId,
-                    "error",
-                    new ChatSseErrorResponse(
-                            userMessageId,
-                            "AI_UNEXPECTED_ERROR",
-                            "AI 응답 생성 중 오류가 발생했습니다."
-                    )
-            );
+                    "AI_UNEXPECTED_ERROR",
+                    "AI 응답 생성 중 오류가 발생했습니다."
+            ));
         }
-
-        chatSseService.complete(userMessageId);
     }
 }
