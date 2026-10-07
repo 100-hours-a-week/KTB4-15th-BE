@@ -20,6 +20,32 @@ public interface WishlistRepository extends JpaRepository<Wishlist, Long> {
     long countByMemberId(Long memberId);
 
     @Query("""
+            select wishlist
+            from Wishlist wishlist
+            join fetch wishlist.product product
+            where wishlist.member.id = :memberId
+            order by wishlist.id desc
+            """)
+    List<Wishlist> findFirstPage(
+            @Param("memberId") Long memberId,
+            Pageable pageable
+    );
+
+    @Query("""
+            select wishlist
+            from Wishlist wishlist
+            join fetch wishlist.product product
+            where wishlist.member.id = :memberId
+              and wishlist.id < :cursor
+            order by wishlist.id desc
+            """)
+    List<Wishlist> findNextPage(
+            @Param("memberId") Long memberId,
+            @Param("cursor") Long cursor,
+            Pageable pageable
+    );
+
+    @Query("""
             select wishlist.product.productCode
             from Wishlist wishlist
             where wishlist.member.id = :memberId

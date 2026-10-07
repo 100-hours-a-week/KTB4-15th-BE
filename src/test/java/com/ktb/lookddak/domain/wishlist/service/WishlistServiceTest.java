@@ -8,6 +8,7 @@ import com.ktb.lookddak.domain.product.repository.ProductRepository;
 import com.ktb.lookddak.domain.wishlist.dto.WishlistCreateRequest;
 import com.ktb.lookddak.domain.wishlist.dto.WishlistCreateResponse;
 import com.ktb.lookddak.domain.wishlist.dto.WishlistCountResponse;
+import com.ktb.lookddak.domain.wishlist.dto.WishlistListResponse;
 import com.ktb.lookddak.domain.wishlist.entity.Wishlist;
 import com.ktb.lookddak.domain.wishlist.repository.WishlistRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
@@ -22,11 +23,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -74,6 +77,104 @@ class WishlistServiceTest {
         WishlistCountResponse response = wishlistService.getWishlistCount(1L);
 
         assertThat(response.getCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("찜 목록을 최신 찜 순으로 조회하고 가격 변동률과 다음 커서를 반환한다")
+    void getWishlists() {
+        Wishlist newestWishlist = createWishlist(30L, createMember(1L));
+        Wishlist middleWishlist = createWishlist(20L, createMember(1L));
+        Wishlist nextWishlist = createWishlist(10L, createMember(1L));
+        ReflectionTestUtils.setField(
+                newestWishlist.getProduct(), "currentPrice", 40_000
+        );
+        ReflectionTestUtils.setField(
+                middleWishlist.getProduct(), "currentPrice", 55_000
+        );
+
+        given(wishlistRepository.findFirstPage(eq(1L), any()))
+                .willReturn(List.of(
+                        newestWishlist,
+                        middleWishlist,
+                        nextWishlist
+                ));
+        given(wishlistRepository.countByMemberId(1L)).willReturn(3L);
+
+        WishlistListResponse response = wishlistService.getWishlists(
+                1L,
+                null,
+                2
+        );
+
+        assertThat(response.getTotalCount()).isEqualTo(3L);
+        assertThat(response.getItems()).hasSize(2);
+        assertThat(response.getItems().get(0).getWishlistId()).isEqualTo(30L);
+        assertThat(response.getItems().get(0).getPriceChangeRate())
+                .isEqualTo(-18);
+        assertThat(response.getItems().get(1).getPriceChangeRate())
+                .isEqualTo(12);
+        assertThat(response.getNextCursor()).isEqualTo(20L);
+        assertThat(response.isHasNext()).isTrue();
+    }
+
+    @Test
+    @DisplayName("다음 찜 목록을 커서 기준으로 조회한다")
+    void getNextWishlists() {
+        Wishlist wishlist = createWishlist(10L, createMember(1L));
+        given(wishlistRepository.findNextPage(eq(1L), eq(20L), any()))
+                .willReturn(List.of(wishlist));
+        given(wishlistRepository.countByMemberId(1L)).willReturn(3L);
+
+        WishlistListResponse response = wishlistService.getWishlists(
+                1L,
+                20L,
+                20
+        );
+
+        assertThat(response.getItems()).hasSize(1);
+        assertThat(response.getNextCursor()).isNull();
+        assertThat(response.isHasNext()).isFalse();
+    }
+
+    @Test
+    @DisplayName("찜 목록이 없으면 빈 목록과 전체 개수 0을 반환한다")
+    void getEmptyWishlists() {
+        given(wishlistRepository.findFirstPage(eq(1L), any()))
+                .willReturn(List.of());
+        given(wishlistRepository.countByMemberId(1L)).willReturn(0L);
+
+        WishlistListResponse response = wishlistService.getWishlists(
+                1L,
+                null,
+                null
+        );
+
+        assertThat(response.getTotalCount()).isZero();
+        assertThat(response.getItems()).isEmpty();
+        assertThat(response.getNextCursor()).isNull();
+        assertThat(response.isHasNext()).isFalse();
+    }
+
+    @Test
+    @DisplayName("유효하지 않은 커서 또는 크기는 조회할 수 없다")
+    void rejectInvalidPagination() {
+        assertThatThrownBy(() -> wishlistService.getWishlists(
+                1L,
+                0L,
+                20
+        )).isInstanceOfSatisfying(BusinessException.class, exception ->
+                assertThat(exception.getErrorCode())
+                        .isEqualTo(ErrorCode.INVALID_PAGINATION_PARAMETER)
+        );
+
+        assertThatThrownBy(() -> wishlistService.getWishlists(
+                1L,
+                null,
+                101
+        )).isInstanceOfSatisfying(BusinessException.class, exception ->
+                assertThat(exception.getErrorCode())
+                        .isEqualTo(ErrorCode.INVALID_PAGINATION_PARAMETER)
+        );
     }
 
     @Test

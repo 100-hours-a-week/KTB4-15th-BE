@@ -9,17 +9,27 @@ import com.ktb.lookddak.domain.wishlist.dto.WishlistCreateResponse;
 import com.ktb.lookddak.domain.wishlist.dto.WishlistCountResponse;
 import com.ktb.lookddak.domain.wishlist.entity.Wishlist;
 import com.ktb.lookddak.domain.wishlist.repository.WishlistRepository;
+import com.ktb.lookddak.domain.wishlist.dto.WishlistListItemResponse;
+import com.ktb.lookddak.domain.wishlist.dto.WishlistListResponse;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class WishlistService {
+
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int MIN_PAGE_SIZE = 1;
+    private static final int MAX_PAGE_SIZE = 100;
 
     private final MemberRepository memberRepository;
     private final ProductRepository productRepository;
@@ -29,6 +39,49 @@ public class WishlistService {
         long count = wishlistRepository.countByMemberId(memberId);
 
         return new WishlistCountResponse(count);
+    }
+
+    public WishlistListResponse getWishlists(
+            Long memberId,
+            Long cursor,
+            Integer size
+    ) {
+        int pageSize = size == null ? DEFAULT_PAGE_SIZE : size;
+        validatePagination(cursor, pageSize);
+
+        List<Wishlist> wishlists = cursor == null
+                ? wishlistRepository.findFirstPage(
+                        memberId,
+                        PageRequest.of(0, pageSize + 1)
+                )
+                : wishlistRepository.findNextPage(
+                        memberId,
+                        cursor,
+                        PageRequest.of(0, pageSize + 1)
+                );
+
+        boolean hasNext = wishlists.size() > pageSize;
+        List<Wishlist> responseWishlists = hasNext
+                ? wishlists.subList(0, pageSize)
+                : wishlists;
+
+        List<WishlistListItemResponse> items = new ArrayList<>();
+        for (Wishlist wishlist : responseWishlists) {
+            items.add(WishlistListItemResponse.from(wishlist));
+        }
+
+        Long nextCursor = hasNext && !responseWishlists.isEmpty()
+                ? responseWishlists.get(responseWishlists.size() - 1).getId()
+                : null;
+
+        long totalCount = wishlistRepository.countByMemberId(memberId);
+
+        return new WishlistListResponse(
+                totalCount,
+                items,
+                nextCursor,
+                hasNext
+        );
     }
 
     @Transactional
@@ -77,5 +130,13 @@ public class WishlistService {
         }
 
         wishlistRepository.delete(wishlist);
+    }
+
+    private void validatePagination(Long cursor, int size) {
+        if ((cursor != null && cursor <= 0)
+                || size < MIN_PAGE_SIZE
+                || size > MAX_PAGE_SIZE) {
+            throw new BusinessException(ErrorCode.INVALID_PAGINATION_PARAMETER);
+        }
     }
 }
