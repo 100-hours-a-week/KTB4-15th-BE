@@ -2,6 +2,7 @@ package com.ktb.lookddak.domain.wishlist.controller;
 
 import com.ktb.lookddak.domain.wishlist.dto.WishlistCreateResponse;
 import com.ktb.lookddak.domain.wishlist.dto.WishlistCountResponse;
+import com.ktb.lookddak.domain.wishlist.dto.WishlistListResponse;
 import com.ktb.lookddak.domain.wishlist.service.WishlistService;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
@@ -83,6 +84,29 @@ class WishlistControllerTest {
                         .value("요청이 성공적으로 처리되었습니다."));
 
         verify(wishlistService).getWishlistCount(1L);
+    }
+
+    @Test
+    @DisplayName("현재 회원의 찜 목록을 반환한다")
+    void getWishlists() throws Exception {
+        given(wishlistService.getWishlists(1L, null, null))
+                .willReturn(new WishlistListResponse(
+                        3L,
+                        List.of(),
+                        null,
+                        false
+                ));
+
+        mockMvc.perform(get("/api/v1/wishlists"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.totalCount").value(3))
+                .andExpect(jsonPath("$.data.items").isEmpty())
+                .andExpect(jsonPath("$.data.hasNext").value(false))
+                .andExpect(jsonPath("$.message")
+                        .value("요청이 성공적으로 처리되었습니다."));
+
+        verify(wishlistService).getWishlists(1L, null, null);
     }
 
     @Test
