@@ -182,8 +182,9 @@ class WishlistServiceTest {
     void createWishlist() {
         Member member = createMember(1L);
         Product product = createProduct(10L, 49_000);
-        given(memberRepository.findByIdAndDeletedAtIsNull(1L))
+        given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(member));
+        given(wishlistRepository.countByMemberId(1L)).willReturn(0L);
         given(productRepository.findById(10L)).willReturn(Optional.of(product));
         given(wishlistRepository.existsByMemberIdAndProductId(1L, 10L))
                 .willReturn(false);
@@ -209,8 +210,9 @@ class WishlistServiceTest {
     @Test
     @DisplayName("존재하지 않는 상품은 찜할 수 없다")
     void rejectMissingProduct() {
-        given(memberRepository.findByIdAndDeletedAtIsNull(1L))
+        given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(createMember(1L)));
+        given(wishlistRepository.countByMemberId(1L)).willReturn(0L);
         given(productRepository.findById(10L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> wishlistService.createWishlist(
@@ -229,8 +231,9 @@ class WishlistServiceTest {
     void rejectDuplicatedWishlist() {
         Member member = createMember(1L);
         Product product = createProduct(10L, 49_000);
-        given(memberRepository.findByIdAndDeletedAtIsNull(1L))
+        given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(member));
+        given(wishlistRepository.countByMemberId(1L)).willReturn(0L);
         given(productRepository.findById(10L)).willReturn(Optional.of(product));
         given(wishlistRepository.existsByMemberIdAndProductId(1L, 10L))
                 .willReturn(true);
@@ -249,8 +252,9 @@ class WishlistServiceTest {
     void handleConcurrentDuplicate() {
         Member member = createMember(1L);
         Product product = createProduct(10L, 49_000);
-        given(memberRepository.findByIdAndDeletedAtIsNull(1L))
+        given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(member));
+        given(wishlistRepository.countByMemberId(1L)).willReturn(0L);
         given(productRepository.findById(10L)).willReturn(Optional.of(product));
         given(wishlistRepository.existsByMemberIdAndProductId(1L, 10L))
                 .willReturn(false);
@@ -264,6 +268,25 @@ class WishlistServiceTest {
                 assertThat(exception.getErrorCode())
                         .isEqualTo(ErrorCode.WISHLIST_ALREADY_EXISTS)
         );
+    }
+
+    @Test
+    @DisplayName("찜이 300개이면 추가할 수 없다")
+    void rejectWishlistOverLimit() {
+        given(memberRepository.findActiveByIdForUpdate(1L))
+                .willReturn(Optional.of(createMember(1L)));
+        given(wishlistRepository.countByMemberId(1L)).willReturn(300L);
+
+        assertThatThrownBy(() -> wishlistService.createWishlist(
+                1L,
+                new WishlistCreateRequest(10L)
+        )).isInstanceOfSatisfying(BusinessException.class, exception ->
+                assertThat(exception.getErrorCode())
+                        .isEqualTo(ErrorCode.WISHLIST_LIMIT_EXCEEDED)
+        );
+
+        verify(productRepository, never()).findById(any());
+        verify(wishlistRepository, never()).saveAndFlush(any());
     }
 
     @Test

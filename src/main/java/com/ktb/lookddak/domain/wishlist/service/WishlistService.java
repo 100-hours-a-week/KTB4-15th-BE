@@ -30,6 +30,7 @@ public class WishlistService {
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MIN_PAGE_SIZE = 1;
     private static final int MAX_PAGE_SIZE = 100;
+    private static final long MAX_WISHLIST_COUNT = 300L;
 
     private final MemberRepository memberRepository;
     private final ProductRepository productRepository;
@@ -89,10 +90,16 @@ public class WishlistService {
             Long memberId,
             WishlistCreateRequest request
     ) {
-        Member member = memberRepository.findByIdAndDeletedAtIsNull(memberId)
+        // 같은 회원의 찜 추가 요청은 직렬화해 최대 개수 초과를 방지한다.
+        Member member = memberRepository.findActiveByIdForUpdate(memberId)
                 .orElseThrow(() ->
                         new BusinessException(ErrorCode.RESOURCE_NOT_FOUND)
                 );
+
+        if (wishlistRepository.countByMemberId(memberId) >= MAX_WISHLIST_COUNT) {
+            throw new BusinessException(ErrorCode.WISHLIST_LIMIT_EXCEEDED);
+        }
+
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() ->
                         new BusinessException(ErrorCode.PRODUCT_NOT_FOUND)
