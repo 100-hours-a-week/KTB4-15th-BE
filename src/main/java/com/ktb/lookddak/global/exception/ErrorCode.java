@@ -51,6 +51,7 @@ public enum ErrorCode {
 
     // Wishlist errors
     WISHLIST_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 찜한 상품입니다."),
+    WISHLIST_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "찜한 상품은 최대 300개까지 추가할 수 있습니다."),
     WISHLIST_NOT_FOUND(HttpStatus.NOT_FOUND, "찜 정보를 찾을 수 없습니다."),
     WISHLIST_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 찜에 접근할 권한이 없습니다."),
 
