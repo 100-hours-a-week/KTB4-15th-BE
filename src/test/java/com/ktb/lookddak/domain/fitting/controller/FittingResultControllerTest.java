@@ -1,7 +1,11 @@
 package com.ktb.lookddak.domain.fitting.controller;
 
+import com.ktb.lookddak.domain.fitting.dto.FittingResultDetailResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingResultListResponse;
+import com.ktb.lookddak.domain.fitting.entity.FittingJob;
+import com.ktb.lookddak.domain.fitting.entity.FittingResult;
 import com.ktb.lookddak.domain.fitting.service.FittingResultService;
+import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import com.ktb.lookddak.global.exception.GlobalExceptionHandler;
@@ -18,6 +22,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
@@ -122,5 +127,58 @@ class FittingResultControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code")
                         .value("INVALID_PAGINATION_PARAMETER"));
+    }
+
+    @Test
+    @DisplayName("저장된 가상피팅 결과 상세를 조회하면 200 OK를 반환한다")
+    void getFittingResult() throws Exception {
+        given(fittingResultService.getFittingResult(1L, 30L))
+                .willReturn(createDetailResponse());
+
+        mockMvc.perform(get("/api/v1/fitting-results/30"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.fittingResultId").value(30))
+                .andExpect(jsonPath("$.data.resultImageUrl")
+                        .value("https://image.example.com/fittings/30.png"))
+                .andExpect(jsonPath("$.data.outfitName").value("출근룩"))
+                .andExpect(jsonPath("$.data.comment").value("AI 코디 설명"))
+                .andExpect(jsonPath("$.data.products").isEmpty());
+
+        verify(fittingResultService).getFittingResult(1L, 30L);
+    }
+
+    @Test
+    @DisplayName("다른 회원의 가상피팅 결과는 403 Forbidden을 반환한다")
+    void rejectOtherMembersFittingResult() throws Exception {
+        given(fittingResultService.getFittingResult(1L, 30L))
+                .willThrow(new BusinessException(
+                        ErrorCode.FITTING_RESULT_ACCESS_DENIED
+                ));
+
+        mockMvc.perform(get("/api/v1/fitting-results/30"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code")
+                        .value("FITTING_RESULT_ACCESS_DENIED"));
+    }
+
+    private FittingResultDetailResponse createDetailResponse() {
+        Member member = Member.create("result@lookddak.com", "password");
+        ReflectionTestUtils.setField(member, "id", 1L);
+        FittingJob fittingJob = FittingJob.create(member);
+        ReflectionTestUtils.setField(fittingJob, "id", 10L);
+        FittingResult fittingResult = FittingResult.create(
+                fittingJob,
+                "fittings/30.png",
+                "출근룩",
+                "AI 코디 설명"
+        );
+        ReflectionTestUtils.setField(fittingResult, "id", 30L);
+
+        return FittingResultDetailResponse.from(
+                fittingResult,
+                "https://image.example.com/fittings/30.png",
+                List.of()
+        );
     }
 }
