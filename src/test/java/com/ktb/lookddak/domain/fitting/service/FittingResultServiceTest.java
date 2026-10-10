@@ -283,6 +283,46 @@ class FittingResultServiceTest {
                 .findAllByFittingJobIdWithProduct(any());
     }
 
+    @Test
+    @DisplayName("본인이 저장한 가상피팅 결과를 soft delete 처리한다")
+    void deleteFittingResult() {
+        FittingResultService service = createService();
+        FittingResult fittingResult = fittingResult(
+                1L,
+                30L,
+                "fittings/30.png"
+        );
+        given(fittingResultRepository
+                .findActiveByIdWithMemberForUpdate(30L))
+                .willReturn(Optional.of(fittingResult));
+
+        service.deleteFittingResult(1L, 30L);
+
+        assertThat(fittingResult.isDeleted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("다른 회원의 가상피팅 결과는 삭제할 수 없다")
+    void rejectDeleteOtherMembersFittingResult() {
+        FittingResultService service = createService();
+        FittingResult fittingResult = fittingResult(
+                2L,
+                30L,
+                "fittings/30.png"
+        );
+        given(fittingResultRepository
+                .findActiveByIdWithMemberForUpdate(30L))
+                .willReturn(Optional.of(fittingResult));
+
+        assertThatThrownBy(() -> service.deleteFittingResult(1L, 30L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(
+                                ErrorCode.FITTING_RESULT_ACCESS_DENIED
+                        )
+                );
+        assertThat(fittingResult.isDeleted()).isFalse();
+    }
+
     private FittingResultService createService() {
         return new FittingResultService(
                 fittingJobRepository,

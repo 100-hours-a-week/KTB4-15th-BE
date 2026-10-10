@@ -184,6 +184,27 @@ public class FittingResultService {
         );
     }
 
+    /**
+     * 사용자가 저장한 가상피팅 결과를 soft delete 처리한다.
+     * 수정 대상 행을 잠가 동시에 들어온 삭제 요청을 안전하게 직렬화한다.
+     */
+    @Transactional
+    public void deleteFittingResult(Long memberId, Long fittingResultId) {
+        FittingResult fittingResult = fittingResultRepository
+                .findActiveByIdWithMemberForUpdate(fittingResultId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.FITTING_RESULT_NOT_FOUND
+                ));
+
+        if (!fittingResult.isOwnedBy(memberId)) {
+            throw new BusinessException(
+                    ErrorCode.FITTING_RESULT_ACCESS_DENIED
+            );
+        }
+
+        fittingResult.delete();
+    }
+
     private void validateOutfitName(String outfitName) {
         if (outfitName == null || outfitName.isBlank()) {
             throw new BusinessException(ErrorCode.INVALID_OUTFIT_NAME);
