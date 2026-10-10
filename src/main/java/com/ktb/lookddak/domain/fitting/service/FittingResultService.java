@@ -2,13 +2,17 @@ package com.ktb.lookddak.domain.fitting.service;
 
 import com.ktb.lookddak.domain.fitting.dto.FittingResultCreateRequest;
 import com.ktb.lookddak.domain.fitting.dto.FittingResultCreateResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingResultDetailResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingResultListItemResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingResultListResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingResultProductResponse;
 import com.ktb.lookddak.domain.fitting.entity.FittingJob;
+import com.ktb.lookddak.domain.fitting.entity.FittingJobProduct;
 import com.ktb.lookddak.domain.fitting.entity.FittingJobStatus;
 import com.ktb.lookddak.domain.fitting.entity.FittingResult;
 import com.ktb.lookddak.domain.fitting.entity.FittingTempResult;
 import com.ktb.lookddak.domain.fitting.repository.FittingJobRepository;
+import com.ktb.lookddak.domain.fitting.repository.FittingJobProductRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingResultRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingTempResultRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
@@ -34,6 +38,7 @@ public class FittingResultService {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final FittingJobRepository fittingJobRepository;
+    private final FittingJobProductRepository fittingJobProductRepository;
     private final FittingTempResultRepository fittingTempResultRepository;
     private final FittingResultRepository fittingResultRepository;
     private final S3PresignedUrlProvider presignedUrlProvider;
@@ -134,6 +139,48 @@ public class FittingResultService {
                 totalCount,
                 nextCursor,
                 hasNext
+        );
+    }
+
+    /**
+     * 저장된 가상피팅 결과와 해당 작업에 사용한 현재 상품 정보를 조회한다.
+     */
+    public FittingResultDetailResponse getFittingResult(
+            Long memberId,
+            Long fittingResultId
+    ) {
+        FittingResult fittingResult = fittingResultRepository
+                .findActiveByIdWithMember(fittingResultId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.FITTING_RESULT_NOT_FOUND
+                ));
+
+        if (!fittingResult.isOwnedBy(memberId)) {
+            throw new BusinessException(
+                    ErrorCode.FITTING_RESULT_ACCESS_DENIED
+            );
+        }
+
+        List<FittingJobProduct> jobProducts = fittingJobProductRepository
+                .findAllByFittingJobIdWithProduct(
+                        fittingResult.getFittingJob().getId()
+                );
+        List<FittingResultProductResponse> products = new ArrayList<>();
+
+        for (FittingJobProduct jobProduct : jobProducts) {
+            products.add(FittingResultProductResponse.from(
+                    jobProduct.getProduct()
+            ));
+        }
+
+        String resultImageUrl = presignedUrlProvider.createGetUrl(
+                fittingResult.getResultImageKey()
+        );
+
+        return FittingResultDetailResponse.from(
+                fittingResult,
+                resultImageUrl,
+                products
         );
     }
 

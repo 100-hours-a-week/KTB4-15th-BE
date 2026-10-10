@@ -2,14 +2,19 @@ package com.ktb.lookddak.domain.fitting.service;
 
 import com.ktb.lookddak.domain.fitting.dto.FittingResultCreateRequest;
 import com.ktb.lookddak.domain.fitting.dto.FittingResultCreateResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingResultDetailResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingResultListResponse;
 import com.ktb.lookddak.domain.fitting.entity.FittingJob;
+import com.ktb.lookddak.domain.fitting.entity.FittingJobProduct;
 import com.ktb.lookddak.domain.fitting.entity.FittingResult;
 import com.ktb.lookddak.domain.fitting.entity.FittingTempResult;
 import com.ktb.lookddak.domain.fitting.repository.FittingJobRepository;
+import com.ktb.lookddak.domain.fitting.repository.FittingJobProductRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingResultRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingTempResultRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
+import com.ktb.lookddak.domain.product.entity.Product;
+import com.ktb.lookddak.domain.product.entity.ProductItemType;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import com.ktb.lookddak.global.storage.s3.S3PresignedUrlProvider;
@@ -36,6 +41,9 @@ class FittingResultServiceTest {
 
     @Mock
     private FittingJobRepository fittingJobRepository;
+
+    @Mock
+    private FittingJobProductRepository fittingJobProductRepository;
 
     @Mock
     private FittingTempResultRepository fittingTempResultRepository;
@@ -206,9 +214,79 @@ class FittingResultServiceTest {
                 );
     }
 
+    @Test
+    @DisplayName("저장된 가상피팅 결과 상세를 현재 상품 정보와 함께 조회한다")
+    void getFittingResult() {
+        FittingResultService service = createService();
+        FittingResult fittingResult = fittingResult(
+                1L,
+                30L,
+                "fittings/30.png"
+        );
+        Product product = Product.create(
+                "TOP-30",
+                "에센셜 램스울 크루넥",
+                "https://image.example.com/products/30.jpg",
+                49_000,
+                "차콜",
+                ProductItemType.TOP,
+                "https://shop.example.com/products/30"
+        );
+        ReflectionTestUtils.setField(product, "id", 100L);
+        FittingJobProduct jobProduct = FittingJobProduct.create(
+                fittingResult.getFittingJob(),
+                product
+        );
+        given(fittingResultRepository.findActiveByIdWithMember(30L))
+                .willReturn(Optional.of(fittingResult));
+        given(fittingJobProductRepository.findAllByFittingJobIdWithProduct(
+                fittingResult.getFittingJob().getId()
+        )).willReturn(List.of(jobProduct));
+        given(presignedUrlProvider.createGetUrl("fittings/30.png"))
+                .willReturn("https://image.example.com/fittings/30.png");
+
+        FittingResultDetailResponse response = service.getFittingResult(
+                1L,
+                30L
+        );
+
+        assertThat(response.getFittingResultId()).isEqualTo(30L);
+        assertThat(response.getResultImageUrl())
+                .isEqualTo("https://image.example.com/fittings/30.png");
+        assertThat(response.getOutfitName()).isEqualTo("출근룩");
+        assertThat(response.getComment()).isEqualTo("AI 코디 설명");
+        assertThat(response.getProducts()).hasSize(1);
+        assertThat(response.getProducts().get(0).getProductId())
+                .isEqualTo(100L);
+    }
+
+    @Test
+    @DisplayName("다른 회원의 저장 가상피팅 결과는 조회할 수 없다")
+    void rejectOtherMembersFittingResult() {
+        FittingResultService service = createService();
+        FittingResult fittingResult = fittingResult(
+                2L,
+                30L,
+                "fittings/30.png"
+        );
+        given(fittingResultRepository.findActiveByIdWithMember(30L))
+                .willReturn(Optional.of(fittingResult));
+
+        assertThatThrownBy(() -> service.getFittingResult(1L, 30L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(
+                                ErrorCode.FITTING_RESULT_ACCESS_DENIED
+                        )
+                );
+
+        verify(fittingJobProductRepository, never())
+                .findAllByFittingJobIdWithProduct(any());
+    }
+
     private FittingResultService createService() {
         return new FittingResultService(
                 fittingJobRepository,
+                fittingJobProductRepository,
                 fittingTempResultRepository,
                 fittingResultRepository,
                 presignedUrlProvider
