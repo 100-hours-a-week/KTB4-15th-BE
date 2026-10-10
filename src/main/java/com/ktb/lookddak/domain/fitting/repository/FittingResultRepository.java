@@ -13,7 +13,7 @@ import java.util.Optional;
 
 public interface FittingResultRepository extends JpaRepository<FittingResult, Long> {
 
-    boolean existsByFittingJobId(Long fittingJobId);
+    Optional<FittingResult> findByFittingJobId(Long fittingJobId);
 
     @Query("""
             select fittingResult

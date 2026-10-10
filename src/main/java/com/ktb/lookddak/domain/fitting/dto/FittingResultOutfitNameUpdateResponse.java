@@ -11,7 +11,7 @@ public class FittingResultOutfitNameUpdateResponse {
     private final Long fittingResultId;
     private final String outfitName;
 
-    private FittingResultOutfitNameUpdateResponse(
+    public FittingResultOutfitNameUpdateResponse(
             Long fittingResultId,
             String outfitName
     ) {

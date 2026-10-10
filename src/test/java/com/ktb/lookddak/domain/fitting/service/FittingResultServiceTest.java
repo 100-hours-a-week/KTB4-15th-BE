@@ -71,7 +71,8 @@ class FittingResultServiceTest {
                 .willReturn(Optional.of(fittingJob));
         given(fittingTempResultRepository.findByFittingJobId(10L))
                 .willReturn(Optional.of(tempResult));
-        given(fittingResultRepository.existsByFittingJobId(10L)).willReturn(false);
+        given(fittingResultRepository.findByFittingJobId(10L))
+                .willReturn(Optional.empty());
         given(fittingResultRepository.saveAndFlush(any(FittingResult.class)))
                 .willAnswer(invocation -> {
                     FittingResult fittingResult = invocation.getArgument(0);
@@ -131,14 +132,15 @@ class FittingResultServiceTest {
     void rejectAlreadySavedResult() {
         FittingResultService service = createService();
         FittingJob fittingJob = completedFittingJob(1L, 10L);
-        FittingTempResult tempResult = FittingTempResult.create(
-                fittingJob, "fittings/result-10.png", "AI 코디명", "AI 코디 설명"
-        );
         given(fittingJobRepository.findByIdWithMemberForResultSave(10L))
                 .willReturn(Optional.of(fittingJob));
-        given(fittingTempResultRepository.findByFittingJobId(10L))
-                .willReturn(Optional.of(tempResult));
-        given(fittingResultRepository.existsByFittingJobId(10L)).willReturn(true);
+        given(fittingResultRepository.findByFittingJobId(10L))
+                .willReturn(Optional.of(FittingResult.create(
+                        fittingJob,
+                        "fittings/result-10.png",
+                        "기존 코디명",
+                        "AI 코디 설명"
+                )));
 
         assertThatThrownBy(() -> service.createFittingResult(
                 1L,
@@ -148,6 +150,37 @@ class FittingResultServiceTest {
                         .isEqualTo(ErrorCode.FITTING_RESULT_ALREADY_SAVED)
         );
 
+        verify(fittingResultRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("삭제한 가상피팅 결과를 같은 작업으로 다시 저장하면 기존 결과를 복구한다")
+    void restoreDeletedFittingResult() {
+        FittingResultService service = createService();
+        FittingJob fittingJob = completedFittingJob(1L, 10L);
+        FittingResult deletedResult = FittingResult.create(
+                fittingJob,
+                "fittings/result-10.png",
+                "기존 코디명",
+                "AI 코디 설명"
+        );
+        ReflectionTestUtils.setField(deletedResult, "id", 100L);
+        deletedResult.delete();
+        given(fittingJobRepository.findByIdWithMemberForResultSave(10L))
+                .willReturn(Optional.of(fittingJob));
+        given(fittingResultRepository.findByFittingJobId(10L))
+                .willReturn(Optional.of(deletedResult));
+
+        FittingResultCreateResponse response = service.createFittingResult(
+                1L,
+                new FittingResultCreateRequest(10L, "새 회사 데일리 룩")
+        );
+
+        assertThat(response.getFittingResultId()).isEqualTo(100L);
+        assertThat(response.getOutfitName()).isEqualTo("새 회사 데일리 룩");
+        assertThat(deletedResult.isDeleted()).isFalse();
+        assertThat(deletedResult.getOutfitName()).isEqualTo("새 회사 데일리 룩");
+        verify(fittingTempResultRepository, never()).findByFittingJobId(any());
         verify(fittingResultRepository, never()).saveAndFlush(any());
     }
 

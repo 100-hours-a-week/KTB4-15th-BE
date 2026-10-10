@@ -2,6 +2,7 @@ package com.ktb.lookddak.domain.fitting.controller;
 
 import com.ktb.lookddak.domain.fitting.dto.FittingResultDetailResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingResultListResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingResultOutfitNameUpdateResponse;
 import com.ktb.lookddak.domain.fitting.entity.FittingJob;
 import com.ktb.lookddak.domain.fitting.entity.FittingResult;
 import com.ktb.lookddak.domain.fitting.service.FittingResultService;
@@ -27,10 +28,12 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.List;
 
 import static org.mockito.BDDMockito.given;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -187,6 +190,54 @@ class FittingResultControllerTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code")
                         .value("FITTING_RESULT_ACCESS_DENIED"));
+    }
+
+    @Test
+    @DisplayName("저장된 가상피팅 결과의 코디명을 수정하면 200 OK를 반환한다")
+    void updateOutfitName() throws Exception {
+        given(fittingResultService.updateOutfitName(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(30L),
+                any()
+        )).willReturn(new FittingResultOutfitNameUpdateResponse(
+                30L,
+                "회사 데일리 니트 룩"
+        ));
+
+        mockMvc.perform(patch("/api/v1/fitting-results/30")
+                        .contentType("application/json")
+                        .content("""
+                                {"outfitName": "회사 데일리 니트 룩"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.fittingResultId").value(30))
+                .andExpect(jsonPath("$.data.outfitName")
+                        .value("회사 데일리 니트 룩"));
+
+        verify(fittingResultService).updateOutfitName(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(30L),
+                any()
+        );
+    }
+
+    @Test
+    @DisplayName("잘못된 코디명 수정 요청은 400 Bad Request를 반환한다")
+    void rejectInvalidOutfitNameUpdate() throws Exception {
+        given(fittingResultService.updateOutfitName(
+                org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(30L),
+                any()
+        )).willThrow(new BusinessException(ErrorCode.INVALID_OUTFIT_NAME));
+
+        mockMvc.perform(patch("/api/v1/fitting-results/30")
+                        .contentType("application/json")
+                        .content("""
+                                {"outfitName": " "}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_OUTFIT_NAME"));
     }
 
     private FittingResultDetailResponse createDetailResponse() {

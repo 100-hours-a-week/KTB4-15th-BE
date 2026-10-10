@@ -70,15 +70,27 @@ public class FittingResultService {
             throw new BusinessException(ErrorCode.FITTING_JOB_NOT_COMPLETED);
         }
 
+        FittingResult existingResult = fittingResultRepository
+                .findByFittingJobId(fittingJob.getId())
+                .orElse(null);
+
+        if (existingResult != null) {
+            if (!existingResult.isDeleted()) {
+                throw new BusinessException(
+                        ErrorCode.FITTING_RESULT_ALREADY_SAVED
+                );
+            }
+
+            // fitting_job_id UNIQUE를 유지하면서 기존 soft delete 결과를 복구한다.
+            existingResult.restore(request.getOutfitName());
+            return FittingResultCreateResponse.from(existingResult);
+        }
+
         FittingTempResult tempResult = fittingTempResultRepository
                 .findByFittingJobId(fittingJob.getId())
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.FITTING_TEMP_RESULT_NOT_FOUND
                 ));
-
-        if (fittingResultRepository.existsByFittingJobId(fittingJob.getId())) {
-            throw new BusinessException(ErrorCode.FITTING_RESULT_ALREADY_SAVED);
-        }
 
         try {
             FittingResult savedResult = fittingResultRepository.saveAndFlush(

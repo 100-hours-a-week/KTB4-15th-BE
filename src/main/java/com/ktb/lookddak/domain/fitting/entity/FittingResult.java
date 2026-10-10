@@ -96,4 +96,9 @@ public class FittingResult extends BaseEntity {
             deletedAt = LocalDateTime.now();
         }
     }
+
+    public void restore(String outfitName) {
+        deletedAt = null;
+        updateOutfitName(outfitName);
+    }
 }

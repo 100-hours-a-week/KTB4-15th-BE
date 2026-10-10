@@ -4,6 +4,8 @@ import com.ktb.lookddak.domain.fitting.dto.FittingResultCreateRequest;
 import com.ktb.lookddak.domain.fitting.dto.FittingResultCreateResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingResultDetailResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingResultListResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingResultOutfitNameUpdateRequest;
+import com.ktb.lookddak.domain.fitting.dto.FittingResultOutfitNameUpdateResponse;
 import com.ktb.lookddak.domain.fitting.service.FittingResultService;
 import com.ktb.lookddak.global.response.ApiResponse;
 import com.ktb.lookddak.global.response.SuccessCode;
@@ -17,6 +19,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -80,6 +83,25 @@ public class FittingResultController {
         return ResponseEntity
                 .status(SuccessCode.OK.getStatus())
                 .body(ApiResponse.success(SuccessCode.OK, null));
+    }
+
+    @PatchMapping("/{fittingResultId}")
+    public ResponseEntity<ApiResponse<FittingResultOutfitNameUpdateResponse>>
+            updateOutfitName(
+                    @AuthenticationPrincipal MemberPrincipal principal,
+                    @Positive @PathVariable Long fittingResultId,
+                    @RequestBody FittingResultOutfitNameUpdateRequest request
+            ) {
+        FittingResultOutfitNameUpdateResponse response =
+                fittingResultService.updateOutfitName(
+                        principal.getMemberId(),
+                        fittingResultId,
+                        request
+                );
+
+        return ResponseEntity
+                .status(SuccessCode.OK.getStatus())
+                .body(ApiResponse.success(SuccessCode.OK, response));
     }
 
     @PostMapping
