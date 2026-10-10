@@ -7,10 +7,23 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface FittingResultRepository extends JpaRepository<FittingResult, Long> {
 
     boolean existsByFittingJobId(Long fittingJobId);
+
+    @Query("""
+            select fittingResult
+            from FittingResult fittingResult
+            join fetch fittingResult.fittingJob fittingJob
+            join fetch fittingJob.member member
+            where fittingResult.id = :fittingResultId
+              and fittingResult.deletedAt is null
+            """)
+    Optional<FittingResult> findActiveByIdWithMember(
+            @Param("fittingResultId") Long fittingResultId
+    );
 
     @Query("""
             select fittingResult

@@ -93,6 +93,25 @@ class FittingResultRepositoryTest {
                 .isEqualTo(1L);
     }
 
+    @Test
+    @DisplayName("상세 조회는 삭제되지 않은 저장 결과와 소유 회원을 함께 조회한다")
+    void findActiveByIdWithMember() {
+        FittingResult active = saveResult(member, "상세 조회 코디");
+        FittingResult deleted = saveResult(member, "삭제된 상세 코디");
+        deleted.delete();
+        fittingResultRepository.saveAndFlush(deleted);
+
+        FittingResult found = fittingResultRepository
+                .findActiveByIdWithMember(active.getId())
+                .orElseThrow();
+
+        assertThat(found.getId()).isEqualTo(active.getId());
+        assertThat(found.getFittingJob().getMember().getId())
+                .isEqualTo(member.getId());
+        assertThat(fittingResultRepository
+                .findActiveByIdWithMember(deleted.getId())).isEmpty();
+    }
+
     private FittingResult saveResult(Member owner, String outfitName) {
         FittingJob fittingJob = fittingJobRepository.save(FittingJob.create(owner));
         return fittingResultRepository.saveAndFlush(FittingResult.create(
