@@ -56,7 +56,7 @@ class FittingResultServiceTest {
         given(fittingTempResultRepository.findByFittingJobId(10L))
                 .willReturn(Optional.of(tempResult));
         given(fittingResultRepository.existsByFittingJobId(10L)).willReturn(false);
-        given(fittingResultRepository.save(any(FittingResult.class)))
+        given(fittingResultRepository.saveAndFlush(any(FittingResult.class)))
                 .willAnswer(invocation -> {
                     FittingResult fittingResult = invocation.getArgument(0);
                     ReflectionTestUtils.setField(fittingResult, "id", 100L);
@@ -73,7 +73,7 @@ class FittingResultServiceTest {
 
         ArgumentCaptor<FittingResult> captor =
                 ArgumentCaptor.forClass(FittingResult.class);
-        verify(fittingResultRepository).save(captor.capture());
+        verify(fittingResultRepository).saveAndFlush(captor.capture());
         assertThat(captor.getValue().getResultImageKey())
                 .isEqualTo("fittings/result-10.png");
         assertThat(captor.getValue().getAiComment()).isEqualTo("AI 코디 설명");
@@ -132,7 +132,7 @@ class FittingResultServiceTest {
                         .isEqualTo(ErrorCode.FITTING_RESULT_ALREADY_SAVED)
         );
 
-        verify(fittingResultRepository, never()).save(any());
+        verify(fittingResultRepository, never()).saveAndFlush(any());
     }
 
     private FittingResultService createService() {

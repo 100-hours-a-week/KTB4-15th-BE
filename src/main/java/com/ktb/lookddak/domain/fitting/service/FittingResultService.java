@@ -63,7 +63,7 @@ public class FittingResultService {
         }
 
         try {
-            FittingResult savedResult = fittingResultRepository.save(
+            FittingResult savedResult = fittingResultRepository.saveAndFlush(
                     FittingResult.create(
                             fittingJob,
                             tempResult.getResultImageKey(),
