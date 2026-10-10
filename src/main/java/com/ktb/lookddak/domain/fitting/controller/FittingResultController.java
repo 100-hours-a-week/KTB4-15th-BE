@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -64,6 +65,21 @@ public class FittingResultController {
         return ResponseEntity
                 .status(SuccessCode.OK.getStatus())
                 .body(ApiResponse.success(SuccessCode.OK, response));
+    }
+
+    @DeleteMapping("/{fittingResultId}")
+    public ResponseEntity<ApiResponse<Void>> deleteFittingResult(
+            @AuthenticationPrincipal MemberPrincipal principal,
+            @Positive @PathVariable Long fittingResultId
+    ) {
+        fittingResultService.deleteFittingResult(
+                principal.getMemberId(),
+                fittingResultId
+        );
+
+        return ResponseEntity
+                .status(SuccessCode.OK.getStatus())
+                .body(ApiResponse.success(SuccessCode.OK, null));
     }
 
     @PostMapping

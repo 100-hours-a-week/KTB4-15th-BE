@@ -29,6 +29,7 @@ import java.util.List;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -157,6 +158,32 @@ class FittingResultControllerTest {
                 ));
 
         mockMvc.perform(get("/api/v1/fitting-results/30"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code")
+                        .value("FITTING_RESULT_ACCESS_DENIED"));
+    }
+
+    @Test
+    @DisplayName("저장된 가상피팅 결과를 삭제하면 200 OK와 null 데이터를 반환한다")
+    void deleteFittingResult() throws Exception {
+        mockMvc.perform(delete("/api/v1/fitting-results/30"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data").isEmpty())
+                .andExpect(jsonPath("$.message")
+                        .value("요청이 성공적으로 처리되었습니다."));
+
+        verify(fittingResultService).deleteFittingResult(1L, 30L);
+    }
+
+    @Test
+    @DisplayName("다른 회원의 가상피팅 결과 삭제는 403 Forbidden을 반환한다")
+    void rejectDeleteOtherMembersFittingResult() throws Exception {
+        org.mockito.Mockito.doThrow(new BusinessException(
+                ErrorCode.FITTING_RESULT_ACCESS_DENIED
+        )).when(fittingResultService).deleteFittingResult(1L, 30L);
+
+        mockMvc.perform(delete("/api/v1/fitting-results/30"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code")
                         .value("FITTING_RESULT_ACCESS_DENIED"));
