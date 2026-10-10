@@ -5,6 +5,8 @@ import com.ktb.lookddak.domain.fitting.dto.FittingResultCreateResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingResultDetailResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingResultListItemResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingResultListResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingResultOutfitNameUpdateRequest;
+import com.ktb.lookddak.domain.fitting.dto.FittingResultOutfitNameUpdateResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingResultProductResponse;
 import com.ktb.lookddak.domain.fitting.entity.FittingJob;
 import com.ktb.lookddak.domain.fitting.entity.FittingJobProduct;
@@ -203,6 +205,34 @@ public class FittingResultService {
         }
 
         fittingResult.delete();
+    }
+
+    /**
+     * 사용자가 저장한 가상피팅 결과의 코디명만 변경한다.
+     */
+    @Transactional
+    public FittingResultOutfitNameUpdateResponse updateOutfitName(
+            Long memberId,
+            Long fittingResultId,
+            FittingResultOutfitNameUpdateRequest request
+    ) {
+        validateOutfitName(request.getOutfitName());
+
+        FittingResult fittingResult = fittingResultRepository
+                .findActiveByIdWithMemberForUpdate(fittingResultId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.FITTING_RESULT_NOT_FOUND
+                ));
+
+        if (!fittingResult.isOwnedBy(memberId)) {
+            throw new BusinessException(
+                    ErrorCode.FITTING_RESULT_ACCESS_DENIED
+            );
+        }
+
+        fittingResult.updateOutfitName(request.getOutfitName());
+
+        return FittingResultOutfitNameUpdateResponse.from(fittingResult);
     }
 
     private void validateOutfitName(String outfitName) {

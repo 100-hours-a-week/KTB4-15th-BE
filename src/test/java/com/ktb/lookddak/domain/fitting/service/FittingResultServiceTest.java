@@ -4,6 +4,8 @@ import com.ktb.lookddak.domain.fitting.dto.FittingResultCreateRequest;
 import com.ktb.lookddak.domain.fitting.dto.FittingResultCreateResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingResultDetailResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingResultListResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingResultOutfitNameUpdateRequest;
+import com.ktb.lookddak.domain.fitting.dto.FittingResultOutfitNameUpdateResponse;
 import com.ktb.lookddak.domain.fitting.entity.FittingJob;
 import com.ktb.lookddak.domain.fitting.entity.FittingJobProduct;
 import com.ktb.lookddak.domain.fitting.entity.FittingResult;
@@ -321,6 +323,52 @@ class FittingResultServiceTest {
                         )
                 );
         assertThat(fittingResult.isDeleted()).isFalse();
+    }
+
+    @Test
+    @DisplayName("본인이 저장한 가상피팅 결과의 코디명을 수정한다")
+    void updateOutfitName() {
+        FittingResultService service = createService();
+        FittingResult fittingResult = fittingResult(
+                1L,
+                30L,
+                "fittings/30.png"
+        );
+        given(fittingResultRepository
+                .findActiveByIdWithMemberForUpdate(30L))
+                .willReturn(Optional.of(fittingResult));
+
+        FittingResultOutfitNameUpdateResponse response =
+                service.updateOutfitName(
+                        1L,
+                        30L,
+                        new FittingResultOutfitNameUpdateRequest(
+                                "회사 데일리 니트 룩"
+                        )
+                );
+
+        assertThat(fittingResult.getOutfitName())
+                .isEqualTo("회사 데일리 니트 룩");
+        assertThat(response.getFittingResultId()).isEqualTo(30L);
+        assertThat(response.getOutfitName()).isEqualTo("회사 데일리 니트 룩");
+    }
+
+    @Test
+    @DisplayName("공백만 있는 코디명으로 수정할 수 없다")
+    void rejectBlankOutfitNameUpdate() {
+        FittingResultService service = createService();
+
+        assertThatThrownBy(() -> service.updateOutfitName(
+                1L,
+                30L,
+                new FittingResultOutfitNameUpdateRequest("  ")
+        )).isInstanceOfSatisfying(BusinessException.class, exception ->
+                assertThat(exception.getErrorCode())
+                        .isEqualTo(ErrorCode.INVALID_OUTFIT_NAME)
+        );
+
+        verify(fittingResultRepository, never())
+                .findActiveByIdWithMemberForUpdate(any());
     }
 
     private FittingResultService createService() {
