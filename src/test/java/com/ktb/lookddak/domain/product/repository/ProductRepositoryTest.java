@@ -2,12 +2,14 @@ package com.ktb.lookddak.domain.product.repository;
 
 import com.ktb.lookddak.domain.product.entity.Product;
 import com.ktb.lookddak.domain.product.entity.ProductItemType;
+import com.ktb.lookddak.domain.product.dto.ProductRankingQueryResult;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 
 import java.util.List;
 
@@ -84,6 +86,35 @@ class ProductRepositoryTest {
         int updatedRowCount = productRepository.incrementClickCount(999L);
 
         assertThat(updatedRowCount).isZero();
+    }
+
+    @Test
+    @DisplayName("클릭 수가 있는 상품만 클릭 수 내림차순과 상품 ID 오름차순으로 조회한다")
+    void findClickRankings() {
+        Product firstProduct = productRepository.saveAndFlush(
+                createProduct("0000001")
+        );
+        Product secondProduct = productRepository.saveAndFlush(
+                createProduct("0000002")
+        );
+        productRepository.saveAndFlush(createProduct("0000003"));
+
+        for (int index = 0; index < 2; index++) {
+            productRepository.incrementClickCount(firstProduct.getId());
+            productRepository.incrementClickCount(secondProduct.getId());
+        }
+        productRepository.incrementClickCount(firstProduct.getId());
+        entityManager.clear();
+
+        List<ProductRankingQueryResult> rankings = productRepository
+                .findClickRankings(PageRequest.of(0, 100));
+
+        assertThat(rankings)
+                .extracting(result -> result.product().getId())
+                .containsExactly(firstProduct.getId(), secondProduct.getId());
+        assertThat(rankings)
+                .extracting(ProductRankingQueryResult::rankingCount)
+                .containsExactly(3L, 2L);
     }
 
     private Product createProduct(String productCode) {
