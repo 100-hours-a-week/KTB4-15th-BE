@@ -48,6 +48,7 @@ public enum ErrorCode {
 
     // Product errors
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."),
+    INVALID_RANKING_TYPE(HttpStatus.BAD_REQUEST, "올바른 랭킹 기준을 선택해주세요."),
 
     // Wishlist errors
     WISHLIST_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 찜한 상품입니다."),
