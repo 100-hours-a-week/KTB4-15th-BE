@@ -1,6 +1,7 @@
 package com.ktb.lookddak.domain.product.controller;
 
 import com.ktb.lookddak.domain.product.dto.ProductPurchaseLinkClickResponse;
+import com.ktb.lookddak.domain.product.dto.ProductRankingResponse;
 import com.ktb.lookddak.domain.product.service.ProductService;
 import com.ktb.lookddak.global.response.ApiResponse;
 import com.ktb.lookddak.global.response.SuccessCode;
@@ -9,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,6 +23,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProductController {
 
     private final ProductService productService;
+
+    @GetMapping("/rankings")
+    public ResponseEntity<ApiResponse<ProductRankingResponse>> getRankings(
+            @RequestParam(required = false) String type
+    ) {
+        ProductRankingResponse response = productService.getRankings(type);
+
+        return ResponseEntity
+                .status(SuccessCode.OK.getStatus())
+                .body(ApiResponse.success(SuccessCode.OK, response));
+    }
 
     @PostMapping("/{productId}/purchase-link-clicks")
     public ResponseEntity<ApiResponse<ProductPurchaseLinkClickResponse>>
