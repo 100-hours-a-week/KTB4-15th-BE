@@ -1,6 +1,7 @@
 package com.ktb.lookddak.domain.wishlist.repository;
 
 import com.ktb.lookddak.domain.wishlist.entity.Wishlist;
+import com.ktb.lookddak.domain.product.dto.ProductRankingQueryResult;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -18,6 +19,17 @@ public interface WishlistRepository extends JpaRepository<Wishlist, Long> {
     boolean existsByMemberIdAndProductId(Long memberId, Long productId);
 
     long countByMemberId(Long memberId);
+
+    @Query("""
+            select new com.ktb.lookddak.domain.product.dto.ProductRankingQueryResult(
+                wishlist.product,
+                count(wishlist.id)
+            )
+            from Wishlist wishlist
+            group by wishlist.product
+            order by count(wishlist.id) desc, wishlist.product.id asc
+            """)
+    List<ProductRankingQueryResult> findWishRankings(Pageable pageable);
 
     @Query("""
             select wishlist

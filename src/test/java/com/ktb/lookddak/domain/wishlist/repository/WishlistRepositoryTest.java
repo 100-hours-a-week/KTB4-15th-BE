@@ -4,6 +4,7 @@ import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
 import com.ktb.lookddak.domain.product.entity.Product;
 import com.ktb.lookddak.domain.product.entity.ProductItemType;
+import com.ktb.lookddak.domain.product.dto.ProductRankingQueryResult;
 import com.ktb.lookddak.domain.product.repository.ProductRepository;
 import com.ktb.lookddak.domain.wishlist.entity.Wishlist;
 import org.junit.jupiter.api.BeforeEach;
@@ -155,6 +156,40 @@ class WishlistRepositoryTest {
         wishlistRepository.flush();
 
         assertThat(wishlistRepository.findById(wishlist.getId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("찜 수가 있는 상품만 찜 수 내림차순과 상품 ID 오름차순으로 조회한다")
+    void findWishRankings() {
+        Product secondProduct = productRepository.save(
+                createProduct("상품 2", 59_000)
+        );
+        productRepository.saveAndFlush(createProduct("상품 3", 69_000));
+
+        Member secondMember = createMember("ranking-member-2@lookddak.com");
+        Member thirdMember = createMember("ranking-member-3@lookddak.com");
+
+        wishlistRepository.save(Wishlist.create(member, product));
+        wishlistRepository.save(Wishlist.create(secondMember, product));
+        wishlistRepository.save(Wishlist.create(thirdMember, product));
+        wishlistRepository.save(Wishlist.create(member, secondProduct));
+        wishlistRepository.saveAndFlush(
+                Wishlist.create(secondMember, secondProduct)
+        );
+
+        List<ProductRankingQueryResult> rankings = wishlistRepository
+                .findWishRankings(PageRequest.of(0, 100));
+
+        assertThat(rankings)
+                .extracting(result -> result.product().getId())
+                .containsExactly(product.getId(), secondProduct.getId());
+        assertThat(rankings)
+                .extracting(ProductRankingQueryResult::rankingCount)
+                .containsExactly(3L, 2L);
+    }
+
+    private Member createMember(String email) {
+        return memberRepository.save(Member.create(email, "encoded-password"));
     }
 
     private Product createProduct(String name, Integer currentPrice) {
