@@ -4,12 +4,15 @@ import com.ktb.lookddak.domain.fitting.entity.FittingJob;
 import com.ktb.lookddak.domain.fitting.entity.FittingJobStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
+import java.time.LocalDateTime;
+import java.util.List;
 
 public interface FittingJobRepository extends JpaRepository<FittingJob, Long> {
 
@@ -71,5 +74,40 @@ public interface FittingJobRepository extends JpaRepository<FittingJob, Long> {
             """)
     Optional<FittingJob> findByIdWithMemberForUpdate(
             @Param("fittingJobId") Long fittingJobId
+    );
+
+    @Query("""
+            select fittingJob
+            from FittingJob fittingJob
+            where fittingJob.member.id = :memberId
+              and (
+                    fittingJob.status = :generatingStatus
+                    or (
+                        fittingJob.status = :failedStatus
+                        and fittingJob.resultViewedAt is null
+                    )
+                    or (
+                        fittingJob.status = :completedStatus
+                        and fittingJob.resultViewedAt is null
+                        and exists (
+                            select tempResult
+                            from FittingTempResult tempResult
+                            where tempResult.fittingJob = fittingJob
+                              and tempResult.expiresAt > :now
+                        )
+                    )
+              )
+            order by
+                case when fittingJob.status = :generatingStatus then 0 else 1 end,
+                fittingJob.createdAt desc,
+                fittingJob.id desc
+            """)
+    List<FittingJob> findCurrentJobs(
+            @Param("memberId") Long memberId,
+            @Param("generatingStatus") FittingJobStatus generatingStatus,
+            @Param("completedStatus") FittingJobStatus completedStatus,
+            @Param("failedStatus") FittingJobStatus failedStatus,
+            @Param("now") LocalDateTime now,
+            Pageable pageable
     );
 }

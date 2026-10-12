@@ -4,8 +4,10 @@ import com.ktb.lookddak.domain.fitting.dto.FittingJobCreateRequest;
 import com.ktb.lookddak.domain.fitting.dto.FittingJobCreateResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingJobStatusResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingJobResultViewedResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingJobCurrentResponse;
 import com.ktb.lookddak.domain.fitting.service.FittingJobService;
 import com.ktb.lookddak.domain.fitting.service.FittingJobResultViewService;
+import com.ktb.lookddak.domain.fitting.service.FittingJobCurrentService;
 import com.ktb.lookddak.global.response.ApiResponse;
 import com.ktb.lookddak.global.response.SuccessCode;
 import com.ktb.lookddak.global.security.principal.MemberPrincipal;
@@ -31,6 +33,7 @@ public class FittingJobController {
 
     private final FittingJobService fittingJobService;
     private final FittingJobResultViewService fittingJobResultViewService;
+    private final FittingJobCurrentService fittingJobCurrentService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<FittingJobCreateResponse>>
@@ -64,6 +67,22 @@ public class FittingJobController {
         return ResponseEntity
                 .status(SuccessCode.OK.getStatus())
                 .body(ApiResponse.success(SuccessCode.OK, response));
+    }
+
+    @GetMapping("/current")
+    public ResponseEntity<ApiResponse<FittingJobCurrentResponse>>
+            getCurrentFittingJob(
+                    @AuthenticationPrincipal MemberPrincipal principal
+            ) {
+        FittingJobCurrentResponse response = fittingJobCurrentService
+                .getCurrentFittingJob(principal.getMemberId());
+        String message = response == null
+                ? "확인할 최근 가상피팅 작업이 없습니다."
+                : "최근 가상피팅 작업을 조회했습니다.";
+
+        return ResponseEntity
+                .status(SuccessCode.OK.getStatus())
+                .body(ApiResponse.success(SuccessCode.OK, response, message));
     }
 
     @PatchMapping("/{fittingJobId}/result/viewed")

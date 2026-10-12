@@ -3,9 +3,11 @@ package com.ktb.lookddak.domain.fitting.controller;
 import com.ktb.lookddak.domain.fitting.dto.FittingJobCreateResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingJobStatusResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingJobResultViewedResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingJobCurrentResponse;
 import com.ktb.lookddak.domain.fitting.entity.FittingJob;
 import com.ktb.lookddak.domain.fitting.service.FittingJobService;
 import com.ktb.lookddak.domain.fitting.service.FittingJobResultViewService;
+import com.ktb.lookddak.domain.fitting.service.FittingJobCurrentService;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
@@ -50,6 +52,9 @@ class FittingJobControllerTest {
     private FittingJobResultViewService fittingJobResultViewService;
 
     @Mock
+    private FittingJobCurrentService fittingJobCurrentService;
+
+    @Mock
     private MemberPrincipal principal;
 
     private MockMvc mockMvc;
@@ -59,7 +64,8 @@ class FittingJobControllerTest {
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new FittingJobController(
                         fittingJobService,
-                        fittingJobResultViewService
+                        fittingJobResultViewService,
+                        fittingJobCurrentService
                 ))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(
@@ -234,6 +240,41 @@ class FittingJobControllerTest {
                         .value("가상피팅 결과를 확인 처리했습니다."));
 
         verify(fittingJobResultViewService).markResultViewed(1L, 100L);
+    }
+
+    @Test
+    @DisplayName("최근 가상피팅 작업을 조회한다")
+    void getCurrentFittingJob() throws Exception {
+        FittingJob fittingJob = createFittingJob(100L);
+        given(fittingJobCurrentService.getCurrentFittingJob(1L))
+                .willReturn(FittingJobCurrentResponse.from(
+                        fittingJob,
+                        List.of()
+                ));
+
+        mockMvc.perform(get("/api/v1/fitting-jobs/current"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.fittingJobId").value(100))
+                .andExpect(jsonPath("$.data.status").value("GENERATING"))
+                .andExpect(jsonPath("$.data.resultViewed").value(false))
+                .andExpect(jsonPath("$.data.products").isEmpty())
+                .andExpect(jsonPath("$.message")
+                        .value("최근 가상피팅 작업을 조회했습니다."));
+    }
+
+    @Test
+    @DisplayName("확인할 최근 가상피팅 작업이 없으면 null을 반환한다")
+    void returnNullWhenNoCurrentFittingJob() throws Exception {
+        given(fittingJobCurrentService.getCurrentFittingJob(1L))
+                .willReturn(null);
+
+        mockMvc.perform(get("/api/v1/fitting-jobs/current"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data").isEmpty())
+                .andExpect(jsonPath("$.message")
+                        .value("확인할 최근 가상피팅 작업이 없습니다."));
     }
 
     private FittingJob createFittingJob(Long fittingJobId) {
