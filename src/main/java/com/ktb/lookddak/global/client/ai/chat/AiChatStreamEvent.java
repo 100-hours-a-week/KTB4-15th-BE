@@ -1,7 +1,7 @@
 package com.ktb.lookddak.global.client.ai.chat;
 
 import com.ktb.lookddak.global.client.ai.dto.AiChatDoneResponse;
-import com.ktb.lookddak.global.client.ai.dto.AiChatProductResponse;
+import com.ktb.lookddak.global.client.ai.dto.AiChatProductsResponse;
 import com.ktb.lookddak.global.client.ai.dto.AiChatTokenResponse;
 import lombok.Getter;
 
@@ -11,20 +11,20 @@ public class AiChatStreamEvent {
     private final AiChatStreamEventType type;
     private final Long chatId;
     private final String content;
-    private final AiChatProductResponse productResponse;
+    private final AiChatProductsResponse productsResponse;
     private final AiChatDoneResponse doneResponse;
 
     private AiChatStreamEvent(
             AiChatStreamEventType type,
             Long chatId,
             String content,
-            AiChatProductResponse productResponse,
+            AiChatProductsResponse productsResponse,
             AiChatDoneResponse doneResponse
     ) {
         this.type = type;
         this.chatId = chatId;
         this.content = content;
-        this.productResponse = productResponse;
+        this.productsResponse = productsResponse;
         this.doneResponse = doneResponse;
     }
 
@@ -38,9 +38,9 @@ public class AiChatStreamEvent {
         );
     }
 
-    public static AiChatStreamEvent product(AiChatProductResponse response) {
+    public static AiChatStreamEvent products(AiChatProductsResponse response) {
         return new AiChatStreamEvent(
-                AiChatStreamEventType.PRODUCT,
+                AiChatStreamEventType.PRODUCTS,
                 response.getChatId(),
                 null,
                 response,

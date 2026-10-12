@@ -3,7 +3,7 @@ package com.ktb.lookddak.global.client.ai.chat;
 import com.ktb.lookddak.global.client.ai.config.AiClientProperties;
 import com.ktb.lookddak.global.client.ai.dto.AiChatDoneResponse;
 import com.ktb.lookddak.global.client.ai.dto.AiChatErrorResponse;
-import com.ktb.lookddak.global.client.ai.dto.AiChatProductResponse;
+import com.ktb.lookddak.global.client.ai.dto.AiChatProductsResponse;
 import com.ktb.lookddak.global.client.ai.dto.AiChatRequest;
 import com.ktb.lookddak.global.client.ai.dto.AiChatTokenResponse;
 import com.ktb.lookddak.global.client.ai.dto.AiErrorResponse;
@@ -26,7 +26,7 @@ public class AiChatStreamingClient {
 
     private static final String CHAT_STREAM_PATH = "/api/v1/chat/stream";
     private static final String TOKEN_EVENT = "token";
-    private static final String PRODUCT_EVENT = "product";
+    private static final String PRODUCTS_EVENT = "products";
     private static final String DONE_EVENT = "done";
     private static final String ERROR_EVENT = "error";
 
@@ -97,14 +97,14 @@ public class AiChatStreamingClient {
             return;
         }
 
-        if (PRODUCT_EVENT.equals(eventName)) {
-            AiChatProductResponse response = readValue(
+        if (PRODUCTS_EVENT.equals(eventName)) {
+            AiChatProductsResponse response = readValue(
                     event.data(),
-                    AiChatProductResponse.class,
+                    AiChatProductsResponse.class,
                     request.getChatId()
             );
             validateChatId(request.getChatId(), response.getChatId());
-            sink.next(AiChatStreamEvent.product(response));
+            sink.next(AiChatStreamEvent.products(response));
             return;
         }
 

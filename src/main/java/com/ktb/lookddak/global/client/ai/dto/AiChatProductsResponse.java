@@ -4,18 +4,20 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 
+import java.util.List;
+
 @Getter
-public class AiChatProductResponse {
+public class AiChatProductsResponse {
 
     private final Long chatId;
-    private final AiRecommendedProductResponse product;
+    private final List<AiRecommendedProductResponse> products;
 
     @JsonCreator
-    public AiChatProductResponse(
+    public AiChatProductsResponse(
             @JsonProperty("chat_id") Long chatId,
-            @JsonProperty("product") AiRecommendedProductResponse product
+            @JsonProperty("products") List<AiRecommendedProductResponse> products
     ) {
         this.chatId = chatId;
-        this.product = product;
+        this.products = products == null ? List.of() : List.copyOf(products);
     }
 }

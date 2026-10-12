@@ -1,11 +1,14 @@
 package com.ktb.lookddak.domain.chat.event;
 
+import com.ktb.lookddak.domain.chat.dto.ChatSseProductsResponse;
 import com.ktb.lookddak.domain.chat.service.ChatSseService;
 import com.ktb.lookddak.global.client.ai.chat.AiChatStreamEvent;
 import com.ktb.lookddak.global.client.ai.chat.AiChatStreamingClient;
 import com.ktb.lookddak.global.client.ai.dto.AiChatDoneResponse;
+import com.ktb.lookddak.global.client.ai.dto.AiChatProductsResponse;
 import com.ktb.lookddak.global.client.ai.dto.AiChatRequest;
 import com.ktb.lookddak.global.client.ai.dto.AiChatTokenResponse;
+import com.ktb.lookddak.global.client.ai.dto.AiRecommendedProductResponse;
 import com.ktb.lookddak.global.client.ai.exception.AiChatException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,7 +40,7 @@ class ChatV2GenerationStreamListenerTest {
     private ApplicationEventPublisher eventPublisher;
 
     @Test
-    @DisplayName("AI token과 done 이벤트를 프런트 SSE 이벤트로 전달한다")
+    @DisplayName("AI token, products, done 이벤트를 프런트 SSE 이벤트로 전달한다")
     void forwardAiEventsToSse() {
         ChatV2GenerationStreamListener listener = new ChatV2GenerationStreamListener(
                 aiChatStreamingClient,
@@ -47,6 +50,19 @@ class ChatV2GenerationStreamListenerTest {
         given(aiChatStreamingClient.stream(any(AiChatRequest.class)))
                 .willReturn(Flux.just(
                         AiChatStreamEvent.token(new AiChatTokenResponse(10L, "추천을 찾고 있어요.")),
+                        AiChatStreamEvent.products(new AiChatProductsResponse(
+                                10L,
+                                List.of(new AiRecommendedProductResponse(
+                                        "0000001",
+                                        "오버핏 코튼 셔츠",
+                                        "https://example.com/1.jpg",
+                                        "https://shop.example.com/1",
+                                        "NAVY",
+                                        com.ktb.lookddak.domain.product.entity.ProductItemType.TOP,
+                                        69_000,
+                                        "소개팅 룩에 잘 어울립니다."
+                                ))
+                        )),
                         AiChatStreamEvent.done(new AiChatDoneResponse(
                                 10L,
                                 "추천 결과입니다.",
@@ -62,6 +78,21 @@ class ChatV2GenerationStreamListenerTest {
                 "content",
                 "추천을 찾고 있어요."
         );
+        ArgumentCaptor<Object> productsCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(chatSseService).send(eq(100L), eq("products"), productsCaptor.capture());
+        assertThat(productsCaptor.getValue()).hasFieldOrPropertyWithValue(
+                "userMessageId",
+                100L
+        );
+        ChatSseProductsResponse productsResponse =
+                (ChatSseProductsResponse) productsCaptor.getValue();
+        assertThat(productsResponse.getProducts())
+                .singleElement()
+                .satisfies(product -> {
+                    assertThat(product.getProductCode()).isEqualTo("0000001");
+                    assertThat(product.getItemType())
+                            .isEqualTo(com.ktb.lookddak.domain.product.entity.ProductItemType.TOP);
+                });
         verify(eventPublisher).publishEvent(any(ChatV2GenerationSucceededEvent.class));
     }
 

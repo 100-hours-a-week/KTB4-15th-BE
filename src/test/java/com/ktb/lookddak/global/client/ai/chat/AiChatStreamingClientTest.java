@@ -27,14 +27,14 @@ class AiChatStreamingClientTest {
     private final ObjectMapper objectMapper = JsonMapper.builder().build();
 
     @Test
-    @DisplayName("token, product, done 이벤트를 순서대로 V2 스트림 이벤트로 변환한다")
+    @DisplayName("token, products, done 이벤트를 순서대로 스트림 이벤트로 변환한다")
     void streamAllAiEvents() {
         AiChatStreamingClient client = createClient(sseResponse("""
                 event: token
                 data: {"chat_id":123,"content":"조건에 맞는 상품을 찾아봤어요."}
 
-                event: product
-                data: {"chat_id":123,"product":{"product_code":"0000001","product_name":"오버핏 코튼 셔츠","image_url":"https://example.com/1.jpg","detail_url":"https://shop.example.com/1","color":"NAVY","item_type":"TOP","price":69000,"llm_comment":"소개팅 룩에 잘 어울립니다."}}
+                event: products
+                data: {"chat_id":123,"products":[{"product_code":"0000001","product_name":"오버핏 코튼 셔츠","image_url":"https://example.com/1.jpg","detail_url":"https://shop.example.com/1","color":"NAVY","item_type":"TOP","price":69000,"llm_comment":"소개팅 룩에 잘 어울립니다."},{"product_code":"0000002","product_name":"미니멀 셔츠","image_url":"https://example.com/2.jpg","detail_url":"https://shop.example.com/2","color":"BLUE","item_type":"TOP","price":59000,"llm_comment":"깔끔한 셔츠입니다."}]}
 
                 event: done
                 data: {"chat_id":123,"content":"조건에 맞는 상품을 찾아봤어요.","products":[{"product_code":"0000001","product_name":"오버핏 코튼 셔츠","image_url":"https://example.com/1.jpg","detail_url":"https://shop.example.com/1","color":"NAVY","item_type":"TOP","price":69000,"llm_comment":"소개팅 룩에 잘 어울립니다."}]}
@@ -49,12 +49,15 @@ class AiChatStreamingClientTest {
                 .extracting(AiChatStreamEvent::getType)
                 .containsExactly(
                         AiChatStreamEventType.TOKEN,
-                        AiChatStreamEventType.PRODUCT,
+                        AiChatStreamEventType.PRODUCTS,
                         AiChatStreamEventType.DONE
                 );
         assertThat(events.get(0).getContent())
                 .isEqualTo("조건에 맞는 상품을 찾아봤어요.");
-        assertThat(events.get(1).getProductResponse().getProduct().getItemType())
+        assertThat(events.get(1).getProductsResponse().getProducts())
+                .hasSize(2)
+                .first()
+                .extracting(product -> product.getItemType())
                 .isEqualTo(ProductItemType.TOP);
         assertThat(events.get(2).getDoneResponse().getProducts())
                 .singleElement()
