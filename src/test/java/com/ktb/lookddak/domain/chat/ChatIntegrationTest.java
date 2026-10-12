@@ -103,7 +103,7 @@ class ChatIntegrationTest {
     }
 
     @Test
-    @DisplayName("인증된 회원이 새 대화를 시작하고 AI 응답 완료 후 메시지를 전송한다")
+    @DisplayName("인증된 회원이 새 대화를 시작하면 대기 메시지가 저장된다")
     void createChatRoomAndMessage() throws Exception {
         String accessToken = loginAndGetAccessToken();
 
@@ -143,7 +143,7 @@ class ChatIntegrationTest {
         assertThat(savedChatRoom.getMember().getId()).isEqualTo(member.getId());
         assertThat(savedChatRoom.getSourceType()).isEqualTo(ChatSourceType.WISHLIST);
         assertThat(firstMessage.getGenerationStatus())
-                .isEqualTo(ChatGenerationStatus.GENERATING);
+                .isEqualTo(ChatGenerationStatus.PENDING);
 
         mockMvc.perform(post("/api/v1/chat-rooms/{chatRoomId}/messages", chatRoomId)
                         .cookie(new Cookie("accessToken", accessToken))
@@ -182,7 +182,7 @@ class ChatIntegrationTest {
                 .existsByChatRoomIdAndSenderTypeAndGenerationStatus(
                         chatRoomId,
                         ChatSenderType.USER,
-                        ChatGenerationStatus.GENERATING
+                        ChatGenerationStatus.PENDING
                 )).isTrue();
     }
 

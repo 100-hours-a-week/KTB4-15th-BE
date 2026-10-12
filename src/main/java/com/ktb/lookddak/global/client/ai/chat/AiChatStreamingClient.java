@@ -1,0 +1,202 @@
+package com.ktb.lookddak.global.client.ai.chat;
+
+import com.ktb.lookddak.global.client.ai.config.AiClientProperties;
+import com.ktb.lookddak.global.client.ai.dto.AiChatDoneResponse;
+import com.ktb.lookddak.global.client.ai.dto.AiChatErrorResponse;
+import com.ktb.lookddak.global.client.ai.dto.AiChatProductsResponse;
+import com.ktb.lookddak.global.client.ai.dto.AiChatRequest;
+import com.ktb.lookddak.global.client.ai.dto.AiChatTokenResponse;
+import com.ktb.lookddak.global.client.ai.dto.AiErrorResponse;
+import com.ktb.lookddak.global.client.ai.exception.AiChatException;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+
+import java.util.concurrent.TimeoutException;
+
+@Component
+public class AiChatStreamingClient {
+
+    private static final String CHAT_STREAM_PATH = "/api/v1/chat/stream";
+    private static final String TOKEN_EVENT = "token";
+    private static final String PRODUCTS_EVENT = "products";
+    private static final String DONE_EVENT = "done";
+    private static final String ERROR_EVENT = "error";
+
+    private final WebClient webClient;
+    private final ObjectMapper objectMapper;
+    private final AiClientProperties properties;
+
+    public AiChatStreamingClient(
+            @Qualifier("aiWebClient") WebClient webClient,
+            ObjectMapper objectMapper,
+            AiClientProperties properties
+    ) {
+        this.webClient = webClient;
+        this.objectMapper = objectMapper;
+        this.properties = properties;
+    }
+
+    /**
+     * AI SSE 이벤트를 V2 채팅 서비스가 그대로 전달할 수 있는 이벤트 흐름으로 변환한다.
+     * 이 메서드만 호출해서는 HTTP 요청이 시작되지 않으며, 이후 subscribe() 시점에 연결된다.
+     */
+    public Flux<AiChatStreamEvent> stream(AiChatRequest request) {
+        return webClient.post()
+                .uri(CHAT_STREAM_PATH)
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .bodyValue(request)
+                .retrieve()
+                .onStatus(status -> status.isError(), response ->
+                        response.bodyToMono(String.class)
+                                .defaultIfEmpty("")
+                                .map(body -> parseHttpError(body, request.getChatId()))
+                )
+                .bodyToFlux(new ParameterizedTypeReference<ServerSentEvent<String>>() {
+                })
+                .<AiChatStreamEvent>handle((event, sink) -> handleEvent(event, request, sink))
+                // AI가 done 없이 연결을 닫으면 정상 완료로 취급하지 않는다.
+                .concatWith(Mono.error(streamClosedException(request.getChatId())))
+                .takeUntil(AiChatStreamEvent::isDone)
+                // timeout은 첫 이벤트와 이벤트 사이의 유휴 시간을 제한한다.
+                .timeout(properties.getResponseTimeout())
+                .onErrorMap(
+                        TimeoutException.class,
+                        exception -> new AiChatException(
+                                "AI_RESPONSE_TIMEOUT",
+                                "AI 응답 제한 시간을 초과했습니다.",
+                                request.getChatId(),
+                                exception
+                        )
+                );
+    }
+
+    private void handleEvent(
+            ServerSentEvent<String> event,
+            AiChatRequest request,
+            reactor.core.publisher.SynchronousSink<AiChatStreamEvent> sink
+    ) {
+        String eventName = event.event();
+
+        if (TOKEN_EVENT.equals(eventName)) {
+            AiChatTokenResponse response = readValue(
+                    event.data(),
+                    AiChatTokenResponse.class,
+                    request.getChatId()
+            );
+            validateChatId(request.getChatId(), response.getChatId());
+            sink.next(AiChatStreamEvent.token(response));
+            return;
+        }
+
+        if (PRODUCTS_EVENT.equals(eventName)) {
+            AiChatProductsResponse response = readValue(
+                    event.data(),
+                    AiChatProductsResponse.class,
+                    request.getChatId()
+            );
+            validateChatId(request.getChatId(), response.getChatId());
+            sink.next(AiChatStreamEvent.products(response));
+            return;
+        }
+
+        if (DONE_EVENT.equals(eventName)) {
+            AiChatDoneResponse response = readValue(
+                    event.data(),
+                    AiChatDoneResponse.class,
+                    request.getChatId()
+            );
+            validateChatId(request.getChatId(), response.getChatId());
+            sink.next(AiChatStreamEvent.done(response));
+            return;
+        }
+
+        if (ERROR_EVENT.equals(eventName)) {
+            sink.error(parseErrorEvent(event.data(), request));
+        }
+    }
+
+    private AiChatException parseHttpError(String body, Long chatId) {
+        if (body == null || body.isBlank()) {
+            return new AiChatException(
+                    "AI_HTTP_ERROR",
+                    "AI 서버가 오류를 반환했습니다.",
+                    chatId
+            );
+        }
+
+        try {
+            AiErrorResponse response = objectMapper.readValue(body, AiErrorResponse.class);
+            return new AiChatException(response.getCode(), response.getMessage(), chatId);
+        } catch (JacksonException exception) {
+            return new AiChatException(
+                    "AI_INVALID_RESPONSE",
+                    "AI 오류 응답 형식을 해석할 수 없습니다.",
+                    chatId,
+                    exception
+            );
+        }
+    }
+
+    private AiChatException parseErrorEvent(String data, AiChatRequest request) {
+        AiChatErrorResponse response = readValue(
+                data,
+                AiChatErrorResponse.class,
+                request.getChatId()
+        );
+        validateChatId(request.getChatId(), response.getChatId());
+
+        return new AiChatException(
+                response.getCode(),
+                response.getMessage(),
+                response.getChatId()
+        );
+    }
+
+    private <T> T readValue(String data, Class<T> responseType, Long chatId) {
+        if (data == null || data.isBlank()) {
+            throw new AiChatException(
+                    "AI_INVALID_RESPONSE",
+                    "AI 응답 데이터가 비어 있습니다.",
+                    chatId
+            );
+        }
+
+        try {
+            return objectMapper.readValue(data, responseType);
+        } catch (JacksonException exception) {
+            throw new AiChatException(
+                    "AI_INVALID_RESPONSE",
+                    "AI 응답 형식을 해석할 수 없습니다.",
+                    chatId,
+                    exception
+            );
+        }
+    }
+
+    private void validateChatId(Long requestedChatId, Long responseChatId) {
+        if (!requestedChatId.equals(responseChatId)) {
+            throw new AiChatException(
+                    "AI_CHAT_ID_MISMATCH",
+                    "요청한 채팅방과 AI 응답의 채팅방이 일치하지 않습니다.",
+                    requestedChatId
+            );
+        }
+    }
+
+    private AiChatException streamClosedException(Long chatId) {
+        return new AiChatException(
+                "AI_STREAM_CLOSED",
+                "AI 응답이 완료되기 전에 연결이 종료되었습니다.",
+                chatId
+        );
+    }
+}
