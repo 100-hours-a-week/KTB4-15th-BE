@@ -4,10 +4,13 @@ import com.ktb.lookddak.domain.fitting.dto.FittingJobCreateResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingJobStatusResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingJobResultViewedResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingJobCurrentResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingTempResultDetailResponse;
 import com.ktb.lookddak.domain.fitting.entity.FittingJob;
+import com.ktb.lookddak.domain.fitting.entity.FittingTempResult;
 import com.ktb.lookddak.domain.fitting.service.FittingJobService;
 import com.ktb.lookddak.domain.fitting.service.FittingJobResultViewService;
 import com.ktb.lookddak.domain.fitting.service.FittingJobCurrentService;
+import com.ktb.lookddak.domain.fitting.service.FittingTempResultQueryService;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
@@ -55,6 +58,9 @@ class FittingJobControllerTest {
     private FittingJobCurrentService fittingJobCurrentService;
 
     @Mock
+    private FittingTempResultQueryService fittingTempResultQueryService;
+
+    @Mock
     private MemberPrincipal principal;
 
     private MockMvc mockMvc;
@@ -65,7 +71,8 @@ class FittingJobControllerTest {
                 .standaloneSetup(new FittingJobController(
                         fittingJobService,
                         fittingJobResultViewService,
-                        fittingJobCurrentService
+                        fittingJobCurrentService,
+                        fittingTempResultQueryService
                 ))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(
@@ -237,7 +244,7 @@ class FittingJobControllerTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.fittingJobId").value(100))
                 .andExpect(jsonPath("$.message")
-                        .value("가상피팅 결과를 확인 처리했습니다."));
+                        .value("요청이 성공적으로 처리되었습니다."));
 
         verify(fittingJobResultViewService).markResultViewed(1L, 100L);
     }
@@ -260,7 +267,7 @@ class FittingJobControllerTest {
                 .andExpect(jsonPath("$.data.resultViewed").value(false))
                 .andExpect(jsonPath("$.data.products").isEmpty())
                 .andExpect(jsonPath("$.message")
-                        .value("최근 가상피팅 작업을 조회했습니다."));
+                        .value("요청이 성공적으로 처리되었습니다."));
     }
 
     @Test
@@ -274,7 +281,26 @@ class FittingJobControllerTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data").isEmpty())
                 .andExpect(jsonPath("$.message")
-                        .value("확인할 최근 가상피팅 작업이 없습니다."));
+                        .value("요청이 성공적으로 처리되었습니다."));
+    }
+
+    @Test
+    @DisplayName("완료된 가상피팅 임시 결과를 조회한다")
+    void getFittingTempResult() throws Exception {
+        FittingJob fittingJob = createFittingJob(100L);
+        given(fittingTempResultQueryService.getTempResult(1L, 100L))
+                .willReturn(tempResultResponse(fittingJob));
+
+        mockMvc.perform(get("/api/v1/fitting-jobs/100/result"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.fittingJobId").value(100))
+                .andExpect(jsonPath("$.data.saved").value(false))
+                .andExpect(jsonPath("$.data.fittingResultId").isEmpty())
+                .andExpect(jsonPath("$.data.resultImageUrl")
+                        .value("https://image.example.com/result.jpg"))
+                .andExpect(jsonPath("$.message")
+                        .value("요청이 성공적으로 처리되었습니다."));
     }
 
     private FittingJob createFittingJob(Long fittingJobId) {
@@ -287,5 +313,23 @@ class FittingJobControllerTest {
         FittingJob fittingJob = FittingJob.create(member);
         ReflectionTestUtils.setField(fittingJob, "id", fittingJobId);
         return fittingJob;
+    }
+
+    private FittingTempResultDetailResponse tempResultResponse(
+            FittingJob fittingJob
+    ) {
+        FittingTempResult tempResult = FittingTempResult.create(
+                fittingJob,
+                "fittings/result.jpg",
+                "출근 코디",
+                "코디 설명"
+        );
+        return FittingTempResultDetailResponse.from(
+                fittingJob,
+                tempResult,
+                null,
+                "https://image.example.com/result.jpg",
+                List.of()
+        );
     }
 }

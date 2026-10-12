@@ -22,14 +22,6 @@ public class ApiResponse<T> {
         return new ApiResponse<>(successCode.name(), data, successCode.getMessage());
     }
 
-    public static <T> ApiResponse<T> success(
-            SuccessCode successCode,
-            T data,
-            String message
-    ) {
-        return new ApiResponse<>(successCode.name(), data, message);
-    }
-
     public static ApiResponse<Void> failure(ErrorCode errorCode) {
         return new ApiResponse<>(errorCode.name(), null, errorCode.getMessage());
     }

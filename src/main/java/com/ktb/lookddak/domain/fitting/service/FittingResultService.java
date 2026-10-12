@@ -26,6 +26,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -91,6 +93,9 @@ public class FittingResultService {
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.FITTING_TEMP_RESULT_NOT_FOUND
                 ));
+        if (tempResult.isExpired(LocalDateTime.now())) {
+            throw new BusinessException(ErrorCode.FITTING_TEMP_RESULT_NOT_FOUND);
+        }
 
         try {
             FittingResult savedResult = fittingResultRepository.saveAndFlush(

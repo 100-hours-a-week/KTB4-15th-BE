@@ -5,9 +5,11 @@ import com.ktb.lookddak.domain.fitting.dto.FittingJobCreateResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingJobStatusResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingJobResultViewedResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingJobCurrentResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingTempResultDetailResponse;
 import com.ktb.lookddak.domain.fitting.service.FittingJobService;
 import com.ktb.lookddak.domain.fitting.service.FittingJobResultViewService;
 import com.ktb.lookddak.domain.fitting.service.FittingJobCurrentService;
+import com.ktb.lookddak.domain.fitting.service.FittingTempResultQueryService;
 import com.ktb.lookddak.global.response.ApiResponse;
 import com.ktb.lookddak.global.response.SuccessCode;
 import com.ktb.lookddak.global.security.principal.MemberPrincipal;
@@ -34,6 +36,7 @@ public class FittingJobController {
     private final FittingJobService fittingJobService;
     private final FittingJobResultViewService fittingJobResultViewService;
     private final FittingJobCurrentService fittingJobCurrentService;
+    private final FittingTempResultQueryService fittingTempResultQueryService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<FittingJobCreateResponse>>
@@ -76,13 +79,24 @@ public class FittingJobController {
             ) {
         FittingJobCurrentResponse response = fittingJobCurrentService
                 .getCurrentFittingJob(principal.getMemberId());
-        String message = response == null
-                ? "확인할 최근 가상피팅 작업이 없습니다."
-                : "최근 가상피팅 작업을 조회했습니다.";
 
         return ResponseEntity
                 .status(SuccessCode.OK.getStatus())
-                .body(ApiResponse.success(SuccessCode.OK, response, message));
+                .body(ApiResponse.success(SuccessCode.OK, response));
+    }
+
+    @GetMapping("/{fittingJobId}/result")
+    public ResponseEntity<ApiResponse<FittingTempResultDetailResponse>>
+            getFittingTempResult(
+                    @AuthenticationPrincipal MemberPrincipal principal,
+                    @Positive @PathVariable Long fittingJobId
+            ) {
+        FittingTempResultDetailResponse response = fittingTempResultQueryService
+                .getTempResult(principal.getMemberId(), fittingJobId);
+
+        return ResponseEntity
+                .status(SuccessCode.OK.getStatus())
+                .body(ApiResponse.success(SuccessCode.OK, response));
     }
 
     @PatchMapping("/{fittingJobId}/result/viewed")
@@ -99,10 +113,6 @@ public class FittingJobController {
 
         return ResponseEntity
                 .status(SuccessCode.OK.getStatus())
-                .body(ApiResponse.success(
-                        SuccessCode.OK,
-                        response,
-                        "가상피팅 결과를 확인 처리했습니다."
-                ));
+                .body(ApiResponse.success(SuccessCode.OK, response));
     }
 }
