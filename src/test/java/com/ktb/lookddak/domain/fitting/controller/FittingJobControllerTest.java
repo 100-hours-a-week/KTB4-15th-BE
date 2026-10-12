@@ -2,8 +2,10 @@ package com.ktb.lookddak.domain.fitting.controller;
 
 import com.ktb.lookddak.domain.fitting.dto.FittingJobCreateResponse;
 import com.ktb.lookddak.domain.fitting.dto.FittingJobStatusResponse;
+import com.ktb.lookddak.domain.fitting.dto.FittingJobResultViewedResponse;
 import com.ktb.lookddak.domain.fitting.entity.FittingJob;
 import com.ktb.lookddak.domain.fitting.service.FittingJobService;
+import com.ktb.lookddak.domain.fitting.service.FittingJobResultViewService;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
@@ -34,6 +36,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -44,6 +47,9 @@ class FittingJobControllerTest {
     private FittingJobService fittingJobService;
 
     @Mock
+    private FittingJobResultViewService fittingJobResultViewService;
+
+    @Mock
     private MemberPrincipal principal;
 
     private MockMvc mockMvc;
@@ -51,7 +57,10 @@ class FittingJobControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new FittingJobController(fittingJobService))
+                .standaloneSetup(new FittingJobController(
+                        fittingJobService,
+                        fittingJobResultViewService
+                ))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(
                         new AuthenticationPrincipalArgumentResolver()
@@ -206,6 +215,25 @@ class FittingJobControllerTest {
                 .andExpect(jsonPath("$.code")
                         .value("FITTING_JOB_ACCESS_DENIED"))
                 .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    @DisplayName("가상피팅 결과 확인 처리를 한다")
+    void markFittingJobResultViewed() throws Exception {
+        FittingJob fittingJob = createFittingJob(100L);
+        given(fittingJobResultViewService.markResultViewed(1L, 100L))
+                .willReturn(FittingJobResultViewedResponse.from(fittingJob));
+
+        mockMvc.perform(patch(
+                        "/api/v1/fitting-jobs/100/result/viewed"
+                ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.fittingJobId").value(100))
+                .andExpect(jsonPath("$.message")
+                        .value("가상피팅 결과를 확인 처리했습니다."));
+
+        verify(fittingJobResultViewService).markResultViewed(1L, 100L);
     }
 
     private FittingJob createFittingJob(Long fittingJobId) {

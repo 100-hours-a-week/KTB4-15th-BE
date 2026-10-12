@@ -61,4 +61,15 @@ public interface FittingJobRepository extends JpaRepository<FittingJob, Long> {
     Optional<FittingJob> findByIdWithMemberForResultSave(
             @Param("fittingJobId") Long fittingJobId
     );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select fittingJob
+            from FittingJob fittingJob
+            join fetch fittingJob.member member
+            where fittingJob.id = :fittingJobId
+            """)
+    Optional<FittingJob> findByIdWithMemberForUpdate(
+            @Param("fittingJobId") Long fittingJobId
+    );
 }
