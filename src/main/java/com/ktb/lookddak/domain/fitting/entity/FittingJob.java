@@ -18,6 +18,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Entity
 @Table(
@@ -42,6 +44,9 @@ public class FittingJob extends BaseEntity {
     @Column(nullable = false, length = 20)
     private FittingJobStatus status;
 
+    @Column(name = "result_viewed_at")
+    private LocalDateTime resultViewedAt;
+
     private FittingJob(Member member) {
         this.member = member;
         this.status = FittingJobStatus.GENERATING;
@@ -61,6 +66,16 @@ public class FittingJob extends BaseEntity {
 
     public void failGeneration() {
         updateStatus(FittingJobStatus.FAILED);
+    }
+
+    public void markResultViewed(LocalDateTime viewedAt) {
+        if (resultViewedAt == null) {
+            resultViewedAt = viewedAt;
+        }
+    }
+
+    public boolean isResultViewed() {
+        return resultViewedAt != null;
     }
 
     private void updateStatus(FittingJobStatus status) {

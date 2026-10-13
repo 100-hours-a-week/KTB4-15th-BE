@@ -3,6 +3,8 @@ package com.ktb.lookddak.domain.fitting.entity;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
@@ -26,5 +28,6 @@ class FittingTempResultTest {
         assertThat(result.getOutfitName()).isEqualTo("가을 출근 니트 룩");
         assertThat(result.getAiComment())
                 .isEqualTo("선택한 상하의 조합이 자연스럽게 어우러져 있어요.");
+        assertThat(result.getExpiresAt()).isAfter(LocalDateTime.now());
     }
 }

@@ -15,6 +15,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Entity
 @Table(
@@ -26,6 +28,8 @@ import lombok.NoArgsConstructor;
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class FittingTempResult extends BaseEntity {
+
+    private static final long VALID_DAYS = 7L;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -44,6 +48,9 @@ public class FittingTempResult extends BaseEntity {
     @Column(name = "ai_comment", nullable = false, columnDefinition = "TEXT")
     private String aiComment;
 
+    @Column(name = "expires_at", nullable = false)
+    private LocalDateTime expiresAt;
+
     private FittingTempResult(
             FittingJob fittingJob,
             String resultImageKey,
@@ -54,6 +61,7 @@ public class FittingTempResult extends BaseEntity {
         this.resultImageKey = resultImageKey;
         this.outfitName = outfitName;
         this.aiComment = aiComment;
+        this.expiresAt = LocalDateTime.now().plusDays(VALID_DAYS);
     }
 
     public static FittingTempResult create(
@@ -68,5 +76,9 @@ public class FittingTempResult extends BaseEntity {
                 outfitName,
                 aiComment
         );
+    }
+
+    public boolean isExpired(LocalDateTime now) {
+        return !expiresAt.isAfter(now);
     }
 }

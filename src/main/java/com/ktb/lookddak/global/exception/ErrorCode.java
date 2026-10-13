@@ -76,6 +76,7 @@ public enum ErrorCode {
     INVALID_OUTFIT_NAME_LENGTH(HttpStatus.BAD_REQUEST, "코디명은 최대 20자까지 입력할 수 있어요."),
     FITTING_TEMP_RESULT_NOT_FOUND(HttpStatus.NOT_FOUND, "가상 피팅 결과를 찾을 수 없습니다."),
     FITTING_JOB_NOT_COMPLETED(HttpStatus.CONFLICT, "가상 피팅 이미지가 아직 생성 중입니다."),
+    FITTING_JOB_FAILED(HttpStatus.CONFLICT, "가상 피팅 이미지 생성에 실패했습니다."),
     FITTING_RESULT_ALREADY_SAVED(HttpStatus.CONFLICT, "이미 저장된 가상 피팅 결과입니다."),
     FITTING_RESULT_NOT_FOUND(HttpStatus.NOT_FOUND, "삭제되었거나 존재하지 않는 피팅 결과입니다."),
     FITTING_RESULT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 가상 피팅 결과에 접근할 수 없습니다."),
