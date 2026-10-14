@@ -12,7 +12,6 @@ import com.ktb.lookddak.global.client.ai.exception.AiChatException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -20,7 +19,6 @@ import reactor.core.publisher.Flux;
 
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -72,12 +70,7 @@ class ChatV2GenerationStreamListenerTest {
 
         listener.handle(event());
 
-        ArgumentCaptor<Object> dataCaptor = ArgumentCaptor.forClass(Object.class);
-        verify(chatSseService).send(eq(100L), eq("token"), dataCaptor.capture());
-        assertThat(dataCaptor.getValue()).hasFieldOrPropertyWithValue(
-                "content",
-                "추천을 찾고 있어요."
-        );
+        verify(chatSseService).sendToken(100L, "추천을 찾고 있어요.");
         verify(chatSseService, never()).send(
                 eq(100L),
                 eq("products"),
