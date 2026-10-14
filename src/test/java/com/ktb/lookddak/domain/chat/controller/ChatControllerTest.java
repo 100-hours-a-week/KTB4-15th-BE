@@ -224,7 +224,7 @@ class ChatControllerTest {
                                         49_000,
                                         "추천 당시 이유"
                                 ),
-                                true,
+                                31L,
                                 null
                         ))
                 );

@@ -79,6 +79,18 @@ public interface WishlistRepository extends JpaRepository<Wishlist, Long> {
             @Param("productIds") Collection<Long> productIds
     );
 
+    @Query("""
+            select wishlist
+            from Wishlist wishlist
+            join fetch wishlist.product
+            where wishlist.member.id = :memberId
+              and wishlist.product.id in :productIds
+            """)
+    List<Wishlist> findAllByMemberIdAndProductIdIn(
+            @Param("memberId") Long memberId,
+            @Param("productIds") Collection<Long> productIds
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select w from Wishlist w where w.id = :wishlistId")
     Optional<Wishlist> findByIdForUpdate(@Param("wishlistId") Long wishlistId);

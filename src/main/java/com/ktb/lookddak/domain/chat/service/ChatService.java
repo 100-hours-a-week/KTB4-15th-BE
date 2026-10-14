@@ -31,6 +31,7 @@ import com.ktb.lookddak.domain.recommendation.entity.RecommendationProduct;
 import com.ktb.lookddak.domain.recommendation.repository.RecommendationProductRepository;
 import com.ktb.lookddak.domain.recommendation.repository.RecommendationRepository;
 import com.ktb.lookddak.domain.wishlist.repository.WishlistRepository;
+import com.ktb.lookddak.domain.wishlist.entity.Wishlist;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -451,12 +452,19 @@ public class ChatService {
         }
 
         // 상품마다 조회하지 않고 찜·피팅 상태를 각각 한 번의 쿼리로 가져온다.
-        Set<Long> wishlistedProductIds = productIds.isEmpty()
-                ? Set.of()
-                : wishlistRepository.findProductIdsByMemberIdAndProductIdIn(
+        List<Wishlist> wishlists = productIds.isEmpty()
+                ? List.of()
+                : wishlistRepository.findAllByMemberIdAndProductIdIn(
                         memberId,
                         productIds
                 );
+        Map<Long, Long> wishlistIdByProductId = new LinkedHashMap<>();
+        for (Wishlist wishlist : wishlists) {
+            wishlistIdByProductId.put(
+                    wishlist.getProduct().getId(),
+                    wishlist.getId()
+            );
+        }
 
         List<FittingCandidate> fittingCandidates = productIds.isEmpty()
                 ? List.of()
@@ -489,7 +497,7 @@ public class ChatService {
                 Long productId = recommendationProduct.getProduct().getId();
                 productResponses.add(RecommendedProductResponse.from(
                         recommendationProduct,
-                        wishlistedProductIds.contains(productId),
+                        wishlistIdByProductId.get(productId),
                         fittingCandidateIdByProductId.get(productId)
                 ));
             }

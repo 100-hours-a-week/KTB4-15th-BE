@@ -19,6 +19,7 @@ import com.ktb.lookddak.domain.recommendation.entity.RecommendationProduct;
 import com.ktb.lookddak.domain.recommendation.repository.RecommendationProductRepository;
 import com.ktb.lookddak.domain.recommendation.repository.RecommendationRepository;
 import com.ktb.lookddak.domain.wishlist.repository.WishlistRepository;
+import com.ktb.lookddak.domain.wishlist.entity.Wishlist;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -152,10 +153,12 @@ class ChatRoomDetailServiceTest {
                         firstRecommendationProduct,
                         secondRecommendationProduct
                 ));
-        given(wishlistRepository.findProductIdsByMemberIdAndProductIdIn(
+        Wishlist wishlist = Wishlist.create(member, firstProduct);
+        ReflectionTestUtils.setField(wishlist, "id", 301L);
+        given(wishlistRepository.findAllByMemberIdAndProductIdIn(
                 eq(1L),
                 eq(Set.of(201L, 202L))
-        )).willReturn(Set.of(201L));
+        )).willReturn(List.of(wishlist));
         FittingCandidate fittingCandidate = FittingCandidate.create(
                 member,
                 secondProduct
@@ -191,11 +194,15 @@ class ChatRoomDetailServiceTest {
         assertThat(recommendationResponse.getRecommendation().getProducts().get(0)
                 .isWishlisted()).isTrue();
         assertThat(recommendationResponse.getRecommendation().getProducts().get(0)
+                .getWishlistId()).isEqualTo(301L);
+        assertThat(recommendationResponse.getRecommendation().getProducts().get(0)
                 .isFittingCandidate()).isFalse();
         assertThat(recommendationResponse.getRecommendation().getProducts().get(0)
                 .getFittingCandidateId()).isNull();
         assertThat(recommendationResponse.getRecommendation().getProducts().get(1)
                 .isWishlisted()).isFalse();
+        assertThat(recommendationResponse.getRecommendation().getProducts().get(1)
+                .getWishlistId()).isNull();
         assertThat(recommendationResponse.getRecommendation().getProducts().get(1)
                 .isFittingCandidate()).isTrue();
         assertThat(recommendationResponse.getRecommendation().getProducts().get(1)
