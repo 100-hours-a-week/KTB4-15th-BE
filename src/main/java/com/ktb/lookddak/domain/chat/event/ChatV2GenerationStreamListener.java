@@ -1,6 +1,5 @@
 package com.ktb.lookddak.domain.chat.event;
 
-import com.ktb.lookddak.domain.chat.dto.ChatSseProductsResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatSseTokenResponse;
 import com.ktb.lookddak.domain.chat.service.ChatSseService;
 import com.ktb.lookddak.global.client.ai.chat.AiChatStreamEvent;
@@ -42,18 +41,6 @@ public class ChatV2GenerationStreamListener {
                     userMessageId,
                     "token",
                     new ChatSseTokenResponse(userMessageId, streamEvent.getContent())
-            );
-            return;
-        }
-
-        if (streamEvent.getType() == AiChatStreamEventType.PRODUCTS) {
-            chatSseService.send(
-                    userMessageId,
-                    "products",
-                    new ChatSseProductsResponse(
-                            userMessageId,
-                            streamEvent.getProductsResponse().getProducts()
-                    )
             );
             return;
         }

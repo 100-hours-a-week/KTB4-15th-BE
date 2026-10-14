@@ -1,6 +1,5 @@
 package com.ktb.lookddak.domain.chat.dto;
 
-import com.ktb.lookddak.global.client.ai.dto.AiRecommendedProductResponse;
 import lombok.Getter;
 
 import java.util.List;
@@ -10,12 +9,12 @@ public class ChatSseDoneResponse {
 
     private final Long userMessageId;
     private final String content;
-    private final List<AiRecommendedProductResponse> products;
+    private final List<RecommendedProductResponse> products;
 
     public ChatSseDoneResponse(
             Long userMessageId,
             String content,
-            List<AiRecommendedProductResponse> products
+            List<RecommendedProductResponse> products
     ) {
         this.userMessageId = userMessageId;
         this.content = content;

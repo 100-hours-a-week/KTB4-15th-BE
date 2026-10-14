@@ -81,7 +81,10 @@ class ChatGenerationStatusServiceTest {
                 recommendationRepository,
                 recommendationProductRepository,
                 wishlistRepository,
-                fittingCandidateRepository,
+                new RecommendedProductResponseAssembler(
+                        wishlistRepository,
+                        fittingCandidateRepository
+                ),
                 eventPublisher
         );
         member = createMember(1L);

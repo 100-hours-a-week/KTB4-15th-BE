@@ -5,6 +5,7 @@ import com.ktb.lookddak.domain.chat.entity.ChatMessage;
 import com.ktb.lookddak.domain.chat.entity.ChatMessageType;
 import com.ktb.lookddak.domain.chat.entity.ChatRoom;
 import com.ktb.lookddak.domain.chat.entity.ChatSourceType;
+import com.ktb.lookddak.domain.chat.dto.ChatSseDoneResponse;
 import com.ktb.lookddak.domain.chat.repository.ChatMessageRepository;
 import com.ktb.lookddak.domain.chat.repository.ChatRoomRepository;
 import com.ktb.lookddak.domain.chat.service.ChatGenerationResultService;
@@ -142,7 +143,7 @@ class ChatGenerationResultIntegrationTest {
                 )
         );
 
-        resultService.complete(
+        ChatSseDoneResponse doneResponse = resultService.complete(
                 userMessage.getId(),
                 new AiChatDoneResponse(
                         chatRoom.getId(),
@@ -189,6 +190,15 @@ class ChatGenerationResultIntegrationTest {
                 .containsExactly("첫 번째 추천 이유", "두 번째 추천 이유");
         assertThat(userMessage.getGenerationStatus())
                 .isEqualTo(ChatGenerationStatus.COMPLETED);
+        assertThat(doneResponse.getProducts())
+                .extracting(product -> product.getProductId())
+                .containsExactly(
+                        unchangedProduct.getId(),
+                        newProduct.getId()
+                );
+        assertThat(doneResponse.getProducts())
+                .extracting(product -> product.isWishlisted())
+                .containsExactly(false, false);
     }
 
     @Test

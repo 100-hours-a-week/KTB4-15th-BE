@@ -1,6 +1,5 @@
 package com.ktb.lookddak.domain.chat.event;
 
-import com.ktb.lookddak.domain.chat.dto.ChatSseProductsResponse;
 import com.ktb.lookddak.domain.chat.service.ChatSseService;
 import com.ktb.lookddak.global.client.ai.chat.AiChatStreamEvent;
 import com.ktb.lookddak.global.client.ai.chat.AiChatStreamingClient;
@@ -26,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class ChatV2GenerationStreamListenerTest {
@@ -40,8 +40,8 @@ class ChatV2GenerationStreamListenerTest {
     private ApplicationEventPublisher eventPublisher;
 
     @Test
-    @DisplayName("AI token, products, done 이벤트를 프런트 SSE 이벤트로 전달한다")
-    void forwardAiEventsToSse() {
+    @DisplayName("AI token은 전달하고 products 이벤트는 프런트에 중계하지 않는다")
+    void forwardTokenAndIgnoreProductsEvent() {
         ChatV2GenerationStreamListener listener = new ChatV2GenerationStreamListener(
                 aiChatStreamingClient,
                 chatSseService,
@@ -78,21 +78,11 @@ class ChatV2GenerationStreamListenerTest {
                 "content",
                 "추천을 찾고 있어요."
         );
-        ArgumentCaptor<Object> productsCaptor = ArgumentCaptor.forClass(Object.class);
-        verify(chatSseService).send(eq(100L), eq("products"), productsCaptor.capture());
-        assertThat(productsCaptor.getValue()).hasFieldOrPropertyWithValue(
-                "userMessageId",
-                100L
+        verify(chatSseService, never()).send(
+                eq(100L),
+                eq("products"),
+                any()
         );
-        ChatSseProductsResponse productsResponse =
-                (ChatSseProductsResponse) productsCaptor.getValue();
-        assertThat(productsResponse.getProducts())
-                .singleElement()
-                .satisfies(product -> {
-                    assertThat(product.getProductCode()).isEqualTo("0000001");
-                    assertThat(product.getItemType())
-                            .isEqualTo(com.ktb.lookddak.domain.product.entity.ProductItemType.TOP);
-                });
         verify(eventPublisher).publishEvent(any(ChatV2GenerationSucceededEvent.class));
     }
 

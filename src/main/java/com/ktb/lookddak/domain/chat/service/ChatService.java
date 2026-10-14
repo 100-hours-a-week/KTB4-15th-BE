@@ -24,14 +24,11 @@ import com.ktb.lookddak.domain.chat.repository.ChatMessageRepository;
 import com.ktb.lookddak.domain.chat.repository.ChatRoomRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
-import com.ktb.lookddak.domain.fitting.entity.FittingCandidate;
-import com.ktb.lookddak.domain.fitting.repository.FittingCandidateRepository;
 import com.ktb.lookddak.domain.recommendation.entity.Recommendation;
 import com.ktb.lookddak.domain.recommendation.entity.RecommendationProduct;
 import com.ktb.lookddak.domain.recommendation.repository.RecommendationProductRepository;
 import com.ktb.lookddak.domain.recommendation.repository.RecommendationRepository;
 import com.ktb.lookddak.domain.wishlist.repository.WishlistRepository;
-import com.ktb.lookddak.domain.wishlist.entity.Wishlist;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -43,10 +40,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -65,7 +60,8 @@ public class ChatService {
     private final RecommendationRepository recommendationRepository;
     private final RecommendationProductRepository recommendationProductRepository;
     private final WishlistRepository wishlistRepository;
-    private final FittingCandidateRepository fittingCandidateRepository;
+    private final RecommendedProductResponseAssembler
+            recommendedProductResponseAssembler;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -431,10 +427,7 @@ public class ChatService {
 
         Map<Long, List<RecommendationProduct>> productsByRecommendationId =
                 new LinkedHashMap<>();
-        Set<Long> productIds = new LinkedHashSet<>();
-
         // Repository의 상품 ID 오름차순을 유지해 추천별 상품 목록을 만든다.
-        // 동시에 찜·피팅 상태 조회에 사용할 상품 ID도 중복 없이 모은다.
         for (RecommendationProduct recommendationProduct
                 : recommendationProducts) {
             Long recommendationId = recommendationProduct
@@ -448,38 +441,14 @@ public class ChatService {
                             key -> new ArrayList<>()
                     )
                     .add(recommendationProduct);
-            productIds.add(recommendationProduct.getProduct().getId());
         }
 
-        // 상품마다 조회하지 않고 찜·피팅 상태를 각각 한 번의 쿼리로 가져온다.
-        List<Wishlist> wishlists = productIds.isEmpty()
-                ? List.of()
-                : wishlistRepository.findAllByMemberIdAndProductIdIn(
+        Map<RecommendationProduct, RecommendedProductResponse>
+                productResponseByRecommendationProduct =
+                recommendedProductResponseAssembler.assemble(
                         memberId,
-                        productIds
+                        recommendationProducts
                 );
-        Map<Long, Long> wishlistIdByProductId = new LinkedHashMap<>();
-        for (Wishlist wishlist : wishlists) {
-            wishlistIdByProductId.put(
-                    wishlist.getProduct().getId(),
-                    wishlist.getId()
-            );
-        }
-
-        List<FittingCandidate> fittingCandidates = productIds.isEmpty()
-                ? List.of()
-                : fittingCandidateRepository
-                        .findAllByMemberIdAndProductIdIn(
-                                memberId,
-                                productIds
-                        );
-        Map<Long, Long> fittingCandidateIdByProductId = new LinkedHashMap<>();
-        for (FittingCandidate fittingCandidate : fittingCandidates) {
-            fittingCandidateIdByProductId.put(
-                    fittingCandidate.getProduct().getId(),
-                    fittingCandidate.getId()
-            );
-        }
 
         Map<Long, RecommendationResponse> responses = new LinkedHashMap<>();
 
@@ -494,12 +463,11 @@ public class ChatService {
                     new ArrayList<>();
 
             for (RecommendationProduct recommendationProduct : products) {
-                Long productId = recommendationProduct.getProduct().getId();
-                productResponses.add(RecommendedProductResponse.from(
-                        recommendationProduct,
-                        wishlistIdByProductId.get(productId),
-                        fittingCandidateIdByProductId.get(productId)
-                ));
+                productResponses.add(
+                        productResponseByRecommendationProduct.get(
+                                recommendationProduct
+                        )
+                );
             }
 
             responses.put(

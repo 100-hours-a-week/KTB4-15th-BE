@@ -29,16 +29,17 @@ public class ChatV2GenerationResultEventHandler {
     @EventListener
     public void handleSucceeded(ChatV2GenerationSucceededEvent event) {
         try {
-            resultService.complete(event.getUserMessageId(), event.getResponse());
-            chatSseService.send(
+            ChatSseDoneResponse response = resultService.complete(
                     event.getUserMessageId(),
-                    "done",
-                    new ChatSseDoneResponse(
-                            event.getUserMessageId(),
-                            event.getResponse().getContent(),
-                            event.getResponse().getProducts()
-                    )
+                    event.getResponse()
             );
+            if (response != null) {
+                chatSseService.send(
+                        event.getUserMessageId(),
+                        "done",
+                        response
+                );
+            }
         } catch (Exception exception) {
             log.error(
                     "V2 AI chat result persistence failed userMessageId={}",
