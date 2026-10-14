@@ -129,8 +129,8 @@ public class ChatGenerationResultService {
             recommendationProducts.add(RecommendationProduct.create(
                     recommendation,
                     product,
-                    aiProduct.getPrice(),
-                    aiProduct.getLlmComment()
+                    aiProduct.getCurrentPrice(),
+                    aiProduct.getRecommendedReason()
             ));
         }
         return recommendationProductRepository.saveAll(recommendationProducts);
@@ -168,11 +168,11 @@ public class ChatGenerationResultService {
         return Product.create(
                 aiProduct.getProductCode(),
                 aiProduct.getProductName(),
-                aiProduct.getImageUrl(),
-                aiProduct.getPrice(),
+                aiProduct.getProductImageUrl(),
+                aiProduct.getCurrentPrice(),
                 aiProduct.getColor(),
                 aiProduct.getItemType(),
-                aiProduct.getDetailUrl()
+                aiProduct.getPurchaseUrl()
         );
     }
 

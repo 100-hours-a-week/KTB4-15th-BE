@@ -34,10 +34,10 @@ class AiChatStreamingClientTest {
                 data: {"chat_id":123,"content":"조건에 맞는 상품을 찾아봤어요."}
 
                 event: products
-                data: {"chat_id":123,"products":[{"product_code":"0000001","product_name":"오버핏 코튼 셔츠","image_url":"https://example.com/1.jpg","detail_url":"https://shop.example.com/1","color":"NAVY","item_type":"TOP","price":69000,"llm_comment":"소개팅 룩에 잘 어울립니다."},{"product_code":"0000002","product_name":"미니멀 셔츠","image_url":"https://example.com/2.jpg","detail_url":"https://shop.example.com/2","color":"BLUE","item_type":"TOP","price":59000,"llm_comment":"깔끔한 셔츠입니다."}]}
+                data: {"chat_id":123,"products":[{"product_code":"0000001","product_name":"오버핏 코튼 셔츠","product_image_url":"https://example.com/1.jpg","purchase_url":"https://shop.example.com/1","color":"NAVY","item_type":"TOP","current_price":69000,"recommended_reason":"소개팅 룩에 잘 어울립니다."},{"product_code":"0000002","product_name":"미니멀 셔츠","product_image_url":"https://example.com/2.jpg","purchase_url":"https://shop.example.com/2","color":"BLUE","item_type":"TOP","current_price":59000,"recommended_reason":"깔끔한 셔츠입니다."}]}
 
                 event: done
-                data: {"chat_id":123,"content":"조건에 맞는 상품을 찾아봤어요.","products":[{"product_code":"0000001","product_name":"오버핏 코튼 셔츠","image_url":"https://example.com/1.jpg","detail_url":"https://shop.example.com/1","color":"NAVY","item_type":"TOP","price":69000,"llm_comment":"소개팅 룩에 잘 어울립니다."}]}
+                data: {"chat_id":123,"content":"조건에 맞는 상품을 찾아봤어요.","products":[{"product_code":"0000001","product_name":"오버핏 코튼 셔츠","product_image_url":"https://example.com/1.jpg","purchase_url":"https://shop.example.com/1","color":"NAVY","item_type":"TOP","current_price":69000,"recommended_reason":"소개팅 룩에 잘 어울립니다."}]}
 
                 """));
 
