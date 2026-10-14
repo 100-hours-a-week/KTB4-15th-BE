@@ -51,12 +51,12 @@ class AiChatDtoTest {
                     {
                       "product_code": "0000001",
                       "product_name": "오버핏 코튼 셔츠",
-                      "image_url": "https://example.com/products/0000001.jpg",
-                      "detail_url": "https://shop.example.com/products/0000001",
+                      "product_image_url": "https://example.com/products/0000001.jpg",
+                      "purchase_url": "https://shop.example.com/products/0000001",
                       "color": "NAVY",
                       "item_type": "TOP",
-                      "price": 69000,
-                      "llm_comment": "소개팅 룩에 잘 어울립니다."
+                      "current_price": 69000,
+                      "recommended_reason": "소개팅 룩에 잘 어울립니다."
                     }
                   ]
                 }
@@ -78,8 +78,8 @@ class AiChatDtoTest {
                             .isEqualTo("오버핏 코튼 셔츠");
                     assertThat(product.getItemType())
                             .isEqualTo(ProductItemType.TOP);
-                    assertThat(product.getPrice()).isEqualTo(69_000);
-                    assertThat(product.getLlmComment())
+                    assertThat(product.getCurrentPrice()).isEqualTo(69_000);
+                    assertThat(product.getRecommendedReason())
                             .isEqualTo("소개팅 룩에 잘 어울립니다.");
                 });
     }

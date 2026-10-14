@@ -1,5 +1,6 @@
 package com.ktb.lookddak.domain.chat.event;
 
+import com.ktb.lookddak.domain.chat.dto.ChatSseDoneResponse;
 import com.ktb.lookddak.domain.chat.service.ChatGenerationResultService;
 import com.ktb.lookddak.domain.chat.service.ChatSseService;
 import com.ktb.lookddak.global.client.ai.dto.AiChatDoneResponse;
@@ -14,6 +15,7 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,6 +35,12 @@ class ChatV2GenerationResultEventHandlerTest {
                 100L,
                 new AiChatDoneResponse(10L, "추천 결과입니다.", List.of())
         );
+        given(resultService.complete(100L, event.getResponse()))
+                .willReturn(new ChatSseDoneResponse(
+                        100L,
+                        "추천 결과입니다.",
+                        List.of()
+                ));
 
         handler.handleSucceeded(event);
 

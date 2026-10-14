@@ -38,7 +38,8 @@ class ChatSseServiceTest {
     void connect() {
         ChatSseService service = new ChatSseService(
                 chatRoomRepository,
-                chatMessageRepository
+                chatMessageRepository,
+                new ChatSseSnapshotStore()
         );
         Member member = createMember(1L);
         ChatRoom chatRoom = createChatRoom(10L, member);
@@ -63,7 +64,8 @@ class ChatSseServiceTest {
     void rejectWhenChatRoomIsNotOwned() {
         ChatSseService service = new ChatSseService(
                 chatRoomRepository,
-                chatMessageRepository
+                chatMessageRepository,
+                new ChatSseSnapshotStore()
         );
         ChatRoom chatRoom = createChatRoom(10L, createMember(2L));
         given(chatRoomRepository.findActiveById(10L))
@@ -81,7 +83,8 @@ class ChatSseServiceTest {
     void rejectWhenMessageDoesNotExist() {
         ChatSseService service = new ChatSseService(
                 chatRoomRepository,
-                chatMessageRepository
+                chatMessageRepository,
+                new ChatSseSnapshotStore()
         );
         ChatRoom chatRoom = createChatRoom(10L, createMember(1L));
         given(chatRoomRepository.findActiveById(10L))
