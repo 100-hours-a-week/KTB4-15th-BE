@@ -101,4 +101,12 @@ public class Notification extends BaseEntity {
                 fittingJobId
         );
     }
+
+    public boolean isOwnedBy(Long memberId) {
+        return member.getId().equals(memberId);
+    }
+
+    public void markAsRead() {
+        this.isRead = true;
+    }
 }
