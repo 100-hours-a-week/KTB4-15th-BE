@@ -3,6 +3,7 @@ package com.ktb.lookddak.domain.notification.service;
 import com.ktb.lookddak.domain.notification.dto.NotificationSseEventResponse;
 import com.ktb.lookddak.domain.notification.dto.NotificationSseResponse;
 import com.ktb.lookddak.domain.notification.entity.NotificationType;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -14,10 +15,12 @@ import java.util.concurrent.ConcurrentMap;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class NotificationSseService {
 
     private static final long SSE_TIMEOUT_MILLIS = 30 * 60 * 1000L;
 
+    private final NotificationService notificationService;
     private final ConcurrentMap<Long, ConcurrentMap<String, SseEmitter>> emittersByMember =
             new ConcurrentHashMap<>();
 
@@ -26,11 +29,12 @@ public class NotificationSseService {
      * SSE 연결을 보관하는 동안 DB 트랜잭션이나 커넥션은 유지하지 않는다.
      */
     public SseEmitter connect(Long memberId) {
+        long unreadCount = notificationService.getUnreadCount(memberId);
         String connectionId = UUID.randomUUID().toString();
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MILLIS);
 
         register(memberId, connectionId, emitter);
-        sendConnectedEvent(memberId, connectionId, emitter);
+        sendConnectedEvent(memberId, connectionId, emitter, unreadCount);
         return emitter;
     }
 
@@ -77,14 +81,15 @@ public class NotificationSseService {
     private void sendConnectedEvent(
             Long memberId,
             String connectionId,
-            SseEmitter emitter
+            SseEmitter emitter,
+            long unreadCount
     ) {
         send(
                 memberId,
                 connectionId,
                 emitter,
                 "connected",
-                NotificationSseEventResponse.connected()
+                NotificationSseEventResponse.connected(unreadCount)
         );
     }
 

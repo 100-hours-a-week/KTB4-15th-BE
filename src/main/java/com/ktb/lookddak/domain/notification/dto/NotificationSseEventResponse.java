@@ -6,10 +6,11 @@ public record NotificationSseEventResponse<T>(
         String message
 ) {
 
-    public static NotificationSseEventResponse<Void> connected() {
+    public static NotificationSseEventResponse<NotificationSseConnectedResponse>
+            connected(long unreadCount) {
         return new NotificationSseEventResponse<>(
                 "NOTIFICATION_STREAM_CONNECTED",
-                null,
+                new NotificationSseConnectedResponse(unreadCount, unreadCount > 0),
                 "실시간 알림 연결이 완료되었습니다."
         );
     }

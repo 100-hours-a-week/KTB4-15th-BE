@@ -18,6 +18,14 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
 
+    public long getUnreadCount(Long memberId) {
+        return notificationRepository
+                .countByMemberIdAndIsReadFalseAndExpiresAtAfter(
+                        memberId,
+                        LocalDateTime.now()
+                );
+    }
+
     @Transactional
     public NotificationReadResponse markAsRead(
             Long memberId,
@@ -44,11 +52,6 @@ public class NotificationService {
     }
 
     private NotificationReadResponse createUnreadCountResponse(Long memberId) {
-        long unreadCount = notificationRepository
-                .countByMemberIdAndIsReadFalseAndExpiresAtAfter(
-                        memberId,
-                        LocalDateTime.now()
-                );
-        return new NotificationReadResponse(unreadCount);
+        return new NotificationReadResponse(getUnreadCount(memberId));
     }
 }
