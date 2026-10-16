@@ -5,6 +5,8 @@ import com.ktb.lookddak.domain.image.repository.FullBodyImageValidationRepositor
 import com.ktb.lookddak.domain.member.dto.MemberProfileCreateRequest;
 import com.ktb.lookddak.domain.member.dto.MemberProfileCreateResponse;
 import com.ktb.lookddak.domain.member.dto.MemberProfileGetResponse;
+import com.ktb.lookddak.domain.member.dto.MemberProfileUpdateRequest;
+import com.ktb.lookddak.domain.member.dto.MemberProfileUpdateResponse;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.entity.MemberProfile;
 import com.ktb.lookddak.domain.member.repository.MemberProfileRepository;
@@ -74,5 +76,50 @@ public class MemberProfileService {
                 profile.getFullBodyImageKey()
         );
         return MemberProfileGetResponse.from(profile, fullBodyImageUrl);
+    }
+
+    @Transactional
+    public MemberProfileUpdateResponse updateProfile(
+            Long memberId,
+            MemberProfileUpdateRequest request
+    ) {
+        MemberProfile profile = memberProfileRepository
+                .findActiveByMemberIdWithMember(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.MEMBER_PROFILE_NOT_FOUND
+                ));
+
+        FullBodyImageValidation validation = null;
+        String fullBodyImageKey = null;
+        if (request.getFullBodyImageValidationId() != null) {
+            validation = validationRepository
+                    .findById(request.getFullBodyImageValidationId())
+                    .filter(result -> result.isOwnedBy(memberId))
+                    .orElseThrow(() -> new BusinessException(
+                            ErrorCode.INVALID_FULL_BODY_IMAGE
+                    ));
+            fullBodyImageKey = validation.getImageKey();
+        }
+
+        profile.update(
+                request.getName(),
+                request.getAge(),
+                request.getHeight(),
+                request.getWeight(),
+                fullBodyImageKey
+        );
+
+        if (validation != null) {
+            validationRepository.delete(validation);
+        }
+
+        String fullBodyImageUrl = presignedUrlProvider.createGetUrl(
+                profile.getFullBodyImageKey()
+        );
+
+        return MemberProfileUpdateResponse.from(
+                profile,
+                fullBodyImageUrl
+        );
     }
 }
