@@ -6,7 +6,10 @@ import com.ktb.lookddak.domain.fitting.entity.FittingTempResult;
 import com.ktb.lookddak.domain.fitting.repository.FittingJobRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingTempResultRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
+import com.ktb.lookddak.domain.notification.event.FittingNotificationCreatedEvent;
+import com.ktb.lookddak.domain.notification.repository.NotificationRepository;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingResultData;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,6 +23,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -32,6 +36,12 @@ class FittingGenerationResultServiceTest {
     @Mock
     private FittingTempResultRepository fittingTempResultRepository;
 
+    @Mock
+    private NotificationRepository notificationRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private FittingGenerationResultService resultService;
 
@@ -42,8 +52,10 @@ class FittingGenerationResultServiceTest {
                 "fitting-result@lookddak.com",
                 "encoded-password"
         ));
-        given(fittingJobRepository.findByIdForGenerationUpdate(100L))
+        given(fittingJobRepository.findByIdWithMemberForResultSave(100L))
                 .willReturn(Optional.of(fittingJob));
+        given(notificationRepository.save(any()))
+                .willAnswer(invocation -> invocation.getArgument(0));
         AiFittingResultData result = new AiFittingResultData(
                 "fittings/result.png",
                 "차분한 데일리 룩",
@@ -63,19 +75,31 @@ class FittingGenerationResultServiceTest {
                 .isEqualTo("깔끔한 색감이 어우러지는 코디입니다.");
         assertThat(fittingJob.getStatus())
                 .isEqualTo(FittingJobStatus.COMPLETED);
+        then(notificationRepository).should().save(any());
+        then(eventPublisher).should().publishEvent(
+                any(FittingNotificationCreatedEvent.class)
+        );
     }
 
     @Test
     @DisplayName("AI 생성 실패 시 가상피팅 작업을 실패 처리한다")
     void failGeneration() {
+        FittingJob fittingJob = FittingJob.create(Member.create(
+                "fitting-fail@lookddak.com",
+                "encoded-password"
+        ));
+        given(fittingJobRepository.findByIdWithMemberForResultSave(100L))
+                .willReturn(Optional.of(fittingJob));
+        given(notificationRepository.save(any()))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
         resultService.fail(100L);
 
-        then(fittingJobRepository).should()
-                .updateStatusIfCurrent(
-                        100L,
-                        FittingJobStatus.GENERATING,
-                        FittingJobStatus.FAILED
-                );
+        assertThat(fittingJob.getStatus()).isEqualTo(FittingJobStatus.FAILED);
+        then(notificationRepository).should().save(any());
+        then(eventPublisher).should().publishEvent(
+                any(FittingNotificationCreatedEvent.class)
+        );
         verify(fittingTempResultRepository, never()).save(
                 org.mockito.ArgumentMatchers.any()
         );
@@ -89,7 +113,7 @@ class FittingGenerationResultServiceTest {
                 "encoded-password"
         ));
         fittingJob.completeGeneration();
-        given(fittingJobRepository.findByIdForGenerationUpdate(100L))
+        given(fittingJobRepository.findByIdWithMemberForResultSave(100L))
                 .willReturn(Optional.of(fittingJob));
 
         resultService.complete(100L, new AiFittingResultData(

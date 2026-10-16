@@ -81,6 +81,10 @@ public enum ErrorCode {
     FITTING_RESULT_NOT_FOUND(HttpStatus.NOT_FOUND, "삭제되었거나 존재하지 않는 피팅 결과입니다."),
     FITTING_RESULT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 가상 피팅 결과에 접근할 수 없습니다."),
 
+    // Notification errors
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다."),
+    NOTIFICATION_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 알림에 접근할 수 없습니다."),
+
     // Server errors
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");
 
