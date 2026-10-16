@@ -5,6 +5,8 @@ import com.ktb.lookddak.domain.image.repository.FullBodyImageValidationRepositor
 import com.ktb.lookddak.domain.member.dto.MemberProfileCreateRequest;
 import com.ktb.lookddak.domain.member.dto.MemberProfileCreateResponse;
 import com.ktb.lookddak.domain.member.dto.MemberProfileGetResponse;
+import com.ktb.lookddak.domain.member.dto.MemberProfileUpdateRequest;
+import com.ktb.lookddak.domain.member.dto.MemberProfileUpdateResponse;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.entity.MemberProfile;
 import com.ktb.lookddak.domain.member.repository.MemberProfileRepository;
@@ -186,6 +188,103 @@ class MemberProfileServiceTest {
                                 ErrorCode.MEMBER_PROFILE_NOT_FOUND
                         )
                 );
+    }
+
+    @Test
+    @DisplayName("전달한 기본정보 필드만 수정한다")
+    void updateOnlyProvidedProfileFields() {
+        Member member = createMember(1L, "member@lookddak.com");
+        MemberProfile profile = createProfile(member);
+        MemberProfileUpdateRequest request = new MemberProfileUpdateRequest(
+                "Jane Doe",
+                null,
+                null,
+                null,
+                null
+        );
+        given(memberProfileRepository.findActiveByMemberIdWithMember(1L))
+                .willReturn(Optional.of(profile));
+        given(presignedUrlProvider.createGetUrl(
+                "full-body/validation/1/test.png"
+        )).willReturn("https://presigned.example.com/current.png");
+
+        MemberProfileUpdateResponse response = memberProfileService
+                .updateProfile(1L, request);
+
+        assertThat(profile.getName()).isEqualTo("Jane Doe");
+        assertThat(profile.getAge()).isEqualTo(29);
+        assertThat(profile.getHeight()).isEqualByComparingTo("175.5");
+        assertThat(profile.getWeight()).isEqualByComparingTo("70.3");
+        assertThat(profile.getFullBodyImageKey())
+                .isEqualTo("full-body/validation/1/test.png");
+        assertThat(response.fullBodyImageUrl())
+                .isEqualTo("https://presigned.example.com/current.png");
+        verify(validationRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("본인이 검증한 전신사진으로 프로필 사진을 교체하고 검증 정보를 소비한다")
+    void updateFullBodyImageWithOwnedValidation() {
+        Member member = createMember(1L, "member@lookddak.com");
+        MemberProfile profile = createProfile(member);
+        FullBodyImageValidation validation = FullBodyImageValidation.create(
+                member,
+                "full-body/validation/1/updated.png"
+        );
+        MemberProfileUpdateRequest request = new MemberProfileUpdateRequest(
+                null,
+                null,
+                null,
+                null,
+                15L
+        );
+        given(memberProfileRepository.findActiveByMemberIdWithMember(1L))
+                .willReturn(Optional.of(profile));
+        given(validationRepository.findById(15L)).willReturn(Optional.of(validation));
+        given(presignedUrlProvider.createGetUrl(
+                "full-body/validation/1/updated.png"
+        )).willReturn("https://presigned.example.com/updated.png");
+
+        MemberProfileUpdateResponse response = memberProfileService
+                .updateProfile(1L, request);
+
+        assertThat(profile.getFullBodyImageKey())
+                .isEqualTo("full-body/validation/1/updated.png");
+        assertThat(response.fullBodyImageUrl())
+                .isEqualTo("https://presigned.example.com/updated.png");
+        verify(validationRepository).delete(validation);
+    }
+
+    @Test
+    @DisplayName("다른 회원의 전신사진 검증 정보로 프로필 사진을 수정할 수 없다")
+    void rejectOtherMembersValidationWhenUpdatingProfile() {
+        Member member = createMember(1L, "member@lookddak.com");
+        Member otherMember = createMember(2L, "other@lookddak.com");
+        MemberProfile profile = createProfile(member);
+        FullBodyImageValidation validation = FullBodyImageValidation.create(
+                otherMember,
+                "full-body/validation/2/test.png"
+        );
+        MemberProfileUpdateRequest request = new MemberProfileUpdateRequest(
+                null,
+                null,
+                null,
+                null,
+                15L
+        );
+        given(memberProfileRepository.findActiveByMemberIdWithMember(1L))
+                .willReturn(Optional.of(profile));
+        given(validationRepository.findById(15L)).willReturn(Optional.of(validation));
+
+        assertThatThrownBy(() -> memberProfileService.updateProfile(1L, request))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.INVALID_FULL_BODY_IMAGE)
+                );
+
+        assertThat(profile.getFullBodyImageKey())
+                .isEqualTo("full-body/validation/1/test.png");
+        verify(validationRepository, never()).delete(any());
     }
 
     private void assertInvalidFullBodyImage() {

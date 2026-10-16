@@ -85,4 +85,28 @@ public class MemberProfile extends BaseEntity {
                 fullBodyImageKey
         );
     }
+
+    public void update(
+            String name,
+            Integer age,
+            BigDecimal height,
+            BigDecimal weight,
+            String fullBodyImageKey
+    ) {
+        if (name != null) {
+            this.name = name;
+        }
+        if (age != null) {
+            this.age = age;
+        }
+        if (height != null) {
+            this.height = height;
+        }
+        if (weight != null) {
+            this.weight = weight;
+        }
+        if (fullBodyImageKey != null) {
+            this.fullBodyImageKey = fullBodyImageKey;
+        }
+    }
 }
