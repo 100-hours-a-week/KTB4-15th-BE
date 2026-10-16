@@ -4,6 +4,7 @@ import com.ktb.lookddak.domain.notification.service.NotificationSseService;
 import com.ktb.lookddak.domain.notification.service.NotificationService;
 import com.ktb.lookddak.domain.notification.dto.NotificationReadRequest;
 import com.ktb.lookddak.domain.notification.dto.NotificationReadResponse;
+import com.ktb.lookddak.domain.notification.dto.NotificationListResponse;
 import com.ktb.lookddak.global.response.ApiResponse;
 import com.ktb.lookddak.global.response.SuccessCode;
 import com.ktb.lookddak.global.security.principal.MemberPrincipal;
@@ -30,6 +31,19 @@ public class NotificationController {
 
     private final NotificationSseService notificationSseService;
     private final NotificationService notificationService;
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<NotificationListResponse>> getNotifications(
+            @AuthenticationPrincipal MemberPrincipal principal
+    ) {
+        NotificationListResponse response = notificationService.getNotifications(
+                principal.getMemberId()
+        );
+
+        return ResponseEntity
+                .status(SuccessCode.OK.getStatus())
+                .body(ApiResponse.success(SuccessCode.OK, response));
+    }
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter connectStream(

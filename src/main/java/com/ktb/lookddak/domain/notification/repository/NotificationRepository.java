@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
@@ -34,6 +35,11 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     int markAllAsReadByMemberId(@Param("memberId") Long memberId);
 
     long countByMemberIdAndIsReadFalseAndExpiresAtAfter(
+            Long memberId,
+            LocalDateTime currentTime
+    );
+
+    List<Notification> findByMemberIdAndExpiresAtAfterOrderByCreatedAtDescIdDesc(
             Long memberId,
             LocalDateTime currentTime
     );

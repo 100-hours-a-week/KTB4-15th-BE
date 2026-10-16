@@ -84,11 +84,15 @@ public class Notification extends BaseEntity {
         this.expiresAt = LocalDateTime.now().plusDays(EXPIRATION_DAYS);
     }
 
-    public static Notification fittingSuccess(Member member, Long fittingJobId) {
+    public static Notification fittingSuccess(
+            Member member,
+            Long fittingJobId,
+            String outfitName
+    ) {
         return new Notification(
                 member,
                 NotificationType.FITTING_SUCCESS,
-                Map.of("title", "피팅 생성 완료", "message", "가상피팅이 완료되었습니다."),
+                Map.of("outfitName", outfitName),
                 fittingJobId
         );
     }
@@ -97,7 +101,7 @@ public class Notification extends BaseEntity {
         return new Notification(
                 member,
                 NotificationType.FITTING_FAIL,
-                Map.of("title", "피팅 생성 실패", "message", "가상피팅 생성에 실패했습니다."),
+                Map.of(),
                 fittingJobId
         );
     }

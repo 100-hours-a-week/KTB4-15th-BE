@@ -1,6 +1,8 @@
 package com.ktb.lookddak.domain.notification.service;
 
 import com.ktb.lookddak.domain.notification.dto.NotificationReadResponse;
+import com.ktb.lookddak.domain.notification.dto.NotificationListItemResponse;
+import com.ktb.lookddak.domain.notification.dto.NotificationListResponse;
 import com.ktb.lookddak.domain.notification.entity.Notification;
 import com.ktb.lookddak.domain.notification.repository.NotificationRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
@@ -10,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +28,20 @@ public class NotificationService {
                         memberId,
                         LocalDateTime.now()
                 );
+    }
+
+    public NotificationListResponse getNotifications(Long memberId) {
+        List<Notification> notifications = notificationRepository
+                .findByMemberIdAndExpiresAtAfterOrderByCreatedAtDescIdDesc(
+                        memberId,
+                        LocalDateTime.now()
+                );
+
+        List<NotificationListItemResponse> items = new ArrayList<>();
+        for (Notification notification : notifications) {
+            items.add(NotificationListItemResponse.from(notification));
+        }
+        return new NotificationListResponse(items);
     }
 
     @Transactional

@@ -42,7 +42,8 @@ public class FittingGenerationResultService {
         fittingJob.completeGeneration();
         createAndPublishNotification(Notification.fittingSuccess(
                 fittingJob.getMember(),
-                fittingJob.getId()
+                fittingJob.getId(),
+                result.getLlmTitle()
         ));
     }
 

@@ -2,7 +2,10 @@ package com.ktb.lookddak.domain.notification.service;
 
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.notification.dto.NotificationReadResponse;
+import com.ktb.lookddak.domain.notification.dto.NotificationListResponse;
 import com.ktb.lookddak.domain.notification.entity.Notification;
+import com.ktb.lookddak.domain.notification.entity.NotificationTargetType;
+import com.ktb.lookddak.domain.notification.entity.NotificationType;
 import com.ktb.lookddak.domain.notification.repository.NotificationRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
@@ -15,6 +18,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -93,9 +98,46 @@ class NotificationServiceTest {
         assertThat(response.unreadCount()).isZero();
     }
 
+    @Test
+    @DisplayName("만료되지 않은 본인 알림을 저장소가 반환한 최신순으로 조회한다")
+    void getNotifications() {
+        Notification newest = mock(Notification.class);
+        given(newest.getId()).willReturn(20L);
+        given(newest.getType()).willReturn(NotificationType.FITTING_SUCCESS);
+        given(newest.isRead()).willReturn(false);
+        given(newest.getTargetType()).willReturn(NotificationTargetType.FITTING_JOB);
+        given(newest.getTargetId()).willReturn(10L);
+        given(newest.getPayload()).willReturn(Map.of("outfitName", "가을 출근 니트 룩"));
+        given(newest.getCreatedAt()).willReturn(LocalDateTime.of(2026, 10, 17, 12, 0));
+
+        Notification older = mock(Notification.class);
+        given(older.getId()).willReturn(19L);
+        given(older.getType()).willReturn(NotificationType.FITTING_FAIL);
+        given(older.isRead()).willReturn(true);
+        given(older.getTargetType()).willReturn(NotificationTargetType.FITTING_JOB);
+        given(older.getTargetId()).willReturn(9L);
+        given(older.getPayload()).willReturn(Map.of());
+        given(older.getCreatedAt()).willReturn(LocalDateTime.of(2026, 10, 17, 11, 0));
+
+        given(notificationRepository
+                .findByMemberIdAndExpiresAtAfterOrderByCreatedAtDescIdDesc(
+                        org.mockito.ArgumentMatchers.eq(1L),
+                        any(LocalDateTime.class)
+                ))
+                .willReturn(List.of(newest, older));
+
+        NotificationListResponse response = notificationService.getNotifications(1L);
+
+        assertThat(response.items()).hasSize(2);
+        assertThat(response.items().getFirst().notificationId()).isEqualTo(20L);
+        assertThat(response.items().getFirst().payload())
+                .containsEntry("outfitName", "가을 출근 니트 룩");
+        assertThat(response.items().get(1).payload()).isEmpty();
+    }
+
     private Notification fittingSuccessNotification(Long memberId) {
         Member member = mock(Member.class);
         given(member.getId()).willReturn(memberId);
-        return Notification.fittingSuccess(member, 10L);
+        return Notification.fittingSuccess(member, 10L, "코디명");
     }
 }
