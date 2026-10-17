@@ -39,6 +39,11 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             LocalDateTime currentTime
     );
 
+    boolean existsByMemberIdAndIsReadFalseAndExpiresAtAfter(
+            Long memberId,
+            LocalDateTime currentTime
+    );
+
     List<Notification> findByMemberIdAndExpiresAtAfterOrderByCreatedAtDescIdDesc(
             Long memberId,
             LocalDateTime currentTime

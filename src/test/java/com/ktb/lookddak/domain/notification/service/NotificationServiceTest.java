@@ -3,6 +3,7 @@ package com.ktb.lookddak.domain.notification.service;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.notification.dto.NotificationReadResponse;
 import com.ktb.lookddak.domain.notification.dto.NotificationListResponse;
+import com.ktb.lookddak.domain.notification.dto.NotificationUnreadStatusResponse;
 import com.ktb.lookddak.domain.notification.entity.Notification;
 import com.ktb.lookddak.domain.notification.entity.NotificationTargetType;
 import com.ktb.lookddak.domain.notification.entity.NotificationType;
@@ -96,6 +97,22 @@ class NotificationServiceTest {
 
         then(notificationRepository).should().markAllAsReadByMemberId(1L);
         assertThat(response.unreadCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("만료되지 않은 읽지 않은 알림이 있으면 존재 여부를 반환한다")
+    void getUnreadStatus() {
+        given(notificationRepository
+                .existsByMemberIdAndIsReadFalseAndExpiresAtAfter(
+                        org.mockito.ArgumentMatchers.eq(1L),
+                        any(LocalDateTime.class)
+                ))
+                .willReturn(true);
+
+        NotificationUnreadStatusResponse response = notificationService
+                .getUnreadStatus(1L);
+
+        assertThat(response.hasUnread()).isTrue();
     }
 
     @Test

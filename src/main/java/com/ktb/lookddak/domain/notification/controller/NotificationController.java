@@ -5,6 +5,7 @@ import com.ktb.lookddak.domain.notification.service.NotificationService;
 import com.ktb.lookddak.domain.notification.dto.NotificationReadRequest;
 import com.ktb.lookddak.domain.notification.dto.NotificationReadResponse;
 import com.ktb.lookddak.domain.notification.dto.NotificationListResponse;
+import com.ktb.lookddak.domain.notification.dto.NotificationUnreadStatusResponse;
 import com.ktb.lookddak.global.response.ApiResponse;
 import com.ktb.lookddak.global.response.SuccessCode;
 import com.ktb.lookddak.global.security.principal.MemberPrincipal;
@@ -39,6 +40,19 @@ public class NotificationController {
         NotificationListResponse response = notificationService.getNotifications(
                 principal.getMemberId()
         );
+
+        return ResponseEntity
+                .status(SuccessCode.OK.getStatus())
+                .body(ApiResponse.success(SuccessCode.OK, response));
+    }
+
+    @GetMapping("/unread")
+    public ResponseEntity<ApiResponse<NotificationUnreadStatusResponse>>
+            getUnreadStatus(
+                    @AuthenticationPrincipal MemberPrincipal principal
+            ) {
+        NotificationUnreadStatusResponse response = notificationService
+                .getUnreadStatus(principal.getMemberId());
 
         return ResponseEntity
                 .status(SuccessCode.OK.getStatus())

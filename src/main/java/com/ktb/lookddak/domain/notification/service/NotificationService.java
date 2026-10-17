@@ -3,6 +3,7 @@ package com.ktb.lookddak.domain.notification.service;
 import com.ktb.lookddak.domain.notification.dto.NotificationReadResponse;
 import com.ktb.lookddak.domain.notification.dto.NotificationListItemResponse;
 import com.ktb.lookddak.domain.notification.dto.NotificationListResponse;
+import com.ktb.lookddak.domain.notification.dto.NotificationUnreadStatusResponse;
 import com.ktb.lookddak.domain.notification.entity.Notification;
 import com.ktb.lookddak.domain.notification.repository.NotificationRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
@@ -28,6 +29,15 @@ public class NotificationService {
                         memberId,
                         LocalDateTime.now()
                 );
+    }
+
+    public NotificationUnreadStatusResponse getUnreadStatus(Long memberId) {
+        boolean hasUnread = notificationRepository
+                .existsByMemberIdAndIsReadFalseAndExpiresAtAfter(
+                        memberId,
+                        LocalDateTime.now()
+                );
+        return new NotificationUnreadStatusResponse(hasUnread);
     }
 
     public NotificationListResponse getNotifications(Long memberId) {
