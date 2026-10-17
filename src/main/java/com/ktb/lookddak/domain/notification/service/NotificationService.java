@@ -41,7 +41,11 @@ public class NotificationService {
         for (Notification notification : notifications) {
             items.add(NotificationListItemResponse.from(notification));
         }
-        return new NotificationListResponse(items);
+        long unreadCount = items.stream()
+                .filter(item -> !item.isRead())
+                .count();
+
+        return new NotificationListResponse(items, unreadCount);
     }
 
     @Transactional

@@ -133,6 +133,7 @@ class NotificationServiceTest {
         assertThat(response.items().getFirst().payload())
                 .containsEntry("outfitName", "가을 출근 니트 룩");
         assertThat(response.items().get(1).payload()).isEmpty();
+        assertThat(response.unreadCount()).isEqualTo(1L);
     }
 
     private Notification fittingSuccessNotification(Long memberId) {
