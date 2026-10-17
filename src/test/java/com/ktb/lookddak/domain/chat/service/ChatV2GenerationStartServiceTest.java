@@ -20,6 +20,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -93,13 +94,85 @@ class ChatV2GenerationStartServiceTest {
         verify(eventPublisher, never()).publishEvent(any());
     }
 
+    @Test
+    @DisplayName("찜 기반 채팅방의 첫 사용자 메시지는 찜 상품 코드와 함께 AI에 요청한다")
+    void startFirstWishlistGeneration() {
+        ChatMessage message = createPendingMessage(ChatSourceType.WISHLIST, 100L);
+        given(chatMessageRepository.findByIdWithChatRoomAndMember(100L))
+                .willReturn(Optional.of(message));
+        given(chatMessageRepository.updateGenerationStatusIfCurrent(
+                100L,
+                ChatSenderType.USER,
+                ChatGenerationStatus.PENDING,
+                ChatGenerationStatus.GENERATING
+        )).willReturn(1);
+        given(chatMessageRepository.existsByChatRoomIdAndSenderTypeAndIdLessThan(
+                10L,
+                ChatSenderType.USER,
+                100L
+        )).willReturn(false);
+        given(wishlistRepository.findRecentProductCodesByMemberId(
+                eq(1L),
+                any()
+        )).willReturn(List.of("0000001", "0000002"));
+
+        service.startIfPending(100L);
+
+        ArgumentCaptor<ChatV2GenerationRequestedEvent> captor = ArgumentCaptor
+                .forClass(ChatV2GenerationRequestedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().getSourceType())
+                .isEqualTo(ChatSourceType.WISHLIST);
+        assertThat(captor.getValue().getProductIds())
+                .containsExactly("0000001", "0000002");
+    }
+
+    @Test
+    @DisplayName("찜 기반 채팅방의 두 번째 사용자 메시지는 일반 대화로 AI에 요청한다")
+    void startFollowingWishlistMessageAsGeneralGeneration() {
+        ChatMessage message = createPendingMessage(ChatSourceType.WISHLIST, 101L);
+        given(chatMessageRepository.findByIdWithChatRoomAndMember(101L))
+                .willReturn(Optional.of(message));
+        given(chatMessageRepository.updateGenerationStatusIfCurrent(
+                101L,
+                ChatSenderType.USER,
+                ChatGenerationStatus.PENDING,
+                ChatGenerationStatus.GENERATING
+        )).willReturn(1);
+        given(chatMessageRepository.existsByChatRoomIdAndSenderTypeAndIdLessThan(
+                10L,
+                ChatSenderType.USER,
+                101L
+        )).willReturn(true);
+
+        service.startIfPending(101L);
+
+        ArgumentCaptor<ChatV2GenerationRequestedEvent> captor = ArgumentCaptor
+                .forClass(ChatV2GenerationRequestedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().getSourceType())
+                .isEqualTo(ChatSourceType.GENERAL);
+        assertThat(captor.getValue().getProductIds()).isEmpty();
+        verify(wishlistRepository, never()).findRecentProductCodesByMemberId(
+                any(),
+                any()
+        );
+    }
+
     private ChatMessage createPendingMessage() {
+        return createPendingMessage(ChatSourceType.GENERAL, 100L);
+    }
+
+    private ChatMessage createPendingMessage(
+            ChatSourceType sourceType,
+            Long messageId
+    ) {
         Member member = Member.create("member@lookddak.com", "encoded-password");
         ReflectionTestUtils.setField(member, "id", 1L);
         ChatRoom chatRoom = ChatRoom.create(
                 member,
                 "가을 니트를 추천해줘",
-                ChatSourceType.GENERAL,
+                sourceType,
                 LocalDateTime.now()
         );
         ReflectionTestUtils.setField(chatRoom, "id", 10L);
@@ -107,7 +180,7 @@ class ChatV2GenerationStartServiceTest {
                 chatRoom,
                 "가을 니트를 추천해줘"
         );
-        ReflectionTestUtils.setField(message, "id", 100L);
+        ReflectionTestUtils.setField(message, "id", messageId);
         return message;
     }
 }

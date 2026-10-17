@@ -29,6 +29,12 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             Collection<ChatGenerationStatus> generationStatuses
     );
 
+    boolean existsByChatRoomIdAndSenderTypeAndIdLessThan(
+            Long chatRoomId,
+            ChatSenderType senderType,
+            Long messageId
+    );
+
     boolean existsByIdAndChatRoomId(Long messageId, Long chatRoomId);
 
     Optional<ChatMessage> findByIdAndChatRoomId(

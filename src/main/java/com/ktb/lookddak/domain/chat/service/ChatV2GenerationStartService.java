@@ -46,7 +46,7 @@ public class ChatV2GenerationStartService {
         Long memberId = chatRoom.getMember().getId();
         Long chatRoomId = chatRoom.getId();
         String content = message.getContent();
-        ChatSourceType sourceType = chatRoom.getSourceType();
+        ChatSourceType chatRoomSourceType = chatRoom.getSourceType();
 
         int updatedCount = chatMessageRepository.updateGenerationStatusIfCurrent(
                 userMessageId,
@@ -59,6 +59,11 @@ public class ChatV2GenerationStartService {
             return;
         }
 
+        ChatSourceType sourceType = getAiSourceType(
+                chatRoomId,
+                message.getId(),
+                chatRoomSourceType
+        );
         List<String> productIds = getAiProductIds(
                 memberId,
                 sourceType
@@ -71,6 +76,27 @@ public class ChatV2GenerationStartService {
                 sourceType,
                 productIds
         ));
+    }
+
+    private ChatSourceType getAiSourceType(
+            Long chatRoomId,
+            Long userMessageId,
+            ChatSourceType chatRoomSourceType
+    ) {
+        if (chatRoomSourceType != ChatSourceType.WISHLIST) {
+            return ChatSourceType.GENERAL;
+        }
+
+        boolean hasPreviousUserMessage = chatMessageRepository
+                .existsByChatRoomIdAndSenderTypeAndIdLessThan(
+                        chatRoomId,
+                        ChatSenderType.USER,
+                        userMessageId
+                );
+
+        return hasPreviousUserMessage
+                ? ChatSourceType.GENERAL
+                : ChatSourceType.WISHLIST;
     }
 
     private List<String> getAiProductIds(
