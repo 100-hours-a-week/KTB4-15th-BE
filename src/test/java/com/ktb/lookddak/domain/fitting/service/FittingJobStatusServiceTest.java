@@ -94,7 +94,7 @@ class FittingJobStatusServiceTest {
 
         assertThat(response.getFittingJobId()).isEqualTo(100L);
         assertThat(response.getStatus())
-                .isEqualTo(FittingJobStatus.GENERATING);
+                .isEqualTo(FittingJobStatus.PENDING);
         assertThat(response.getResult()).isNull();
         verifyNoInteractions(
                 fittingTempResultRepository,

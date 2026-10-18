@@ -49,7 +49,7 @@ public class FittingJob extends BaseEntity {
 
     private FittingJob(Member member) {
         this.member = member;
-        this.status = FittingJobStatus.GENERATING;
+        this.status = FittingJobStatus.PENDING;
     }
 
     public static FittingJob create(Member member) {
@@ -79,9 +79,9 @@ public class FittingJob extends BaseEntity {
     }
 
     private void updateStatus(FittingJobStatus status) {
-        if (this.status != FittingJobStatus.GENERATING) {
+        if (this.status != FittingJobStatus.PENDING) {
             throw new IllegalStateException(
-                    "생성 중인 가상피팅 작업만 상태를 변경할 수 있습니다."
+                    "대기 중인 가상피팅 작업만 상태를 변경할 수 있습니다."
             );
         }
 

@@ -101,7 +101,7 @@ class FittingJobServiceTest {
                 .willReturn(true);
         given(fittingJobRepository.existsByMemberIdAndStatus(
                 1L,
-                FittingJobStatus.GENERATING
+                FittingJobStatus.PENDING
         )).willReturn(false);
         given(productRepository.findAllById(Set.of(10L, 20L)))
                 .willReturn(List.of(bottom, top));
@@ -125,7 +125,7 @@ class FittingJobServiceTest {
 
         assertThat(response.getFittingJobId()).isEqualTo(100L);
         assertThat(response.getStatus())
-                .isEqualTo(FittingJobStatus.GENERATING);
+                .isEqualTo(FittingJobStatus.PENDING);
         assertThat(member.getFittingRequestCount()).isEqualTo(1);
 
         @SuppressWarnings("unchecked")
@@ -159,7 +159,7 @@ class FittingJobServiceTest {
                 .willReturn(true);
         given(fittingJobRepository.existsByMemberIdAndStatus(
                 1L,
-                FittingJobStatus.GENERATING
+                FittingJobStatus.PENDING
         )).willReturn(false);
         given(productRepository.findAllById(Set.of(10L)))
                 .willReturn(List.of(top));
@@ -215,7 +215,7 @@ class FittingJobServiceTest {
                 .willReturn(true);
         given(fittingJobRepository.existsByMemberIdAndStatus(
                 1L,
-                FittingJobStatus.GENERATING
+                FittingJobStatus.PENDING
         )).willReturn(true);
 
         assertBusinessException(
@@ -239,7 +239,7 @@ class FittingJobServiceTest {
                 .willReturn(true);
         given(fittingJobRepository.existsByMemberIdAndStatus(
                 1L,
-                FittingJobStatus.GENERATING
+                FittingJobStatus.PENDING
         )).willReturn(false);
 
         assertBusinessException(
@@ -358,7 +358,7 @@ class FittingJobServiceTest {
                 .willReturn(true);
         given(fittingJobRepository.existsByMemberIdAndStatus(
                 1L,
-                FittingJobStatus.GENERATING
+                FittingJobStatus.PENDING
         )).willReturn(false);
     }
 

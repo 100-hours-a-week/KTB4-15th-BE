@@ -114,7 +114,7 @@ class FittingJobControllerTest {
                 .andExpect(jsonPath("$.code").value("CREATED"))
                 .andExpect(jsonPath("$.data.fittingJobId").value(100))
                 .andExpect(jsonPath("$.data.status")
-                        .value("GENERATING"))
+                        .value("PENDING"))
                 .andExpect(jsonPath("$.message")
                         .value("리소스가 성공적으로 생성되었습니다."));
 
@@ -196,7 +196,7 @@ class FittingJobControllerTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.fittingJobId").value(100))
                 .andExpect(jsonPath("$.data.status")
-                        .value("GENERATING"))
+                        .value("PENDING"))
                 .andExpect(jsonPath("$.data.result").isEmpty())
                 .andExpect(jsonPath("$.message")
                         .value("요청이 성공적으로 처리되었습니다."));
@@ -263,7 +263,7 @@ class FittingJobControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.fittingJobId").value(100))
-                .andExpect(jsonPath("$.data.status").value("GENERATING"))
+                .andExpect(jsonPath("$.data.status").value("PENDING"))
                 .andExpect(jsonPath("$.data.resultViewed").value(false))
                 .andExpect(jsonPath("$.data.products").isEmpty())
                 .andExpect(jsonPath("$.message")

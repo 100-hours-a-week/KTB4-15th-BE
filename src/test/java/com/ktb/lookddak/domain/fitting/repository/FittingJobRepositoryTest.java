@@ -68,7 +68,7 @@ class FittingJobRepositoryTest {
 
         assertThat(fittingJobRepository.existsByMemberIdAndStatus(
                 member.getId(),
-                FittingJobStatus.GENERATING
+                FittingJobStatus.PENDING
         )).isTrue();
         assertThat(generatingJob.getCreatedAt()).isNotNull();
     }
@@ -86,12 +86,12 @@ class FittingJobRepositoryTest {
 
         int updatedGenerating = fittingJobRepository.updateStatusIfCurrent(
                 generatingJob.getId(),
-                FittingJobStatus.GENERATING,
+                FittingJobStatus.PENDING,
                 FittingJobStatus.FAILED
         );
         int updatedCompleted = fittingJobRepository.updateStatusIfCurrent(
                 completedJob.getId(),
-                FittingJobStatus.GENERATING,
+                FittingJobStatus.PENDING,
                 FittingJobStatus.FAILED
         );
 

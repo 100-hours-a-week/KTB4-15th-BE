@@ -70,7 +70,7 @@ public class FittingGenerationResultService {
     }
 
     private boolean isGenerating(FittingJob fittingJob) {
-        return fittingJob.getStatus() == FittingJobStatus.GENERATING;
+        return fittingJob.getStatus() == FittingJobStatus.PENDING;
     }
 
     private void createAndPublishNotification(Notification notification) {
