@@ -65,7 +65,7 @@ public class FittingJobService {
             Long memberId,
             FittingJobCreateRequest request
     ) {
-        // 같은 회원의 동시 생성 요청을 직렬화해 PENDING 작업 중복 생성을 막는다.
+        // 같은 회원의 동시 생성 요청을 직렬화해 생성 중인 작업의 중복 생성을 막는다.
         Member member = memberRepository.findActiveByIdForUpdate(memberId)
                 .orElseThrow(() ->
                         new BusinessException(ErrorCode.RESOURCE_NOT_FOUND)
@@ -87,7 +87,7 @@ public class FittingJobService {
 
         if (fittingJobRepository.existsByMemberIdAndStatus(
                 memberId,
-                FittingJobStatus.PENDING
+                FittingJobStatus.GENERATING
         )) {
             throw new BusinessException(
                     ErrorCode.FITTING_JOB_ALREADY_GENERATING

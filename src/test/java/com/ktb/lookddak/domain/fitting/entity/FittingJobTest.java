@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class FittingJobTest {
 
     @Test
-    @DisplayName("가상피팅 작업은 PENDING 상태로 생성된다")
+    @DisplayName("가상피팅 작업은 GENERATING 상태로 생성된다")
     void createFittingJob() {
         Member member = createMember(1L);
 
@@ -19,7 +19,7 @@ class FittingJobTest {
 
         assertThat(fittingJob.getMember()).isSameAs(member);
         assertThat(fittingJob.getStatus())
-                .isEqualTo(FittingJobStatus.PENDING);
+                .isEqualTo(FittingJobStatus.GENERATING);
         assertThat(fittingJob.isOwnedBy(1L)).isTrue();
         assertThat(fittingJob.isOwnedBy(2L)).isFalse();
     }
@@ -54,7 +54,7 @@ class FittingJobTest {
 
         assertThatThrownBy(fittingJob::failGeneration)
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("대기 중인 가상피팅 작업만 상태를 변경할 수 있습니다.");
+                .hasMessage("생성 중인 가상피팅 작업만 상태를 변경할 수 있습니다.");
     }
 
     private Member createMember(Long memberId) {

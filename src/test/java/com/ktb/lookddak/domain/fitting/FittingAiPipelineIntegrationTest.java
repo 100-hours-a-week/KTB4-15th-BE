@@ -84,7 +84,7 @@ class FittingAiPipelineIntegrationTest {
     }
 
     @Test
-    @DisplayName("작업 생성 시 PENDING Job과 요청 Outbox 이벤트를 함께 저장한다")
+    @DisplayName("작업 생성 시 GENERATING Job과 요청 Outbox 이벤트를 함께 저장한다")
     void savePendingJobAndRequestOutboxTogether() {
         TestData data = saveTestData("fitting-pipeline-success@lookddak.com");
 
@@ -102,7 +102,7 @@ class FittingAiPipelineIntegrationTest {
                 .orElseThrow();
         OutboxEvent outboxEvent = outboxEventRepository.findAll().getFirst();
 
-        assertThat(fittingJob.getStatus()).isEqualTo(FittingJobStatus.PENDING);
+        assertThat(fittingJob.getStatus()).isEqualTo(FittingJobStatus.GENERATING);
         assertThat(outboxEvent.getAggregateId()).isEqualTo(fittingJob.getId());
         assertThat(outboxEvent.getStatus()).isEqualTo(OutboxEventStatus.PENDING);
         assertThat(outboxEvent.getPayload())
@@ -113,7 +113,7 @@ class FittingAiPipelineIntegrationTest {
     }
 
     @Test
-    @DisplayName("생성 API는 AI HTTP 호출 없이 PENDING 작업만 접수한다")
+    @DisplayName("생성 API는 AI HTTP 호출 없이 GENERATING 작업만 접수한다")
     void doNotCallAiHttpWhenCreatingFittingJob() {
         TestData data = saveTestData("fitting-pipeline-failure@lookddak.com");
 
@@ -128,7 +128,7 @@ class FittingAiPipelineIntegrationTest {
 
         assertThat(fittingJobRepository.findById(response.getFittingJobId()))
                 .map(FittingJob::getStatus)
-                .contains(FittingJobStatus.PENDING);
+                .contains(FittingJobStatus.GENERATING);
         assertThat(fittingTempResultRepository
                 .findByFittingJobId(response.getFittingJobId())).isEmpty();
         verifyNoInteractions(aiFittingClient, presignedUrlProvider);

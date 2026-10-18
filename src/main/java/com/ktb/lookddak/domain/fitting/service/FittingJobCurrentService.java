@@ -27,7 +27,7 @@ public class FittingJobCurrentService {
     public FittingJobCurrentResponse getCurrentFittingJob(Long memberId) {
         List<FittingJob> fittingJobs = fittingJobRepository.findCurrentJobs(
                 memberId,
-                FittingJobStatus.PENDING,
+                FittingJobStatus.GENERATING,
                 FittingJobStatus.COMPLETED,
                 FittingJobStatus.FAILED,
                 LocalDateTime.now(),
