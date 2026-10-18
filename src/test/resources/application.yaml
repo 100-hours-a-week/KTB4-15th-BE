@@ -48,6 +48,10 @@ ai:
     await-termination: 5s
 
 aws:
+  sqs:
+    region: ap-northeast-2
+    fitting-request-queue-url: ""
+    fitting-response-queue-url: ""
   s3:
     bucket: lookddak-test-images
     region: ap-northeast-2

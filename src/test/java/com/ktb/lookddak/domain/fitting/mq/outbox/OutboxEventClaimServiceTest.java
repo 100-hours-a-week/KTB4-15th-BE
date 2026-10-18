@@ -43,8 +43,12 @@ class OutboxEventClaimServiceTest {
         );
 
         assertThat(claimedEvents).containsExactly(
-                new ClaimedOutboxEvent(10L, 100L, "{\"fitting_job_id\":100}"),
-                new ClaimedOutboxEvent(20L, 200L, "{\"fitting_job_id\":200}")
+                new ClaimedOutboxEvent(
+                        10L, 100L, "{\"fitting_job_id\":100}", "server-a", 0
+                ),
+                new ClaimedOutboxEvent(
+                        20L, 200L, "{\"fitting_job_id\":200}", "server-a", 0
+                )
         );
         assertThat(first.getStatus()).isEqualTo(OutboxEventStatus.PROCESSING);
         assertThat(second.getStatus()).isEqualTo(OutboxEventStatus.PROCESSING);

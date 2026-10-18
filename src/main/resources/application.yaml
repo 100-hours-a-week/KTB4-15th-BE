@@ -46,6 +46,10 @@ ai:
     await-termination: ${AI_RESULT_PERSISTENCE_AWAIT_TERMINATION:30s}
 
 aws:
+  sqs:
+    region: ${AWS_REGION:ap-northeast-2}
+    fitting-request-queue-url: ${BE_FITTING_REQUEST_QUEUE_URL:}
+    fitting-response-queue-url: ${BE_FITTING_RESPONSE_QUEUE_URL:}
   s3:
     bucket: ${AWS_S3_BUCKET}
     region: ${AWS_REGION:ap-northeast-2}
