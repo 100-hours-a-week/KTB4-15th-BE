@@ -31,7 +31,7 @@ public class FittingGenerationQueryService {
                         "AI 요청을 생성할 가상피팅 작업이 없습니다."
                 ));
 
-        if (fittingJob.getStatus() != FittingJobStatus.PENDING) {
+        if (fittingJob.getStatus() != FittingJobStatus.GENERATING) {
             throw new IllegalStateException(
                     "생성 중인 가상피팅 작업만 AI에 요청할 수 있습니다."
             );

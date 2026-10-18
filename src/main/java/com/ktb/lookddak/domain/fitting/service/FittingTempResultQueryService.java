@@ -83,7 +83,7 @@ public class FittingTempResultQueryService {
     }
 
     private void validateCompleted(FittingJob fittingJob) {
-        if (fittingJob.getStatus() == FittingJobStatus.PENDING) {
+        if (fittingJob.getStatus() == FittingJobStatus.GENERATING) {
             throw new BusinessException(ErrorCode.FITTING_JOB_NOT_COMPLETED);
         }
         if (fittingJob.getStatus() == FittingJobStatus.FAILED) {

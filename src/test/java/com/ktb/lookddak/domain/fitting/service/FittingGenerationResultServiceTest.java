@@ -9,6 +9,7 @@ import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.notification.event.FittingNotificationCreatedEvent;
 import com.ktb.lookddak.domain.notification.repository.NotificationRepository;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingResultData;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,6 +39,9 @@ class FittingGenerationResultServiceTest {
     @Mock
     private NotificationRepository notificationRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private FittingGenerationResultService resultService;
 
@@ -58,7 +62,7 @@ class FittingGenerationResultServiceTest {
                 "깔끔한 색감이 어우러지는 코디입니다."
         );
 
-        var notificationEvent = resultService.complete(100L, result);
+        resultService.complete(100L, result);
 
         ArgumentCaptor<FittingTempResult> captor =
                 ArgumentCaptor.forClass(FittingTempResult.class);
@@ -72,7 +76,9 @@ class FittingGenerationResultServiceTest {
         assertThat(fittingJob.getStatus())
                 .isEqualTo(FittingJobStatus.COMPLETED);
         then(notificationRepository).should().save(any());
-        assertThat(notificationEvent).isPresent();
+        then(eventPublisher).should().publishEvent(
+                any(FittingNotificationCreatedEvent.class)
+        );
     }
 
     @Test
@@ -87,11 +93,13 @@ class FittingGenerationResultServiceTest {
         given(notificationRepository.save(any()))
                 .willAnswer(invocation -> invocation.getArgument(0));
 
-        var notificationEvent = resultService.fail(100L);
+        resultService.fail(100L);
 
         assertThat(fittingJob.getStatus()).isEqualTo(FittingJobStatus.FAILED);
         then(notificationRepository).should().save(any());
-        assertThat(notificationEvent).isPresent();
+        then(eventPublisher).should().publishEvent(
+                any(FittingNotificationCreatedEvent.class)
+        );
         verify(fittingTempResultRepository, never()).save(
                 org.mockito.ArgumentMatchers.any()
         );

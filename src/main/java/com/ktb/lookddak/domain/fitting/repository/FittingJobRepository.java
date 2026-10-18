@@ -81,7 +81,7 @@ public interface FittingJobRepository extends JpaRepository<FittingJob, Long> {
             from FittingJob fittingJob
             where fittingJob.member.id = :memberId
               and (
-                    fittingJob.status = :pendingStatus
+                    fittingJob.status = :generatingStatus
                     or (
                         fittingJob.status = :failedStatus
                         and fittingJob.resultViewedAt is null
@@ -98,13 +98,13 @@ public interface FittingJobRepository extends JpaRepository<FittingJob, Long> {
                     )
               )
             order by
-                case when fittingJob.status = :pendingStatus then 0 else 1 end,
+                case when fittingJob.status = :generatingStatus then 0 else 1 end,
                 fittingJob.createdAt desc,
                 fittingJob.id desc
             """)
     List<FittingJob> findCurrentJobs(
             @Param("memberId") Long memberId,
-            @Param("pendingStatus") FittingJobStatus pendingStatus,
+            @Param("generatingStatus") FittingJobStatus generatingStatus,
             @Param("completedStatus") FittingJobStatus completedStatus,
             @Param("failedStatus") FittingJobStatus failedStatus,
             @Param("now") LocalDateTime now,

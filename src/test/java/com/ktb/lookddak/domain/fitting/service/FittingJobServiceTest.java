@@ -5,14 +5,12 @@ import com.ktb.lookddak.domain.fitting.dto.FittingJobCreateResponse;
 import com.ktb.lookddak.domain.fitting.entity.FittingJob;
 import com.ktb.lookddak.domain.fitting.entity.FittingJobProduct;
 import com.ktb.lookddak.domain.fitting.entity.FittingJobStatus;
-import com.ktb.lookddak.domain.fitting.mq.outbox.OutboxEvent;
-import com.ktb.lookddak.domain.fitting.mq.outbox.OutboxEventRepository;
+import com.ktb.lookddak.domain.fitting.event.FittingGenerationRequestedEvent;
 import com.ktb.lookddak.domain.fitting.repository.FittingCandidateRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingJobProductRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingJobRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingTempResultRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
-import com.ktb.lookddak.domain.member.entity.MemberProfile;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
 import com.ktb.lookddak.domain.member.repository.MemberProfileRepository;
 import com.ktb.lookddak.domain.product.entity.Product;
@@ -29,9 +27,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.ArrayList;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -43,7 +41,6 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 class FittingJobServiceTest {
@@ -70,7 +67,7 @@ class FittingJobServiceTest {
     private FittingTempResultRepository fittingTempResultRepository;
 
     @Mock
-    private OutboxEventRepository outboxEventRepository;
+    private ApplicationEventPublisher eventPublisher;
 
     @Mock
     private S3PresignedUrlProvider presignedUrlProvider;
@@ -87,9 +84,8 @@ class FittingJobServiceTest {
                 fittingJobRepository,
                 fittingJobProductRepository,
                 fittingTempResultRepository,
-                outboxEventRepository,
-                presignedUrlProvider,
-                JsonMapper.builder().build()
+                eventPublisher,
+                presignedUrlProvider
         );
     }
 
@@ -103,11 +99,9 @@ class FittingJobServiceTest {
                 .willReturn(Optional.of(member));
         given(memberProfileRepository.existsByMemberId(1L))
                 .willReturn(true);
-        given(memberProfileRepository.findByMemberId(1L))
-                .willReturn(Optional.of(createProfile(member)));
         given(fittingJobRepository.existsByMemberIdAndStatus(
                 1L,
-                FittingJobStatus.PENDING
+                FittingJobStatus.GENERATING
         )).willReturn(false);
         given(productRepository.findAllById(Set.of(10L, 20L)))
                 .willReturn(List.of(bottom, top));
@@ -131,7 +125,7 @@ class FittingJobServiceTest {
 
         assertThat(response.getFittingJobId()).isEqualTo(100L);
         assertThat(response.getStatus())
-                .isEqualTo(FittingJobStatus.PENDING);
+                .isEqualTo(FittingJobStatus.GENERATING);
         assertThat(member.getFittingRequestCount()).isEqualTo(1);
 
         @SuppressWarnings("unchecked")
@@ -145,15 +139,12 @@ class FittingJobServiceTest {
                 .extracting(jobProduct -> jobProduct.getProduct().getId())
                 .containsExactly(10L, 20L);
 
-        ArgumentCaptor<OutboxEvent> eventCaptor =
-                ArgumentCaptor.forClass(OutboxEvent.class);
-        verify(outboxEventRepository).save(eventCaptor.capture());
-        assertThat(eventCaptor.getValue().getAggregateId()).isEqualTo(100L);
-        assertThat(eventCaptor.getValue().getPayload())
-                .startsWith("{\"fitting_job_id\":100,\"requested_at\":\"")
-                .endsWith("\",\"user_image_key\":\"members/1/full-body.png\","
-                        + "\"products\":[{\"product_code\":\"product-10\"},"
-                        + "{\"product_code\":\"product-20\"}]}");
+        ArgumentCaptor<FittingGenerationRequestedEvent> eventCaptor =
+                ArgumentCaptor.forClass(
+                        FittingGenerationRequestedEvent.class
+                );
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getFittingJobId()).isEqualTo(100L);
     }
 
     @Test
@@ -166,11 +157,9 @@ class FittingJobServiceTest {
                 .willReturn(Optional.of(member));
         given(memberProfileRepository.existsByMemberId(1L))
                 .willReturn(true);
-        given(memberProfileRepository.findByMemberId(1L))
-                .willReturn(Optional.of(createProfile(member)));
         given(fittingJobRepository.existsByMemberIdAndStatus(
                 1L,
-                FittingJobStatus.PENDING
+                FittingJobStatus.GENERATING
         )).willReturn(false);
         given(productRepository.findAllById(Set.of(10L)))
                 .willReturn(List.of(top));
@@ -214,7 +203,7 @@ class FittingJobServiceTest {
         assertThat(member.getFittingRequestCount()).isEqualTo(10);
         verifyNoInteractions(memberProfileRepository);
         verify(fittingJobRepository, never()).save(any());
-        verify(outboxEventRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -226,7 +215,7 @@ class FittingJobServiceTest {
                 .willReturn(true);
         given(fittingJobRepository.existsByMemberIdAndStatus(
                 1L,
-                FittingJobStatus.PENDING
+                FittingJobStatus.GENERATING
         )).willReturn(true);
 
         assertBusinessException(
@@ -250,7 +239,7 @@ class FittingJobServiceTest {
                 .willReturn(true);
         given(fittingJobRepository.existsByMemberIdAndStatus(
                 1L,
-                FittingJobStatus.PENDING
+                FittingJobStatus.GENERATING
         )).willReturn(false);
 
         assertBusinessException(
@@ -359,7 +348,7 @@ class FittingJobServiceTest {
         );
 
         verify(fittingJobRepository, never()).save(any());
-        verify(outboxEventRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     private void givenReadyMember() {
@@ -369,7 +358,7 @@ class FittingJobServiceTest {
                 .willReturn(true);
         given(fittingJobRepository.existsByMemberIdAndStatus(
                 1L,
-                FittingJobStatus.PENDING
+                FittingJobStatus.GENERATING
         )).willReturn(false);
     }
 
@@ -394,17 +383,6 @@ class FittingJobServiceTest {
         );
         ReflectionTestUtils.setField(product, "id", id);
         return product;
-    }
-
-    private MemberProfile createProfile(Member member) {
-        return MemberProfile.create(
-                member,
-                "테스트 회원",
-                25,
-                new BigDecimal("175.0"),
-                new BigDecimal("65.0"),
-                "members/1/full-body.png"
-        );
     }
 
     private void assertBusinessException(
