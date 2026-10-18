@@ -37,7 +37,7 @@ public class FittingJobResultViewService {
             throw new BusinessException(ErrorCode.FITTING_JOB_ACCESS_DENIED);
         }
 
-        if (fittingJob.getStatus() == FittingJobStatus.PENDING) {
+        if (fittingJob.getStatus() == FittingJobStatus.GENERATING) {
             throw new BusinessException(ErrorCode.FITTING_JOB_NOT_COMPLETED);
         }
 

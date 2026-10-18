@@ -48,28 +48,10 @@ ai:
     await-termination: 5s
 
 aws:
-  sqs:
-    region: ap-northeast-2
-    fitting-request-queue-url: ""
-    fitting-response-queue-url: ""
   s3:
     bucket: lookddak-test-images
     region: ap-northeast-2
     presigned-url-expiration: 10m
-
-fitting:
-  outbox:
-    enabled: false
-    server-id: test-server
-    poll-interval: 1s
-    batch-size: 20
-    lease-duration: 30s
-  result-consumer:
-    enabled: false
-    poll-interval: 1s
-    max-messages: 10
-    wait-time-seconds: 10
-    visibility-timeout-seconds: 60
 
 sentry:
   dsn: ""

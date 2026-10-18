@@ -10,10 +10,9 @@ import com.ktb.lookddak.domain.notification.event.FittingNotificationCreatedEven
 import com.ktb.lookddak.domain.notification.repository.NotificationRepository;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingResultData;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -22,15 +21,16 @@ public class FittingGenerationResultService {
     private final FittingJobRepository fittingJobRepository;
     private final FittingTempResultRepository fittingTempResultRepository;
     private final NotificationRepository notificationRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
-    public Optional<FittingNotificationCreatedEvent> complete(
+    public void complete(
             Long fittingJobId,
             AiFittingResultData result
     ) {
         FittingJob fittingJob = getFittingJobForUpdate(fittingJobId);
         if (!isGenerating(fittingJob)) {
-            return Optional.empty();
+            return;
         }
 
         fittingTempResultRepository.save(FittingTempResult.create(
@@ -40,34 +40,25 @@ public class FittingGenerationResultService {
                 result.getLlmComment()
         ));
         fittingJob.completeGeneration();
-        return Optional.of(createNotificationEvent(Notification.fittingSuccess(
+        createAndPublishNotification(Notification.fittingSuccess(
                 fittingJob.getMember(),
                 fittingJob.getId(),
                 result.getLlmTitle()
-        )));
+        ));
     }
 
     @Transactional
-    public Optional<FittingNotificationCreatedEvent> fail(Long fittingJobId) {
-        return fail(fittingJobId, null, null);
-    }
-
-    @Transactional
-    public Optional<FittingNotificationCreatedEvent> fail(
-            Long fittingJobId,
-            String failureCode,
-            String failureMessage
-    ) {
+    public void fail(Long fittingJobId) {
         FittingJob fittingJob = getFittingJobForUpdate(fittingJobId);
         if (!isGenerating(fittingJob)) {
-            return Optional.empty();
+            return;
         }
 
-        fittingJob.failGeneration(failureCode, failureMessage);
-        return Optional.of(createNotificationEvent(Notification.fittingFailure(
+        fittingJob.failGeneration();
+        createAndPublishNotification(Notification.fittingFailure(
                 fittingJob.getMember(),
                 fittingJob.getId()
-        )));
+        ));
     }
 
     private FittingJob getFittingJobForUpdate(Long fittingJobId) {
@@ -79,18 +70,16 @@ public class FittingGenerationResultService {
     }
 
     private boolean isGenerating(FittingJob fittingJob) {
-        return fittingJob.getStatus() == FittingJobStatus.PENDING;
+        return fittingJob.getStatus() == FittingJobStatus.GENERATING;
     }
 
-    private FittingNotificationCreatedEvent createNotificationEvent(
-            Notification notification
-    ) {
+    private void createAndPublishNotification(Notification notification) {
         Notification savedNotification = notificationRepository.save(notification);
-        return new FittingNotificationCreatedEvent(
+        eventPublisher.publishEvent(new FittingNotificationCreatedEvent(
                 savedNotification.getId(),
                 savedNotification.getMember().getId(),
                 savedNotification.getTargetId(),
                 savedNotification.getType()
-        );
+        ));
     }
 }

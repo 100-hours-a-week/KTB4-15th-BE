@@ -5,7 +5,6 @@ import com.ktb.lookddak.domain.fitting.entity.FittingJob;
 import com.ktb.lookddak.domain.fitting.entity.FittingJobProduct;
 import com.ktb.lookddak.domain.fitting.entity.FittingJobStatus;
 import com.ktb.lookddak.domain.fitting.entity.FittingTempResult;
-import com.ktb.lookddak.domain.fitting.mq.outbox.OutboxEventRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingCandidateRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingJobProductRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingJobRepository;
@@ -25,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -34,7 +34,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verifyNoInteractions;
-import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 class FittingJobStatusServiceTest {
@@ -61,7 +60,7 @@ class FittingJobStatusServiceTest {
     private FittingTempResultRepository fittingTempResultRepository;
 
     @Mock
-    private OutboxEventRepository outboxEventRepository;
+    private ApplicationEventPublisher eventPublisher;
 
     @Mock
     private S3PresignedUrlProvider presignedUrlProvider;
@@ -78,9 +77,8 @@ class FittingJobStatusServiceTest {
                 fittingJobRepository,
                 fittingJobProductRepository,
                 fittingTempResultRepository,
-                outboxEventRepository,
-                presignedUrlProvider,
-                JsonMapper.builder().build()
+                eventPublisher,
+                presignedUrlProvider
         );
     }
 
@@ -96,7 +94,7 @@ class FittingJobStatusServiceTest {
 
         assertThat(response.getFittingJobId()).isEqualTo(100L);
         assertThat(response.getStatus())
-                .isEqualTo(FittingJobStatus.PENDING);
+                .isEqualTo(FittingJobStatus.GENERATING);
         assertThat(response.getResult()).isNull();
         verifyNoInteractions(
                 fittingTempResultRepository,

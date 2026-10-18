@@ -8,24 +8,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
-import static org.mockito.BDDMockito.given;
 
 @ExtendWith(MockitoExtension.class)
 class FittingGenerationResultEventHandlerTest {
 
     @Mock
     private FittingGenerationResultService resultService;
-
-    @Mock
-    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private FittingGenerationResultEventHandler handler;
@@ -39,7 +32,6 @@ class FittingGenerationResultEventHandlerTest {
                 "코디 설명"
         );
 
-        given(resultService.complete(100L, result)).willReturn(Optional.empty());
         handler.handleSucceeded(new FittingGenerationSucceededEvent(
                 100L,
                 result
@@ -51,7 +43,6 @@ class FittingGenerationResultEventHandlerTest {
     @Test
     @DisplayName("가상피팅 실패 이벤트를 실패 처리 서비스에 전달한다")
     void handleFailedEvent() {
-        given(resultService.fail(100L)).willReturn(Optional.empty());
         handler.handleFailed(new FittingGenerationFailedEvent(
                 100L,
                 "AI_RESPONSE_TIMEOUT",
