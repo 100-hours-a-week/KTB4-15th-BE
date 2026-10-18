@@ -62,6 +62,12 @@ fitting:
     poll-interval: ${FITTING_OUTBOX_POLL_INTERVAL:1s}
     batch-size: ${FITTING_OUTBOX_BATCH_SIZE:20}
     lease-duration: ${FITTING_OUTBOX_LEASE_DURATION:30s}
+  result-consumer:
+    enabled: ${FITTING_RESULT_CONSUMER_ENABLED:false}
+    poll-interval: ${FITTING_RESULT_CONSUMER_POLL_INTERVAL:1s}
+    max-messages: ${FITTING_RESULT_CONSUMER_MAX_MESSAGES:10}
+    wait-time-seconds: ${FITTING_RESULT_CONSUMER_WAIT_TIME_SECONDS:10}
+    visibility-timeout-seconds: ${FITTING_RESULT_CONSUMER_VISIBILITY_TIMEOUT_SECONDS:60}
 
 management:
   endpoints:

@@ -2,6 +2,7 @@ package com.ktb.lookddak.domain.fitting.event;
 
 import com.ktb.lookddak.domain.fitting.service.FittingGenerationResultService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -11,15 +12,18 @@ import org.springframework.stereotype.Component;
 public class FittingGenerationResultEventHandler {
 
     private final FittingGenerationResultService resultService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @EventListener
     public void handleSucceeded(FittingGenerationSucceededEvent event) {
-        resultService.complete(event.getFittingJobId(), event.getResult());
+        resultService.complete(event.getFittingJobId(), event.getResult())
+                .ifPresent(eventPublisher::publishEvent);
     }
 
     @EventListener
     @Async("aiResultPersistenceExecutor")
     public void handleFailed(FittingGenerationFailedEvent event) {
-        resultService.fail(event.getFittingJobId());
+        resultService.fail(event.getFittingJobId())
+                .ifPresent(eventPublisher::publishEvent);
     }
 }

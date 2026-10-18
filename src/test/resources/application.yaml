@@ -64,6 +64,12 @@ fitting:
     poll-interval: 1s
     batch-size: 20
     lease-duration: 30s
+  result-consumer:
+    enabled: false
+    poll-interval: 1s
+    max-messages: 10
+    wait-time-seconds: 10
+    visibility-timeout-seconds: 60
 
 sentry:
   dsn: ""
