@@ -1,5 +1,6 @@
 package com.ktb.lookddak.global.aws.sqs;
 
+import com.ktb.lookddak.domain.fitting.mq.outbox.FittingOutboxProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -7,7 +8,7 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Configuration
-@EnableConfigurationProperties(SqsProperties.class)
+@EnableConfigurationProperties({SqsProperties.class, FittingOutboxProperties.class})
 public class SqsConfig {
 
     @Bean

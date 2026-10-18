@@ -57,6 +57,14 @@ aws:
     region: ap-northeast-2
     presigned-url-expiration: 10m
 
+fitting:
+  outbox:
+    enabled: false
+    server-id: test-server
+    poll-interval: 1s
+    batch-size: 20
+    lease-duration: 30s
+
 sentry:
   dsn: ""
   logging:

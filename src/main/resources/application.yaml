@@ -55,6 +55,14 @@ aws:
     region: ${AWS_REGION:ap-northeast-2}
     presigned-url-expiration: 10m
 
+fitting:
+  outbox:
+    enabled: ${FITTING_OUTBOX_ENABLED:false}
+    server-id: ${FITTING_OUTBOX_SERVER_ID:${HOSTNAME:local}}
+    poll-interval: ${FITTING_OUTBOX_POLL_INTERVAL:1s}
+    batch-size: ${FITTING_OUTBOX_BATCH_SIZE:20}
+    lease-duration: ${FITTING_OUTBOX_LEASE_DURATION:30s}
+
 management:
   endpoints:
     web:
