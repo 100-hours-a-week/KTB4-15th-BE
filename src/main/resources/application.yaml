@@ -46,10 +46,28 @@ ai:
     await-termination: ${AI_RESULT_PERSISTENCE_AWAIT_TERMINATION:30s}
 
 aws:
+  sqs:
+    region: ${AWS_REGION:ap-northeast-2}
+    fitting-request-queue-url: ${BE_FITTING_REQUEST_QUEUE_URL:}
+    fitting-response-queue-url: ${BE_FITTING_RESPONSE_QUEUE_URL:}
   s3:
     bucket: ${AWS_S3_BUCKET}
     region: ${AWS_REGION:ap-northeast-2}
     presigned-url-expiration: 10m
+
+fitting:
+  outbox:
+    enabled: ${FITTING_OUTBOX_ENABLED:false}
+    server-id: ${FITTING_OUTBOX_SERVER_ID:${HOSTNAME:local}}
+    poll-interval: ${FITTING_OUTBOX_POLL_INTERVAL:1s}
+    batch-size: ${FITTING_OUTBOX_BATCH_SIZE:20}
+    lease-duration: ${FITTING_OUTBOX_LEASE_DURATION:30s}
+  result-consumer:
+    enabled: ${FITTING_RESULT_CONSUMER_ENABLED:false}
+    poll-interval: ${FITTING_RESULT_CONSUMER_POLL_INTERVAL:1s}
+    max-messages: ${FITTING_RESULT_CONSUMER_MAX_MESSAGES:10}
+    wait-time-seconds: ${FITTING_RESULT_CONSUMER_WAIT_TIME_SECONDS:10}
+    visibility-timeout-seconds: ${FITTING_RESULT_CONSUMER_VISIBILITY_TIMEOUT_SECONDS:60}
 
 management:
   endpoints:
