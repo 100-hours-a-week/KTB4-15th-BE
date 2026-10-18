@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class FittingJobResponseTest {
 
     @Test
-    @DisplayName("생성된 가상피팅 작업의 ID와 GENERATING 상태를 반환한다")
+    @DisplayName("생성된 가상피팅 작업의 ID와 PENDING 상태를 반환한다")
     void createFittingJobResponse() {
         FittingJob fittingJob = createFittingJob(123L);
 
@@ -30,7 +30,7 @@ class FittingJobResponseTest {
 
         assertThat(response.getFittingJobId()).isEqualTo(123L);
         assertThat(response.getStatus())
-                .isEqualTo(FittingJobStatus.GENERATING);
+                .isEqualTo(FittingJobStatus.PENDING);
     }
 
     @Test
@@ -46,7 +46,7 @@ class FittingJobResponseTest {
                 FittingJobStatusResponse.from(failedJob, null);
 
         assertThat(generatingResponse.getStatus())
-                .isEqualTo(FittingJobStatus.GENERATING);
+                .isEqualTo(FittingJobStatus.PENDING);
         assertThat(generatingResponse.getResult()).isNull();
         assertThat(failedResponse.getStatus())
                 .isEqualTo(FittingJobStatus.FAILED);

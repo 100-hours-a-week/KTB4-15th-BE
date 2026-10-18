@@ -52,7 +52,7 @@ class FittingJobCurrentServiceTest {
         Product product = product(10L);
         given(fittingJobRepository.findCurrentJobs(
                 eq(1L),
-                eq(FittingJobStatus.GENERATING),
+                eq(FittingJobStatus.PENDING),
                 eq(FittingJobStatus.COMPLETED),
                 eq(FittingJobStatus.FAILED),
                 any(LocalDateTime.class),
@@ -70,7 +70,7 @@ class FittingJobCurrentServiceTest {
 
         assertThat(response.getFittingJobId()).isEqualTo(100L);
         assertThat(response.getStatus()).isEqualTo(
-                FittingJobStatus.GENERATING
+                FittingJobStatus.PENDING
         );
         assertThat(response.isResultViewed()).isFalse();
         assertThat(response.getProducts()).singleElement().satisfies(item -> {
@@ -84,7 +84,7 @@ class FittingJobCurrentServiceTest {
     void returnNullWhenNoCurrentFittingJob() {
         given(fittingJobRepository.findCurrentJobs(
                 eq(1L),
-                eq(FittingJobStatus.GENERATING),
+                eq(FittingJobStatus.PENDING),
                 eq(FittingJobStatus.COMPLETED),
                 eq(FittingJobStatus.FAILED),
                 any(LocalDateTime.class),

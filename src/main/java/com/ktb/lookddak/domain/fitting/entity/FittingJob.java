@@ -47,9 +47,15 @@ public class FittingJob extends BaseEntity {
     @Column(name = "result_viewed_at")
     private LocalDateTime resultViewedAt;
 
+    @Column(name = "failure_code", length = 100)
+    private String failureCode;
+
+    @Column(name = "failure_message", columnDefinition = "TEXT")
+    private String failureMessage;
+
     private FittingJob(Member member) {
         this.member = member;
-        this.status = FittingJobStatus.GENERATING;
+        this.status = FittingJobStatus.PENDING;
     }
 
     public static FittingJob create(Member member) {
@@ -65,7 +71,13 @@ public class FittingJob extends BaseEntity {
     }
 
     public void failGeneration() {
+        failGeneration(null, null);
+    }
+
+    public void failGeneration(String failureCode, String failureMessage) {
         updateStatus(FittingJobStatus.FAILED);
+        this.failureCode = failureCode;
+        this.failureMessage = failureMessage;
     }
 
     public void markResultViewed(LocalDateTime viewedAt) {
@@ -79,9 +91,9 @@ public class FittingJob extends BaseEntity {
     }
 
     private void updateStatus(FittingJobStatus status) {
-        if (this.status != FittingJobStatus.GENERATING) {
+        if (this.status != FittingJobStatus.PENDING) {
             throw new IllegalStateException(
-                    "생성 중인 가상피팅 작업만 상태를 변경할 수 있습니다."
+                    "대기 중인 가상피팅 작업만 상태를 변경할 수 있습니다."
             );
         }
 
