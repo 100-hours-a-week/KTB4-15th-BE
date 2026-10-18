@@ -34,6 +34,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -105,6 +106,7 @@ public class FittingJobService {
                         ErrorCode.MEMBER_PROFILE_NOT_FOUND
                 ));
 
+        Instant requestedAt = Instant.now();
         FittingJob fittingJob = fittingJobRepository.save(
                 FittingJob.create(member)
         );
@@ -122,6 +124,7 @@ public class FittingJobService {
                 fittingJob.getId(),
                 serializeRequestMessage(
                         fittingJob.getId(),
+                        requestedAt,
                         memberProfile,
                         requestedProducts,
                         productsById
@@ -134,6 +137,7 @@ public class FittingJobService {
 
     private String serializeRequestMessage(
             Long fittingJobId,
+            Instant requestedAt,
             MemberProfile memberProfile,
             LinkedHashMap<Long, ProductItemType> requestedProducts,
             Map<Long, Product> productsById
@@ -148,6 +152,7 @@ public class FittingJobService {
         try {
             return objectMapper.writeValueAsString(new FittingRequestMessage(
                     fittingJobId,
+                    requestedAt.toString(),
                     memberProfile.getFullBodyImageKey(),
                     products
             ));

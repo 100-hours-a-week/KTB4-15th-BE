@@ -16,6 +16,7 @@ class FittingMessageTest {
     void serializeRequestWithFittingJobIdAndImageKey() {
         FittingRequestMessage message = new FittingRequestMessage(
                 123L,
+                "2026-10-18T06:00:00Z",
                 "members/1/full-body.png",
                 List.of(
                         new FittingRequestProductMessage("000001"),
@@ -26,7 +27,7 @@ class FittingMessageTest {
         String json = objectMapper.writeValueAsString(message);
 
         assertThat(json).isEqualTo("""
-                {"fitting_job_id":123,"user_image_key":"members/1/full-body.png","products":[{"product_code":"000001"},{"product_code":"000002"}]}
+                {"fitting_job_id":123,"requested_at":"2026-10-18T06:00:00Z","user_image_key":"members/1/full-body.png","products":[{"product_code":"000001"},{"product_code":"000002"}]}
                 """.strip());
     }
 

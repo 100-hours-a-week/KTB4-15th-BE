@@ -105,11 +105,11 @@ class FittingAiPipelineIntegrationTest {
         assertThat(fittingJob.getStatus()).isEqualTo(FittingJobStatus.PENDING);
         assertThat(outboxEvent.getAggregateId()).isEqualTo(fittingJob.getId());
         assertThat(outboxEvent.getStatus()).isEqualTo(OutboxEventStatus.PENDING);
-        assertThat(outboxEvent.getPayload()).isEqualTo(
-                "{\"fitting_job_id\":%d,\"user_image_key\":\"profiles/member.png\","
-                        .formatted(fittingJob.getId())
-                        + "\"products\":[{\"product_code\":\"1234333\"}]}"
-        );
+        assertThat(outboxEvent.getPayload())
+                .startsWith("{\"fitting_job_id\":%d,\"requested_at\":\""
+                        .formatted(fittingJob.getId()))
+                .endsWith("\",\"user_image_key\":\"profiles/member.png\","
+                        + "\"products\":[{\"product_code\":\"1234333\"}]}");
     }
 
     @Test

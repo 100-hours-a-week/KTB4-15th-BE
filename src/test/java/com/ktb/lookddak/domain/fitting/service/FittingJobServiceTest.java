@@ -149,11 +149,11 @@ class FittingJobServiceTest {
                 ArgumentCaptor.forClass(OutboxEvent.class);
         verify(outboxEventRepository).save(eventCaptor.capture());
         assertThat(eventCaptor.getValue().getAggregateId()).isEqualTo(100L);
-        assertThat(eventCaptor.getValue().getPayload()).isEqualTo(
-                "{\"fitting_job_id\":100,\"user_image_key\":\"members/1/full-body.png\","
+        assertThat(eventCaptor.getValue().getPayload())
+                .startsWith("{\"fitting_job_id\":100,\"requested_at\":\"")
+                .endsWith("\",\"user_image_key\":\"members/1/full-body.png\","
                         + "\"products\":[{\"product_code\":\"product-10\"},"
-                        + "{\"product_code\":\"product-20\"}]}"
-        );
+                        + "{\"product_code\":\"product-20\"}]}");
     }
 
     @Test
