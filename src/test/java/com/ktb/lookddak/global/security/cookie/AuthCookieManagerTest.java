@@ -32,7 +32,7 @@ class AuthCookieManagerTest {
     }
 
     @Test
-    @DisplayName("Access Token과 Refresh Token을 HttpOnly 쿠키로 추가한다")
+    @DisplayName("Access Token과 두 경로의 Refresh Token을 HttpOnly 쿠키로 추가한다")
     void addLoginCookies() {
         MockHttpServletResponse response = new MockHttpServletResponse();
         LoginTokens tokens = new LoginTokens("access-token", "refresh-token");
@@ -40,7 +40,7 @@ class AuthCookieManagerTest {
         authCookieManager.addAuthCookies(response, tokens);
 
         List<String> cookies = response.getHeaders(HttpHeaders.SET_COOKIE);
-        assertThat(cookies).hasSize(2);
+        assertThat(cookies).hasSize(3);
         assertThat(cookies.get(0))
                 .contains("accessToken=access-token")
                 .contains("Path=/")
@@ -49,6 +49,13 @@ class AuthCookieManagerTest {
                 .contains("SameSite=Lax")
                 .doesNotContain("Secure");
         assertThat(cookies.get(1))
+                .contains("refreshToken=refresh-token")
+                .contains("Path=/bff/auth")
+                .contains("Max-Age=1209600")
+                .contains("HttpOnly")
+                .contains("SameSite=Lax")
+                .doesNotContain("Secure");
+        assertThat(cookies.get(2))
                 .contains("refreshToken=refresh-token")
                 .contains("Path=/api/v1/auth")
                 .contains("Max-Age=1209600")
@@ -72,14 +79,14 @@ class AuthCookieManagerTest {
     }
 
     @Test
-    @DisplayName("로그아웃 시 Access Token과 Refresh Token 쿠키를 삭제한다")
+    @DisplayName("로그아웃 시 Access Token과 두 경로의 Refresh Token 쿠키를 삭제한다")
     void clearAuthCookies() {
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         authCookieManager.clearAuthCookies(response);
 
         List<String> cookies = response.getHeaders(HttpHeaders.SET_COOKIE);
-        assertThat(cookies).hasSize(2);
+        assertThat(cookies).hasSize(3);
         assertThat(cookies.get(0))
                 .contains("accessToken=")
                 .contains("Path=/")
@@ -87,6 +94,12 @@ class AuthCookieManagerTest {
                 .contains("HttpOnly")
                 .contains("SameSite=Lax");
         assertThat(cookies.get(1))
+                .contains("refreshToken=")
+                .contains("Path=/bff/auth")
+                .contains("Max-Age=0")
+                .contains("HttpOnly")
+                .contains("SameSite=Lax");
+        assertThat(cookies.get(2))
                 .contains("refreshToken=")
                 .contains("Path=/api/v1/auth")
                 .contains("Max-Age=0")
