@@ -72,6 +72,9 @@ class FittingJobCurrentServiceTest {
         assertThat(response.getStatus()).isEqualTo(
                 FittingJobStatus.GENERATING
         );
+        assertThat(response.getCreatedAt()).isEqualTo(
+                LocalDateTime.of(2026, 10, 20, 12, 0)
+        );
         assertThat(response.isResultViewed()).isFalse();
         assertThat(response.getProducts()).singleElement().satisfies(item -> {
             assertThat(item.getProductId()).isEqualTo(10L);
@@ -99,6 +102,11 @@ class FittingJobCurrentServiceTest {
         ReflectionTestUtils.setField(member, "id", 1L);
         FittingJob fittingJob = FittingJob.create(member);
         ReflectionTestUtils.setField(fittingJob, "id", fittingJobId);
+        ReflectionTestUtils.setField(
+                fittingJob,
+                "createdAt",
+                LocalDateTime.of(2026, 10, 20, 12, 0)
+        );
         return fittingJob;
     }
 
