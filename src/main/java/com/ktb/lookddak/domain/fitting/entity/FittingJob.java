@@ -47,6 +47,12 @@ public class FittingJob extends BaseEntity {
     @Column(name = "result_viewed_at")
     private LocalDateTime resultViewedAt;
 
+    @Column(name = "failure_code", length = 100)
+    private String failureCode;
+
+    @Column(name = "failure_message", columnDefinition = "TEXT")
+    private String failureMessage;
+
     private FittingJob(Member member) {
         this.member = member;
         this.status = FittingJobStatus.GENERATING;
@@ -65,7 +71,13 @@ public class FittingJob extends BaseEntity {
     }
 
     public void failGeneration() {
+        failGeneration(null, null);
+    }
+
+    public void failGeneration(String failureCode, String failureMessage) {
         updateStatus(FittingJobStatus.FAILED);
+        this.failureCode = failureCode;
+        this.failureMessage = failureMessage;
     }
 
     public void markResultViewed(LocalDateTime viewedAt) {
