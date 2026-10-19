@@ -104,7 +104,8 @@ class MemberProfileControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "name": "김민준"
+                                  "name": "김민준",
+                                  "priceAlertEnabled": true
                                 }
                                 """))
                 .andExpect(status().isCreated())
