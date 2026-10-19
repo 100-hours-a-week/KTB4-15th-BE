@@ -101,6 +101,38 @@ class MemberProfileServiceTest {
     }
 
     @Test
+    @DisplayName("이름만으로 프로필을 생성할 수 있다")
+    void createProfileWithNameOnly() {
+        Member member = createMember(1L, "member@lookddak.com");
+        MemberProfileCreateRequest request = new MemberProfileCreateRequest(
+                "John Doe", null, null, null, null, false
+        );
+
+        given(memberRepository.findByIdAndDeletedAtIsNull(1L))
+                .willReturn(Optional.of(member));
+        given(memberProfileRepository.existsByMemberId(1L)).willReturn(false);
+        given(memberProfileRepository.save(any(MemberProfile.class)))
+                .willAnswer(invocation -> {
+                    MemberProfile profile = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(profile, "id", 10L);
+                    return profile;
+                });
+
+        memberProfileService.createProfile(1L, request);
+
+        ArgumentCaptor<MemberProfile> profileCaptor =
+                ArgumentCaptor.forClass(MemberProfile.class);
+        verify(memberProfileRepository).save(profileCaptor.capture());
+        assertThat(profileCaptor.getValue().getAge()).isNull();
+        assertThat(profileCaptor.getValue().getHeight()).isNull();
+        assertThat(profileCaptor.getValue().getWeight()).isNull();
+        assertThat(profileCaptor.getValue().getFullBodyImageKey()).isNull();
+        verify(validationRepository, never()).findById(any());
+        verify(validationRepository, never()).delete(any());
+        assertThat(member.isPriceAlertEnabled()).isFalse();
+    }
+
+    @Test
     @DisplayName("이미 프로필이 존재하면 생성을 거부한다")
     void rejectDuplicatedProfile() {
         Member member = createMember(1L, "member@lookddak.com");

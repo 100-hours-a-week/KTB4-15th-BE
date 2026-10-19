@@ -79,9 +79,16 @@ public class FittingJobService {
             );
         }
 
-        if (!memberProfileRepository.existsByMemberId(memberId)) {
+        MemberProfile memberProfile = memberProfileRepository
+                .findByMemberId(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.MEMBER_PROFILE_NOT_FOUND
+                ));
+
+        if (memberProfile.getFullBodyImageKey() == null
+                || memberProfile.getFullBodyImageKey().isBlank()) {
             throw new BusinessException(
-                    ErrorCode.MEMBER_PROFILE_NOT_FOUND
+                    ErrorCode.FULL_BODY_IMAGE_REQUIRED_FOR_FITTING
             );
         }
 
@@ -100,12 +107,6 @@ public class FittingJobService {
 
         validateProductTypes(requestedProducts, productsById);
         validateFittingCandidates(memberId, requestedProducts.keySet());
-        MemberProfile memberProfile = memberProfileRepository
-                .findByMemberId(memberId)
-                .orElseThrow(() -> new BusinessException(
-                        ErrorCode.MEMBER_PROFILE_NOT_FOUND
-                ));
-
         Instant requestedAt = Instant.now();
         FittingJob fittingJob = fittingJobRepository.save(
                 FittingJob.create(member)

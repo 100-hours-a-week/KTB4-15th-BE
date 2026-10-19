@@ -43,6 +43,8 @@ class ErrorCodeTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(ErrorCode.FITTING_PRODUCT_NOT_CANDIDATE.getStatus())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.FULL_BODY_IMAGE_REQUIRED_FOR_FITTING.getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(ErrorCode.FITTING_JOB_ALREADY_GENERATING.getStatus())
                 .isEqualTo(HttpStatus.CONFLICT);
         assertThat(ErrorCode.FITTING_JOB_NOT_FOUND.getStatus())

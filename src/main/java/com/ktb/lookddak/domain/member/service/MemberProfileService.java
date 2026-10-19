@@ -40,12 +40,17 @@ public class MemberProfileService {
             throw new BusinessException(ErrorCode.MEMBER_PROFILE_ALREADY_EXISTS);
         }
 
-        FullBodyImageValidation validation = validationRepository
-                .findById(request.getFullBodyImageValidationId())
-                .filter(result -> result.isOwnedBy(memberId))
-                .orElseThrow(() ->
-                        new BusinessException(ErrorCode.INVALID_FULL_BODY_IMAGE)
-                );
+        FullBodyImageValidation validation = null;
+        String fullBodyImageKey = null;
+        if (request.getFullBodyImageValidationId() != null) {
+            validation = validationRepository
+                    .findById(request.getFullBodyImageValidationId())
+                    .filter(result -> result.isOwnedBy(memberId))
+                    .orElseThrow(() -> new BusinessException(
+                            ErrorCode.INVALID_FULL_BODY_IMAGE
+                    ));
+            fullBodyImageKey = validation.getImageKey();
+        }
 
         MemberProfile profile = MemberProfile.create(
                 member,
@@ -53,14 +58,16 @@ public class MemberProfileService {
                 request.getAge(),
                 request.getHeight(),
                 request.getWeight(),
-                validation.getImageKey()
+                fullBodyImageKey
         );
 
         MemberProfile savedProfile = memberProfileRepository.save(profile);
 
         member.updatePriceAlertEnabled(request.getPriceAlertEnabled());
 
-        validationRepository.delete(validation);
+        if (validation != null) {
+            validationRepository.delete(validation);
+        }
 
         return new MemberProfileCreateResponse(savedProfile.getId());
     }
@@ -72,9 +79,7 @@ public class MemberProfileService {
                         ErrorCode.MEMBER_PROFILE_NOT_FOUND
                 ));
 
-        String fullBodyImageUrl = presignedUrlProvider.createGetUrl(
-                profile.getFullBodyImageKey()
-        );
+        String fullBodyImageUrl = createFullBodyImageUrl(profile);
         return MemberProfileGetResponse.from(profile, fullBodyImageUrl);
     }
 
@@ -113,13 +118,19 @@ public class MemberProfileService {
             validationRepository.delete(validation);
         }
 
-        String fullBodyImageUrl = presignedUrlProvider.createGetUrl(
-                profile.getFullBodyImageKey()
-        );
+        String fullBodyImageUrl = createFullBodyImageUrl(profile);
 
         return MemberProfileUpdateResponse.from(
                 profile,
                 fullBodyImageUrl
         );
+    }
+
+    private String createFullBodyImageUrl(MemberProfile profile) {
+        if (profile.getFullBodyImageKey() == null
+                || profile.getFullBodyImageKey().isBlank()) {
+            return null;
+        }
+        return presignedUrlProvider.createGetUrl(profile.getFullBodyImageKey());
     }
 }

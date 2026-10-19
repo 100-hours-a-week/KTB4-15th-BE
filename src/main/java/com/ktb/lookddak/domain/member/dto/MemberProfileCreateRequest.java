@@ -28,24 +28,20 @@ public class MemberProfileCreateRequest {
     @Pattern(regexp = NAME_PATTERN)
     private String name;
 
-    @NotNull
     @Min(1)
     @Max(100)
     private Integer age;
 
-    @NotNull
     @DecimalMin("100.0")
     @DecimalMax("250.0")
     @Digits(integer = 3, fraction = 1)
     private BigDecimal height;
 
-    @NotNull
     @DecimalMin("30.0")
     @DecimalMax("200.0")
     @Digits(integer = 3, fraction = 1)
     private BigDecimal weight;
 
-    @NotNull
     @Positive
     private Long fullBodyImageValidationId;
 

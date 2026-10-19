@@ -101,8 +101,6 @@ class FittingJobServiceTest {
         Product bottom = createProduct(20L, ProductItemType.BOTTOM);
         given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(member));
-        given(memberProfileRepository.existsByMemberId(1L))
-                .willReturn(true);
         given(memberProfileRepository.findByMemberId(1L))
                 .willReturn(Optional.of(createProfile(member)));
         given(fittingJobRepository.existsByMemberIdAndStatus(
@@ -164,8 +162,6 @@ class FittingJobServiceTest {
         Product top = createProduct(10L, ProductItemType.TOP);
         given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(member));
-        given(memberProfileRepository.existsByMemberId(1L))
-                .willReturn(true);
         given(memberProfileRepository.findByMemberId(1L))
                 .willReturn(Optional.of(createProfile(member)));
         given(fittingJobRepository.existsByMemberIdAndStatus(
@@ -222,8 +218,8 @@ class FittingJobServiceTest {
     void rejectWhenJobIsGenerating() {
         given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(createMember(1L)));
-        given(memberProfileRepository.existsByMemberId(1L))
-                .willReturn(true);
+        given(memberProfileRepository.findByMemberId(1L))
+                .willReturn(Optional.of(createProfile(createMember(1L))));
         given(fittingJobRepository.existsByMemberIdAndStatus(
                 1L,
                 FittingJobStatus.GENERATING
@@ -246,8 +242,8 @@ class FittingJobServiceTest {
     void rejectEmptyProductSelection() {
         given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(createMember(1L)));
-        given(memberProfileRepository.existsByMemberId(1L))
-                .willReturn(true);
+        given(memberProfileRepository.findByMemberId(1L))
+                .willReturn(Optional.of(createProfile(createMember(1L))));
         given(fittingJobRepository.existsByMemberIdAndStatus(
                 1L,
                 FittingJobStatus.GENERATING
@@ -347,8 +343,8 @@ class FittingJobServiceTest {
     void rejectMissingMemberProfile() {
         given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(createMember(1L)));
-        given(memberProfileRepository.existsByMemberId(1L))
-                .willReturn(false);
+        given(memberProfileRepository.findByMemberId(1L))
+                .willReturn(Optional.empty());
 
         assertBusinessException(
                 () -> fittingJobService.createFittingJob(
@@ -365,8 +361,8 @@ class FittingJobServiceTest {
     private void givenReadyMember() {
         given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(createMember(1L)));
-        given(memberProfileRepository.existsByMemberId(1L))
-                .willReturn(true);
+        given(memberProfileRepository.findByMemberId(1L))
+                .willReturn(Optional.of(createProfile(createMember(1L))));
         given(fittingJobRepository.existsByMemberIdAndStatus(
                 1L,
                 FittingJobStatus.GENERATING
@@ -405,6 +401,30 @@ class FittingJobServiceTest {
                 new BigDecimal("65.0"),
                 "members/1/full-body.png"
         );
+    }
+
+    @Test
+    @DisplayName("전신사진이 없는 회원은 가상피팅 작업과 Outbox를 생성할 수 없다")
+    void rejectFittingJobWithoutFullBodyImage() {
+        Member member = createMember(1L);
+        MemberProfile profile = MemberProfile.create(
+                member, "테스트 회원", null, null, null, null
+        );
+        given(memberRepository.findActiveByIdForUpdate(1L))
+                .willReturn(Optional.of(member));
+        given(memberProfileRepository.findByMemberId(1L))
+                .willReturn(Optional.of(profile));
+
+        assertBusinessException(
+                () -> fittingJobService.createFittingJob(
+                        1L, new FittingJobCreateRequest(10L, null)
+                ),
+                ErrorCode.FULL_BODY_IMAGE_REQUIRED_FOR_FITTING
+        );
+
+        verify(fittingJobRepository, never()).save(any());
+        verify(outboxEventRepository, never()).save(any());
+        verifyNoInteractions(productRepository, fittingCandidateRepository);
     }
 
     private void assertBusinessException(

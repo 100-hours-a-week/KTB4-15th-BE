@@ -40,16 +40,16 @@ public class MemberProfile extends BaseEntity {
     @Column(nullable = false, length = 10)
     private String name;
 
-    @Column(nullable = false)
+    @Column
     private Integer age;
 
-    @Column(nullable = false, precision = 5, scale = 1)
+    @Column(precision = 5, scale = 1)
     private BigDecimal height;
 
-    @Column(nullable = false, precision = 5, scale = 1)
+    @Column(precision = 5, scale = 1)
     private BigDecimal weight;
 
-    @Column(name = "full_body_image_key", nullable = false, length = 1024)
+    @Column(name = "full_body_image_key", length = 1024)
     private String fullBodyImageKey;
 
     private MemberProfile(

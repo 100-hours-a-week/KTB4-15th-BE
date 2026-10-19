@@ -95,6 +95,25 @@ class MemberProfileControllerTest {
     }
 
     @Test
+    @DisplayName("이름만 전달해도 기본정보를 등록할 수 있다")
+    void createProfileWithNameOnly() throws Exception {
+        given(memberProfileService.createProfile(any(), any()))
+                .willReturn(new MemberProfileCreateResponse(10L));
+
+        mockMvc.perform(post("/api/v1/members/me/profile")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "김민준"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value("CREATED"));
+
+        verify(memberProfileService).createProfile(eq(1L), any());
+    }
+
+    @Test
     @DisplayName("인증된 회원의 기본정보를 조회하면 200 OK를 반환한다")
     void getProfile() throws Exception {
         given(memberProfileService.getProfile(1L))
