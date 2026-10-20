@@ -30,6 +30,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.math.BigDecimal;
 import java.util.List;
@@ -47,6 +51,12 @@ import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 class FittingJobServiceTest {
+
+    private static final LocalDate TODAY = LocalDate.of(2026, 10, 21);
+    private static final Clock CLOCK = Clock.fixed(
+            Instant.parse("2026-10-21T00:00:00Z"),
+            ZoneId.of("Asia/Seoul")
+    );
 
     @Mock
     private MemberRepository memberRepository;
@@ -89,7 +99,8 @@ class FittingJobServiceTest {
                 fittingTempResultRepository,
                 outboxEventRepository,
                 presignedUrlProvider,
-                JsonMapper.builder().build()
+                JsonMapper.builder().build(),
+                CLOCK
         );
     }
 
@@ -155,10 +166,11 @@ class FittingJobServiceTest {
     }
 
     @Test
-    @DisplayName("9회 사용한 회원은 마지막 가상피팅 작업을 생성할 수 있다")
+    @DisplayName("24회 사용한 회원은 마지막 가상피팅 작업을 생성할 수 있다")
     void createFittingJobWithTopOnly() {
         Member member = createMember(1L);
-        ReflectionTestUtils.setField(member, "fittingRequestCount", 9);
+        ReflectionTestUtils.setField(member, "fittingRequestCount", 24);
+        ReflectionTestUtils.setField(member, "fittingRequestDate", TODAY);
         Product top = createProduct(10L, ProductItemType.TOP);
         given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(member));
@@ -187,15 +199,16 @@ class FittingJobServiceTest {
                 );
 
         assertThat(response.getFittingJobId()).isEqualTo(100L);
-        assertThat(member.getFittingRequestCount()).isEqualTo(10);
+        assertThat(member.getFittingRequestCount()).isEqualTo(25);
         verify(fittingJobProductRepository).saveAll(any());
     }
 
     @Test
-    @DisplayName("가상피팅을 10회 요청한 회원은 새로운 작업을 생성할 수 없다")
+    @DisplayName("가상피팅을 하루 25회 요청한 회원은 새로운 작업을 생성할 수 없다")
     void rejectFittingRequestLimit() {
         Member member = createMember(1L);
-        ReflectionTestUtils.setField(member, "fittingRequestCount", 10);
+        ReflectionTestUtils.setField(member, "fittingRequestCount", 25);
+        ReflectionTestUtils.setField(member, "fittingRequestDate", TODAY);
         given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(member));
 
@@ -207,7 +220,7 @@ class FittingJobServiceTest {
                 ErrorCode.FITTING_REQUEST_LIMIT_EXCEEDED
         );
 
-        assertThat(member.getFittingRequestCount()).isEqualTo(10);
+        assertThat(member.getFittingRequestCount()).isEqualTo(25);
         verifyNoInteractions(memberProfileRepository);
         verify(fittingJobRepository, never()).save(any());
         verify(outboxEventRepository, never()).save(any());
@@ -425,6 +438,33 @@ class FittingJobServiceTest {
         verify(fittingJobRepository, never()).save(any());
         verify(outboxEventRepository, never()).save(any());
         verifyNoInteractions(productRepository, fittingCandidateRepository);
+    }
+
+    @Test
+    @DisplayName("전날 이용 횟수가 25회여도 오늘 첫 요청에서 일일 사용량을 초기화한다")
+    void resetDailyQuotaOnFirstRequestOfNewDay() {
+        Member member = createMember(1L);
+        ReflectionTestUtils.setField(member, "fittingRequestCount", 25);
+        ReflectionTestUtils.setField(member, "fittingRequestDate", TODAY.minusDays(1));
+        Product top = createProduct(10L, ProductItemType.TOP);
+        given(memberRepository.findActiveByIdForUpdate(1L)).willReturn(Optional.of(member));
+        given(memberProfileRepository.findByMemberId(1L)).willReturn(Optional.of(createProfile(member)));
+        given(fittingJobRepository.existsByMemberIdAndStatus(1L, FittingJobStatus.GENERATING))
+                .willReturn(false);
+        given(productRepository.findAllById(Set.of(10L))).willReturn(List.of(top));
+        given(fittingCandidateRepository.findProductIdsByMemberIdAndProductIdIn(1L, Set.of(10L)))
+                .willReturn(Set.of(10L));
+        given(fittingJobRepository.save(any(FittingJob.class)))
+                .willAnswer(invocation -> {
+                    FittingJob fittingJob = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(fittingJob, "id", 100L);
+                    return fittingJob;
+                });
+
+        fittingJobService.createFittingJob(1L, new FittingJobCreateRequest(10L, null));
+
+        assertThat(member.getFittingRequestDate()).isEqualTo(TODAY);
+        assertThat(member.getFittingRequestCount()).isEqualTo(1);
     }
 
     private void assertBusinessException(
