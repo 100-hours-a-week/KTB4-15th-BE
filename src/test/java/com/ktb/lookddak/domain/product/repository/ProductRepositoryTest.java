@@ -89,6 +89,46 @@ class ProductRepositoryTest {
     }
 
     @Test
+    @DisplayName("현재 가격이 일치할 때만 직전 가격과 현재 가격을 함께 갱신한다")
+    void updatePriceIfCurrentPriceMatches() {
+        Product product = productRepository.saveAndFlush(createProduct("0000001"));
+        entityManager.clear();
+
+        int updatedRowCount = productRepository.updatePriceIfCurrentPriceMatches(
+                "0000001",
+                49_000,
+                39_000
+        );
+        entityManager.flush();
+        entityManager.clear();
+
+        Product updatedProduct = productRepository.findById(product.getId())
+                .orElseThrow();
+        assertThat(updatedRowCount).isEqualTo(1);
+        assertThat(updatedProduct.getPreviousPrice()).isEqualTo(49_000);
+        assertThat(updatedProduct.getCurrentPrice()).isEqualTo(39_000);
+    }
+
+    @Test
+    @DisplayName("현재 가격이 일치하지 않으면 가격을 갱신하지 않는다")
+    void doNotUpdatePriceWhenCurrentPriceDoesNotMatch() {
+        Product product = productRepository.saveAndFlush(createProduct("0000001"));
+
+        int updatedRowCount = productRepository.updatePriceIfCurrentPriceMatches(
+                "0000001",
+                50_000,
+                39_000
+        );
+        entityManager.clear();
+
+        Product unchangedProduct = productRepository.findById(product.getId())
+                .orElseThrow();
+        assertThat(updatedRowCount).isZero();
+        assertThat(unchangedProduct.getPreviousPrice()).isNull();
+        assertThat(unchangedProduct.getCurrentPrice()).isEqualTo(49_000);
+    }
+
+    @Test
     @DisplayName("클릭 수가 있는 상품만 클릭 수 내림차순과 상품 ID 오름차순으로 조회한다")
     void findClickRankings() {
         Product firstProduct = productRepository.saveAndFlush(

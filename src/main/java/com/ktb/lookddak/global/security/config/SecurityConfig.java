@@ -1,6 +1,8 @@
 package com.ktb.lookddak.global.security.config;
 
 import com.ktb.lookddak.global.security.cookie.AuthCookieProperties;
+import com.ktb.lookddak.global.security.internal.InternalApiKeyFilter;
+import com.ktb.lookddak.global.security.internal.InternalApiKeyProperties;
 import com.ktb.lookddak.global.security.jwt.JwtAuthenticationFilter;
 import com.ktb.lookddak.global.security.handler.CustomAccessDeniedHandler;
 import com.ktb.lookddak.global.security.handler.CustomAuthenticationEntryPoint;
@@ -20,7 +22,10 @@ import org.springframework.web.cors.CorsConfigurationSource;
 
 @Configuration
 @RequiredArgsConstructor
-@EnableConfigurationProperties(AuthCookieProperties.class)
+@EnableConfigurationProperties({
+        AuthCookieProperties.class,
+        InternalApiKeyProperties.class
+})
 public class SecurityConfig {
 
     private static final String[] PUBLIC_AUTH_ENDPOINTS = {
@@ -31,6 +36,7 @@ public class SecurityConfig {
     };
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final InternalApiKeyFilter internalApiKeyFilter;
     private final CustomAuthenticationEntryPoint authenticationEntryPoint;
     private final CustomAccessDeniedHandler accessDeniedHandler;
     private final CorsConfigurationSource corsConfigurationSource;
@@ -61,7 +67,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.POST, PUBLIC_AUTH_ENDPOINTS).permitAll()
+                        .requestMatchers("/api/v1/internal/**").hasRole("INTERNAL")
                         .anyRequest().authenticated()
+                )
+                .addFilterBefore(
+                        internalApiKeyFilter,
+                        UsernamePasswordAuthenticationFilter.class
                 )
                 .addFilterBefore(
                         jwtAuthenticationFilter,
