@@ -20,6 +20,10 @@ auth:
     secure: true
     same-site: Lax
 
+internal:
+  api:
+    key: ${INTERNAL_API_KEY:}
+
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS}
 
