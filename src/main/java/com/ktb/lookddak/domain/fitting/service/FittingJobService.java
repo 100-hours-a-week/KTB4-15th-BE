@@ -35,6 +35,8 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 import java.time.Instant;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -47,7 +49,7 @@ import java.util.Set;
 @Transactional(readOnly = true)
 public class FittingJobService {
 
-    private static final int MAX_FITTING_REQUEST_COUNT = 10;
+    private static final int MAX_DAILY_FITTING_REQUEST_COUNT = 25;
 
     private final MemberRepository memberRepository;
     private final MemberProfileRepository memberProfileRepository;
@@ -59,6 +61,7 @@ public class FittingJobService {
     private final OutboxEventRepository outboxEventRepository;
     private final S3PresignedUrlProvider presignedUrlProvider;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     @Transactional
     public FittingJobCreateResponse createFittingJob(
@@ -71,8 +74,10 @@ public class FittingJobService {
                         new BusinessException(ErrorCode.RESOURCE_NOT_FOUND)
                 );
 
+        LocalDate today = LocalDate.now(clock);
         if (member.hasReachedFittingRequestLimit(
-                MAX_FITTING_REQUEST_COUNT
+                today,
+                MAX_DAILY_FITTING_REQUEST_COUNT
         )) {
             throw new BusinessException(
                     ErrorCode.FITTING_REQUEST_LIMIT_EXCEEDED
@@ -107,9 +112,10 @@ public class FittingJobService {
 
         validateProductTypes(requestedProducts, productsById);
         validateFittingCandidates(memberId, requestedProducts.keySet());
-        Instant requestedAt = Instant.now();
+        Instant requestedAt = Instant.now(clock);
+        member.consumeFittingRequestQuota(today);
         FittingJob fittingJob = fittingJobRepository.save(
-                FittingJob.create(member)
+                FittingJob.create(member, today)
         );
 
         List<FittingJobProduct> jobProducts = new ArrayList<>();
@@ -120,7 +126,6 @@ public class FittingJobService {
             ));
         }
         fittingJobProductRepository.saveAll(jobProducts);
-        member.increaseFittingRequestCount();
         outboxEventRepository.save(OutboxEvent.fittingRequest(
                 fittingJob.getId(),
                 serializeRequestMessage(

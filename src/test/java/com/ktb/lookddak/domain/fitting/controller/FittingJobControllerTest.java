@@ -178,7 +178,7 @@ class FittingJobControllerTest {
                         .value("FITTING_REQUEST_LIMIT_EXCEEDED"))
                 .andExpect(jsonPath("$.data").isEmpty())
                 .andExpect(jsonPath("$.message")
-                        .value("가상피팅은 최대 10회까지 요청할 수 있습니다."));
+                        .value("가상피팅은 하루 최대 25회까지 요청할 수 있습니다."));
     }
 
     @Test
