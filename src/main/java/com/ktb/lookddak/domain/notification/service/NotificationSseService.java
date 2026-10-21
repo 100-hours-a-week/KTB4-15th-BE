@@ -34,6 +34,12 @@ public class NotificationSseService {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MILLIS);
 
         register(memberId, connectionId, emitter);
+        log.info(
+                "NOTIFICATION_SSE_CONNECTED memberId={} connectionId={} unreadCount={}",
+                memberId,
+                connectionId,
+                unreadCount
+        );
         sendConnectedEvent(memberId, connectionId, emitter, unreadCount);
         return emitter;
     }
@@ -73,9 +79,31 @@ public class NotificationSseService {
         emittersByMember.computeIfAbsent(memberId, ignored -> new ConcurrentHashMap<>())
                 .put(connectionId, emitter);
 
-        emitter.onCompletion(() -> remove(memberId, connectionId, emitter));
-        emitter.onTimeout(() -> remove(memberId, connectionId, emitter));
-        emitter.onError(exception -> remove(memberId, connectionId, emitter));
+        emitter.onCompletion(() -> {
+            log.info(
+                    "NOTIFICATION_SSE_COMPLETED memberId={} connectionId={}",
+                    memberId,
+                    connectionId
+            );
+            remove(memberId, connectionId, emitter);
+        });
+        emitter.onTimeout(() -> {
+            log.warn(
+                    "NOTIFICATION_SSE_TIMEOUT memberId={} connectionId={}",
+                    memberId,
+                    connectionId
+            );
+            remove(memberId, connectionId, emitter);
+        });
+        emitter.onError(exception -> {
+            log.warn(
+                    "NOTIFICATION_SSE_ERROR memberId={} connectionId={}",
+                    memberId,
+                    connectionId,
+                    exception
+            );
+            remove(memberId, connectionId, emitter);
+        });
     }
 
     private void sendConnectedEvent(
@@ -102,6 +130,13 @@ public class NotificationSseService {
     ) {
         try {
             emitter.send(SseEmitter.event().name(eventName).data(data));
+            if ("connected".equals(eventName)) {
+                log.info(
+                        "NOTIFICATION_SSE_CONNECTED_EVENT_SENT memberId={} connectionId={}",
+                        memberId,
+                        connectionId
+                );
+            }
         } catch (IOException exception) {
             log.info(
                     "NOTIFICATION_SSE_SEND_FAILED memberId={} connectionId={} event={}",
