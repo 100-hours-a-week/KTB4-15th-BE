@@ -6,6 +6,7 @@ import com.ktb.lookddak.global.security.internal.InternalApiKeyProperties;
 import com.ktb.lookddak.global.security.jwt.JwtAuthenticationFilter;
 import com.ktb.lookddak.global.security.handler.CustomAccessDeniedHandler;
 import com.ktb.lookddak.global.security.handler.CustomAuthenticationEntryPoint;
+import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -65,6 +66,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler)
                 )
                 .authorizeHttpRequests(authorize -> authorize
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/actuator/health",
