@@ -5,6 +5,7 @@ import com.ktb.lookddak.domain.notification.dto.NotificationSseResponse;
 import com.ktb.lookddak.domain.notification.entity.NotificationType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -69,6 +70,23 @@ public class NotificationSseService {
                 "notification",
                 response
         ));
+    }
+
+    /**
+     * 알림이 없는 유휴 시간에도 SSE 연결을 유지하고, 이미 끊긴 연결을 정리한다.
+     * 각 서버는 자신이 JVM 메모리에 보관한 emitter에만 heartbeat를 전송한다.
+     */
+    @Scheduled(fixedDelayString = "${notification.sse.heartbeat-interval:15s}")
+    public void sendHeartbeat() {
+        emittersByMember.forEach((memberId, memberEmitters) ->
+                memberEmitters.forEach((connectionId, emitter) -> send(
+                        memberId,
+                        connectionId,
+                        emitter,
+                        "ping",
+                        "keep-alive"
+                ))
+        );
     }
 
     private void register(
