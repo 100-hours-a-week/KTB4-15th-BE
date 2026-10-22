@@ -42,8 +42,8 @@ class ProductPriceSyncServiceTest {
 
         assertThat(result.partialFailure()).isFalse();
         assertThat(result.response().receivedCount()).isEqualTo(1);
-        assertThat(result.response().failedProductCodes()).isEmpty();
         assertThat(result.response().notFoundProductCodes()).isEmpty();
+        assertThat(result.response().priceConflicts()).isEmpty();
         verify(productRepository).updatePriceIfCurrentPriceMatches("0000001", 89_000, 79_000);
         verify(productRepository, never()).findByProductCode("0000001");
     }
@@ -61,13 +61,13 @@ class ProductPriceSyncServiceTest {
         ProductPriceSyncService.ProductPriceSyncResult result = productPriceSyncService.sync(request);
 
         assertThat(result.partialFailure()).isFalse();
-        assertThat(result.response().failedProductCodes()).isEmpty();
         assertThat(result.response().notFoundProductCodes()).isEmpty();
+        assertThat(result.response().priceConflicts()).isEmpty();
     }
 
     @Test
-    @DisplayName("현재 가격이 oldPrice와 newPrice 모두 다르면 실패 코드로 반환한다")
-    void returnFailedCodeForStalePrice() {
+    @DisplayName("현재 가격이 oldPrice와 newPrice 모두 다르면 가격을 변경하지 않고 충돌 정보를 반환한다")
+    void returnPriceConflictForStalePrice() {
         Product product = product("0000001", 85_000);
         ProductPriceSyncRequest request = request(item("0000001", 89_000, 79_000));
         given(productRepository.updatePriceIfCurrentPriceMatches("0000001", 89_000, 79_000))
@@ -78,8 +78,9 @@ class ProductPriceSyncServiceTest {
         ProductPriceSyncService.ProductPriceSyncResult result = productPriceSyncService.sync(request);
 
         assertThat(result.partialFailure()).isTrue();
-        assertThat(result.response().failedProductCodes()).containsExactly("0000001");
         assertThat(result.response().notFoundProductCodes()).isEmpty();
+        assertThat(result.response().priceConflicts())
+                .containsExactly(new com.ktb.lookddak.domain.product.dto.ProductPriceConflictResponse("0000001", 85_000));
     }
 
     @Test
@@ -94,8 +95,8 @@ class ProductPriceSyncServiceTest {
         ProductPriceSyncService.ProductPriceSyncResult result = productPriceSyncService.sync(request);
 
         assertThat(result.partialFailure()).isTrue();
-        assertThat(result.response().failedProductCodes()).isEmpty();
         assertThat(result.response().notFoundProductCodes()).containsExactly("0000001");
+        assertThat(result.response().priceConflicts()).isEmpty();
     }
 
     @Test
@@ -120,6 +121,15 @@ class ProductPriceSyncServiceTest {
                         item("0000001", 79_000, 69_000)
                 )
         );
+
+        assertThatThrownBy(() -> productPriceSyncService.sync(request))
+                .isInstanceOf(ProductPriceSyncInvalidRequestException.class);
+    }
+
+    @Test
+    @DisplayName("숫자가 아닌 상품 코드 요청을 거절한다")
+    void rejectNonNumericProductCode() {
+        ProductPriceSyncRequest request = request(item("ABC123", 89_000, 79_000));
 
         assertThatThrownBy(() -> productPriceSyncService.sync(request))
                 .isInstanceOf(ProductPriceSyncInvalidRequestException.class);

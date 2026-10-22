@@ -8,6 +8,7 @@ import com.ktb.lookddak.global.response.ApiResponse;
 import com.ktb.lookddak.global.response.SuccessCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -44,5 +45,12 @@ public class InternalProductController {
         return ResponseEntity
                 .badRequest()
                 .body(ApiResponse.failure("INVALID_REQUEST", INVALID_REQUEST_MESSAGE));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidJson(HttpMessageNotReadableException exception) {
+        return ResponseEntity
+                .badRequest()
+                .body(ApiResponse.failure("INVALID_JSON_FORMAT", "요청 JSON 형식이 올바르지 않습니다."));
     }
 }

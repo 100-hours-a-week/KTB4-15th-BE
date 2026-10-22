@@ -6,7 +6,7 @@ import java.util.List;
 
 public record ProductPriceSyncResponse(
         @JsonProperty("received_count") int receivedCount,
-        @JsonProperty("failed_product_codes") List<String> failedProductCodes,
-        @JsonProperty("not_found_product_codes") List<String> notFoundProductCodes
+        @JsonProperty("not_found_product_codes") List<String> notFoundProductCodes,
+        @JsonProperty("price_conflicts") List<ProductPriceConflictResponse> priceConflicts
 ) {
 }

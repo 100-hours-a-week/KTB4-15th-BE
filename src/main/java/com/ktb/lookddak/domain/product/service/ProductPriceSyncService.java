@@ -3,6 +3,7 @@ package com.ktb.lookddak.domain.product.service;
 import com.ktb.lookddak.domain.product.dto.ProductPriceSyncItemRequest;
 import com.ktb.lookddak.domain.product.dto.ProductPriceSyncRequest;
 import com.ktb.lookddak.domain.product.dto.ProductPriceSyncResponse;
+import com.ktb.lookddak.domain.product.dto.ProductPriceConflictResponse;
 import com.ktb.lookddak.domain.product.entity.Product;
 import com.ktb.lookddak.domain.product.exception.ProductPriceSyncInvalidRequestException;
 import com.ktb.lookddak.domain.product.repository.ProductRepository;
@@ -28,8 +29,8 @@ public class ProductPriceSyncService {
     public ProductPriceSyncResult sync(ProductPriceSyncRequest request) {
         validate(request);
 
-        List<String> failedProductCodes = new ArrayList<>();
         List<String> notFoundProductCodes = new ArrayList<>();
+        List<ProductPriceConflictResponse> priceConflicts = new ArrayList<>();
 
         for (ProductPriceSyncItemRequest item : request.getProducts()) {
             int updatedCount = productRepository.updatePriceIfCurrentPriceMatches(
@@ -42,25 +43,25 @@ public class ProductPriceSyncService {
                 continue;
             }
 
-            classifyUnchangedItem(item, failedProductCodes, notFoundProductCodes);
+            classifyUnchangedItem(item, notFoundProductCodes, priceConflicts);
         }
 
         ProductPriceSyncResponse response = new ProductPriceSyncResponse(
                 request.getProducts().size(),
-                List.copyOf(failedProductCodes),
-                List.copyOf(notFoundProductCodes)
+                List.copyOf(notFoundProductCodes),
+                List.copyOf(priceConflicts)
         );
 
         return new ProductPriceSyncResult(
                 response,
-                !failedProductCodes.isEmpty() || !notFoundProductCodes.isEmpty()
+                !notFoundProductCodes.isEmpty() || !priceConflicts.isEmpty()
         );
     }
 
     private void classifyUnchangedItem(
             ProductPriceSyncItemRequest item,
-            List<String> failedProductCodes,
-            List<String> notFoundProductCodes
+            List<String> notFoundProductCodes,
+            List<ProductPriceConflictResponse> priceConflicts
     ) {
         Product product = productRepository.findByProductCode(item.getProductCode())
                 .orElse(null);
@@ -71,7 +72,10 @@ public class ProductPriceSyncService {
         }
 
         if (!product.getCurrentPrice().equals(item.getNewPrice())) {
-            failedProductCodes.add(item.getProductCode());
+            priceConflicts.add(new ProductPriceConflictResponse(
+                    item.getProductCode(),
+                    product.getCurrentPrice()
+            ));
         }
     }
 
@@ -91,6 +95,7 @@ public class ProductPriceSyncService {
                     || item.getProductCode() == null
                     || item.getProductCode().isBlank()
                     || item.getProductCode().length() > MAX_PRODUCT_CODE_LENGTH
+                    || !item.getProductCode().matches("\\d+")
                     || item.getOldPrice() == null
                     || item.getNewPrice() == null
                     || item.getOldPrice() <= 0

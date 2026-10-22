@@ -50,8 +50,8 @@ class InternalProductControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("PRODUCT_PRICE_UPDATE_SUCCESS"))
                 .andExpect(jsonPath("$.data.received_count").value(1))
-                .andExpect(jsonPath("$.data.failed_product_codes").isEmpty())
-                .andExpect(jsonPath("$.data.not_found_product_codes").isEmpty());
+                .andExpect(jsonPath("$.data.not_found_product_codes").isEmpty())
+                .andExpect(jsonPath("$.data.price_conflicts").isEmpty());
     }
 
     @Test
@@ -59,7 +59,11 @@ class InternalProductControllerTest {
     void returnPartialSuccess() throws Exception {
         given(productPriceSyncService.sync(any()))
                 .willReturn(new ProductPriceSyncService.ProductPriceSyncResult(
-                        new ProductPriceSyncResponse(2, List.of("2027362"), List.of("4044872")),
+                        new ProductPriceSyncResponse(
+                                2,
+                                List.of("4044872"),
+                                List.of(new com.ktb.lookddak.domain.product.dto.ProductPriceConflictResponse("2027362", 80_000))
+                        ),
                         true
                 ));
 
@@ -76,8 +80,9 @@ class InternalProductControllerTest {
                                 "\"new_price\":59000}]}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("PRODUCT_PRICE_UPDATE_PARTIAL_SUCCESS"))
-                .andExpect(jsonPath("$.data.failed_product_codes[0]").value("2027362"))
-                .andExpect(jsonPath("$.data.not_found_product_codes[0]").value("4044872"));
+                .andExpect(jsonPath("$.data.not_found_product_codes[0]").value("4044872"))
+                .andExpect(jsonPath("$.data.price_conflicts[0].product_code").value("2027362"))
+                .andExpect(jsonPath("$.data.price_conflicts[0].current_price").value(80_000));
     }
 
     @Test
@@ -91,6 +96,16 @@ class InternalProductControllerTest {
                         .content("{\"changed_count\":0,\"products\":[]}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    @DisplayName("JSON 타입이 올바르지 않으면 INVALID_JSON_FORMAT을 반환한다")
+    void rejectInvalidJsonFormat() throws Exception {
+        mockMvc().perform(patch("/api/v1/internal/products")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"changed_count\":\"one\",\"products\":[]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_JSON_FORMAT"));
     }
 
     private MockMvc mockMvc() {
