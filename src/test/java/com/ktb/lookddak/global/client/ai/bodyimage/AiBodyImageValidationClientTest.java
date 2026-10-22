@@ -185,7 +185,7 @@ class AiBodyImageValidationClientTest {
         AiClientProperties properties = new AiClientProperties(
                 "http://localhost:8000",
                 "internal-key",
-                Duration.ofSeconds(3),
+                Duration.ofSeconds(10),
                 responseTimeout
         );
         return new AiBodyImageValidationClient(
