@@ -9,12 +9,16 @@ import com.ktb.lookddak.domain.fitting.entity.FittingJob;
 import com.ktb.lookddak.domain.fitting.entity.FittingJobProduct;
 import com.ktb.lookddak.domain.fitting.entity.FittingJobStatus;
 import com.ktb.lookddak.domain.fitting.entity.FittingTempResult;
-import com.ktb.lookddak.domain.fitting.event.FittingGenerationRequestedEvent;
+import com.ktb.lookddak.domain.fitting.mq.message.FittingRequestMessage;
+import com.ktb.lookddak.domain.fitting.mq.message.FittingRequestProductMessage;
+import com.ktb.lookddak.domain.fitting.mq.outbox.OutboxEvent;
+import com.ktb.lookddak.domain.fitting.mq.outbox.OutboxEventRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingCandidateRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingJobProductRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingJobRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingTempResultRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
+import com.ktb.lookddak.domain.member.entity.MemberProfile;
 import com.ktb.lookddak.domain.member.repository.MemberRepository;
 import com.ktb.lookddak.domain.member.repository.MemberProfileRepository;
 import com.ktb.lookddak.domain.product.entity.Product;
@@ -25,9 +29,14 @@ import com.ktb.lookddak.global.exception.ErrorCode;
 import com.ktb.lookddak.global.storage.s3.S3PresignedUrlProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
+import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -40,7 +49,7 @@ import java.util.Set;
 @Transactional(readOnly = true)
 public class FittingJobService {
 
-    private static final int MAX_FITTING_REQUEST_COUNT = 10;
+    private static final int MAX_DAILY_FITTING_REQUEST_COUNT = 25;
 
     private final MemberRepository memberRepository;
     private final MemberProfileRepository memberProfileRepository;
@@ -49,31 +58,42 @@ public class FittingJobService {
     private final FittingJobRepository fittingJobRepository;
     private final FittingJobProductRepository fittingJobProductRepository;
     private final FittingTempResultRepository fittingTempResultRepository;
-    private final ApplicationEventPublisher eventPublisher;
+    private final OutboxEventRepository outboxEventRepository;
     private final S3PresignedUrlProvider presignedUrlProvider;
+    private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     @Transactional
     public FittingJobCreateResponse createFittingJob(
             Long memberId,
             FittingJobCreateRequest request
     ) {
-        // 같은 회원의 동시 생성 요청을 직렬화해 GENERATING 작업 중복 생성을 막는다.
+        // 같은 회원의 동시 생성 요청을 직렬화해 생성 중인 작업의 중복 생성을 막는다.
         Member member = memberRepository.findActiveByIdForUpdate(memberId)
                 .orElseThrow(() ->
                         new BusinessException(ErrorCode.RESOURCE_NOT_FOUND)
                 );
 
+        LocalDate today = LocalDate.now(clock);
         if (member.hasReachedFittingRequestLimit(
-                MAX_FITTING_REQUEST_COUNT
+                today,
+                MAX_DAILY_FITTING_REQUEST_COUNT
         )) {
             throw new BusinessException(
                     ErrorCode.FITTING_REQUEST_LIMIT_EXCEEDED
             );
         }
 
-        if (!memberProfileRepository.existsByMemberId(memberId)) {
+        MemberProfile memberProfile = memberProfileRepository
+                .findByMemberId(memberId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.MEMBER_PROFILE_NOT_FOUND
+                ));
+
+        if (memberProfile.getFullBodyImageKey() == null
+                || memberProfile.getFullBodyImageKey().isBlank()) {
             throw new BusinessException(
-                    ErrorCode.MEMBER_PROFILE_NOT_FOUND
+                    ErrorCode.FULL_BODY_IMAGE_REQUIRED_FOR_FITTING
             );
         }
 
@@ -92,9 +112,10 @@ public class FittingJobService {
 
         validateProductTypes(requestedProducts, productsById);
         validateFittingCandidates(memberId, requestedProducts.keySet());
-
+        Instant requestedAt = Instant.now(clock);
+        member.consumeFittingRequestQuota(today);
         FittingJob fittingJob = fittingJobRepository.save(
-                FittingJob.create(member)
+                FittingJob.create(member, today)
         );
 
         List<FittingJobProduct> jobProducts = new ArrayList<>();
@@ -105,12 +126,48 @@ public class FittingJobService {
             ));
         }
         fittingJobProductRepository.saveAll(jobProducts);
-        member.increaseFittingRequestCount();
-        eventPublisher.publishEvent(new FittingGenerationRequestedEvent(
-                fittingJob.getId()
+        outboxEventRepository.save(OutboxEvent.fittingRequest(
+                fittingJob.getId(),
+                serializeRequestMessage(
+                        fittingJob.getId(),
+                        requestedAt,
+                        memberProfile,
+                        requestedProducts,
+                        productsById
+                ),
+                LocalDateTime.now()
         ));
 
         return FittingJobCreateResponse.from(fittingJob);
+    }
+
+    private String serializeRequestMessage(
+            Long fittingJobId,
+            Instant requestedAt,
+            MemberProfile memberProfile,
+            LinkedHashMap<Long, ProductItemType> requestedProducts,
+            Map<Long, Product> productsById
+    ) {
+        List<FittingRequestProductMessage> products = new ArrayList<>();
+        for (Long productId : requestedProducts.keySet()) {
+            products.add(new FittingRequestProductMessage(
+                    productsById.get(productId).getProductCode()
+            ));
+        }
+
+        try {
+            return objectMapper.writeValueAsString(new FittingRequestMessage(
+                    fittingJobId,
+                    requestedAt.toString(),
+                    memberProfile.getFullBodyImageKey(),
+                    products
+            ));
+        } catch (JacksonException exception) {
+            throw new IllegalStateException(
+                    "가상피팅 요청 메시지를 직렬화할 수 없습니다.",
+                    exception
+            );
+        }
     }
 
     public FittingJobStatusResponse getFittingJobStatus(

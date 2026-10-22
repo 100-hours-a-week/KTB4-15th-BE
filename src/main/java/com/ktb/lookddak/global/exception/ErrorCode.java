@@ -48,9 +48,11 @@ public enum ErrorCode {
 
     // Product errors
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."),
+    INVALID_RANKING_TYPE(HttpStatus.BAD_REQUEST, "올바른 랭킹 기준을 선택해주세요."),
 
     // Wishlist errors
     WISHLIST_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 찜한 상품입니다."),
+    WISHLIST_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "찜한 상품은 최대 300개까지 추가할 수 있습니다."),
     WISHLIST_NOT_FOUND(HttpStatus.NOT_FOUND, "찜 정보를 찾을 수 없습니다."),
     WISHLIST_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 찜에 접근할 권한이 없습니다."),
 
@@ -64,10 +66,25 @@ public enum ErrorCode {
     FITTING_PRODUCT_REQUIRED(HttpStatus.BAD_REQUEST, "선택한 상품이 필요합니다."),
     FITTING_PRODUCT_TYPE_MISMATCH(HttpStatus.BAD_REQUEST, "선택한 상품 종류가 올바르지 않습니다."),
     FITTING_PRODUCT_NOT_CANDIDATE(HttpStatus.BAD_REQUEST, "피팅 후보에 등록된 상품만 사용할 수 있습니다."),
-    FITTING_REQUEST_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "가상피팅은 최대 10회까지 요청할 수 있습니다."),
+    FULL_BODY_IMAGE_REQUIRED_FOR_FITTING(HttpStatus.BAD_REQUEST, "가상피팅을 위해 전신사진을 등록해주세요."),
+    FITTING_REQUEST_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "가상피팅은 하루 최대 25회까지 요청할 수 있습니다."),
     FITTING_JOB_ALREADY_GENERATING(HttpStatus.CONFLICT, "이미 생성 중인 가상피팅 작업이 있습니다."),
     FITTING_JOB_NOT_FOUND(HttpStatus.NOT_FOUND, "가상피팅 작업을 찾을 수 없습니다."),
     FITTING_JOB_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 가상피팅 작업에 접근할 권한이 없습니다."),
+
+    // Fitting result errors
+    INVALID_OUTFIT_NAME(HttpStatus.BAD_REQUEST, "코디명을 입력해주세요."),
+    INVALID_OUTFIT_NAME_LENGTH(HttpStatus.BAD_REQUEST, "코디명은 최대 20자까지 입력할 수 있어요."),
+    FITTING_TEMP_RESULT_NOT_FOUND(HttpStatus.NOT_FOUND, "가상 피팅 결과를 찾을 수 없습니다."),
+    FITTING_JOB_NOT_COMPLETED(HttpStatus.CONFLICT, "가상 피팅 이미지가 아직 생성 중입니다."),
+    FITTING_JOB_FAILED(HttpStatus.CONFLICT, "가상 피팅 이미지 생성에 실패했습니다."),
+    FITTING_RESULT_ALREADY_SAVED(HttpStatus.CONFLICT, "이미 저장된 가상 피팅 결과입니다."),
+    FITTING_RESULT_NOT_FOUND(HttpStatus.NOT_FOUND, "삭제되었거나 존재하지 않는 피팅 결과입니다."),
+    FITTING_RESULT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 가상 피팅 결과에 접근할 수 없습니다."),
+
+    // Notification errors
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다."),
+    NOTIFICATION_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 알림에 접근할 수 없습니다."),
 
     // Server errors
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");

@@ -86,7 +86,10 @@ class ChatServiceTest {
                 recommendationRepository,
                 recommendationProductRepository,
                 wishlistRepository,
-                fittingCandidateRepository,
+                new RecommendedProductResponseAssembler(
+                        wishlistRepository,
+                        fittingCandidateRepository
+                ),
                 eventPublisher
         );
     }

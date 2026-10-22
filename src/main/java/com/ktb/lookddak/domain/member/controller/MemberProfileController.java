@@ -3,6 +3,8 @@ package com.ktb.lookddak.domain.member.controller;
 import com.ktb.lookddak.domain.member.dto.MemberProfileCreateRequest;
 import com.ktb.lookddak.domain.member.dto.MemberProfileCreateResponse;
 import com.ktb.lookddak.domain.member.dto.MemberProfileGetResponse;
+import com.ktb.lookddak.domain.member.dto.MemberProfileUpdateRequest;
+import com.ktb.lookddak.domain.member.dto.MemberProfileUpdateResponse;
 import com.ktb.lookddak.domain.member.service.MemberProfileService;
 import com.ktb.lookddak.global.response.ApiResponse;
 import com.ktb.lookddak.global.response.SuccessCode;
@@ -13,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -50,5 +53,20 @@ public class MemberProfileController {
         return ResponseEntity
                 .status(SuccessCode.CREATED.getStatus())
                 .body(ApiResponse.success(SuccessCode.CREATED, response));
+    }
+
+    @PatchMapping
+    public ResponseEntity<ApiResponse<MemberProfileUpdateResponse>> updateProfile(
+            @AuthenticationPrincipal MemberPrincipal principal,
+            @Valid @RequestBody MemberProfileUpdateRequest request
+    ) {
+        MemberProfileUpdateResponse response = memberProfileService.updateProfile(
+                principal.getMemberId(),
+                request
+        );
+
+        return ResponseEntity
+                .status(SuccessCode.OK.getStatus())
+                .body(ApiResponse.success(SuccessCode.OK, response));
     }
 }

@@ -15,6 +15,9 @@ import com.ktb.lookddak.domain.chat.entity.ChatGenerationStatus;
 import com.ktb.lookddak.domain.chat.entity.ChatRoom;
 import com.ktb.lookddak.domain.chat.entity.ChatSourceType;
 import com.ktb.lookddak.domain.chat.service.ChatService;
+import com.ktb.lookddak.domain.chat.service.ChatSseService;
+import com.ktb.lookddak.domain.chat.service.ChatV2GenerationStartService;
+import com.ktb.lookddak.domain.chat.service.ChatV2Service;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.product.entity.Product;
 import com.ktb.lookddak.domain.product.entity.ProductItemType;
@@ -52,6 +55,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
@@ -61,13 +65,27 @@ class ChatControllerTest {
     private ChatService chatService;
 
     @Mock
+    private ChatV2Service chatV2Service;
+
+    @Mock
+    private ChatSseService chatSseService;
+
+    @Mock
+    private ChatV2GenerationStartService chatV2GenerationStartService;
+
+    @Mock
     private MemberPrincipal principal;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        ChatController controller = new ChatController(chatService);
+        ChatController controller = new ChatController(
+                chatService,
+                chatV2Service,
+                chatSseService,
+                chatV2GenerationStartService
+        );
         mockMvc = MockMvcBuilders
                 .standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -206,7 +224,7 @@ class ChatControllerTest {
                                         49_000,
                                         "추천 당시 이유"
                                 ),
-                                true,
+                                31L,
                                 null
                         ))
                 );
@@ -379,7 +397,7 @@ class ChatControllerTest {
     @Test
     @DisplayName("새 대화를 시작하면 201 Created를 반환한다")
     void createChatRoom() throws Exception {
-        given(chatService.createChatRoom(any(), any()))
+        given(chatV2Service.createChatRoom(any(), any()))
                 .willReturn(new ChatRoomCreateResponse(
                         10L,
                         100L,
@@ -403,13 +421,13 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.message")
                         .value("리소스가 성공적으로 생성되었습니다."));
 
-        verify(chatService).createChatRoom(eq(1L), any());
+        verify(chatV2Service).createChatRoom(eq(1L), any());
     }
 
     @Test
     @DisplayName("기존 채팅방에 메시지를 전송하면 201 Created를 반환한다")
     void createMessage() throws Exception {
-        given(chatService.createMessage(any(), any(), any()))
+        given(chatV2Service.createMessage(any(), any(), any()))
                 .willReturn(new ChatMessageCreateResponse(
                         10L,
                         101L,
@@ -432,7 +450,22 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.data.createdAt")
                         .value("2026-09-24T16:55:00"));
 
-        verify(chatService).createMessage(eq(1L), eq(10L), any());
+        verify(chatV2Service).createMessage(eq(1L), eq(10L), any());
+    }
+
+    @Test
+    @DisplayName("SSE 연결 요청은 생성 대기 메시지의 AI 스트림을 시작한다")
+    void connectStream() throws Exception {
+        given(chatSseService.connect(1L, 10L, 100L))
+                .willReturn(new org.springframework.web.servlet.mvc.method.annotation.SseEmitter());
+
+        mockMvc.perform(get("/api/v1/chat-rooms/10/messages/100/stream")
+                        .accept("text/event-stream"))
+                .andExpect(request().asyncStarted())
+                .andExpect(status().isOk());
+
+        verify(chatSseService).connect(1L, 10L, 100L);
+        verify(chatV2GenerationStartService).startIfPending(100L);
     }
 
     @Test
@@ -469,7 +502,7 @@ class ChatControllerTest {
     @Test
     @DisplayName("채팅방이 없으면 404 Not Found를 반환한다")
     void rejectMissingChatRoom() throws Exception {
-        given(chatService.createMessage(any(), any(), any()))
+        given(chatV2Service.createMessage(any(), any(), any()))
                 .willThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
 
         performCreateMessage()
@@ -480,7 +513,7 @@ class ChatControllerTest {
     @Test
     @DisplayName("다른 회원의 채팅방이면 403 Forbidden을 반환한다")
     void rejectChatRoomAccess() throws Exception {
-        given(chatService.createMessage(any(), any(), any()))
+        given(chatV2Service.createMessage(any(), any(), any()))
                 .willThrow(new BusinessException(ErrorCode.CHAT_ROOM_ACCESS_DENIED));
 
         performCreateMessage()
@@ -491,7 +524,7 @@ class ChatControllerTest {
     @Test
     @DisplayName("AI 응답 생성 중이면 409 Conflict를 반환한다")
     void rejectWhileGeneratingResponse() throws Exception {
-        given(chatService.createMessage(any(), any(), any()))
+        given(chatV2Service.createMessage(any(), any(), any()))
                 .willThrow(new BusinessException(ErrorCode.AI_RESPONSE_GENERATING));
 
         performCreateMessage()

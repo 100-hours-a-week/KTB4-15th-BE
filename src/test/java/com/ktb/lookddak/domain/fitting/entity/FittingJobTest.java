@@ -5,6 +5,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -55,6 +58,19 @@ class FittingJobTest {
         assertThatThrownBy(fittingJob::failGeneration)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("생성 중인 가상피팅 작업만 상태를 변경할 수 있습니다.");
+    }
+
+    @Test
+    @DisplayName("AI 실패 이용권 환불은 한 번만 표시한다")
+    void refundQuotaOnlyOnce() {
+        LocalDate quotaDate = LocalDate.of(2026, 10, 21);
+        FittingJob fittingJob = FittingJob.create(createMember(1L), quotaDate);
+
+        assertThat(fittingJob.refundQuota(LocalDateTime.of(2026, 10, 21, 12, 0))).isTrue();
+        assertThat(fittingJob.refundQuota(LocalDateTime.of(2026, 10, 21, 12, 1))).isFalse();
+        assertThat(fittingJob.getQuotaChargedDate()).isEqualTo(quotaDate);
+        assertThat(fittingJob.getQuotaRefundedAt())
+                .isEqualTo(LocalDateTime.of(2026, 10, 21, 12, 0));
     }
 
     private Member createMember(Long memberId) {

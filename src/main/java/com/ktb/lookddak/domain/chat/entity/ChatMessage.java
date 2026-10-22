@@ -91,6 +91,19 @@ public class ChatMessage {
         );
     }
 
+    public static ChatMessage createPendingUserText(
+            ChatRoom chatRoom,
+            String content
+    ) {
+        return new ChatMessage(
+                chatRoom,
+                ChatSenderType.USER,
+                ChatMessageType.TEXT,
+                ChatGenerationStatus.PENDING,
+                content
+        );
+    }
+
     public static ChatMessage createAiText(ChatRoom chatRoom, String content) {
         return new ChatMessage(
                 chatRoom,
@@ -120,6 +133,17 @@ public class ChatMessage {
 
     public void failGeneration() {
         updateGenerationStatus(ChatGenerationStatus.FAILED);
+    }
+
+    public void startGeneration() {
+        if (senderType != ChatSenderType.USER
+                || generationStatus != ChatGenerationStatus.PENDING) {
+            throw new IllegalStateException(
+                    "대기 중인 사용자 메시지만 생성할 수 있습니다."
+            );
+        }
+
+        generationStatus = ChatGenerationStatus.GENERATING;
     }
 
     private void updateGenerationStatus(ChatGenerationStatus status) {

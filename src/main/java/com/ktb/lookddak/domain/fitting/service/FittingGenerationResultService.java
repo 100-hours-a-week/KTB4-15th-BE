@@ -5,10 +5,20 @@ import com.ktb.lookddak.domain.fitting.entity.FittingJobStatus;
 import com.ktb.lookddak.domain.fitting.entity.FittingTempResult;
 import com.ktb.lookddak.domain.fitting.repository.FittingJobRepository;
 import com.ktb.lookddak.domain.fitting.repository.FittingTempResultRepository;
+import com.ktb.lookddak.domain.member.entity.Member;
+import com.ktb.lookddak.domain.member.repository.MemberRepository;
+import com.ktb.lookddak.domain.notification.entity.Notification;
+import com.ktb.lookddak.domain.notification.event.FittingNotificationCreatedEvent;
+import com.ktb.lookddak.domain.notification.repository.NotificationRepository;
 import com.ktb.lookddak.global.client.ai.fitting.dto.AiFittingResultData;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -16,15 +26,18 @@ public class FittingGenerationResultService {
 
     private final FittingJobRepository fittingJobRepository;
     private final FittingTempResultRepository fittingTempResultRepository;
+    private final NotificationRepository notificationRepository;
+    private final MemberRepository memberRepository;
+    private final Clock clock;
 
     @Transactional
-    public void complete(
+    public Optional<FittingNotificationCreatedEvent> complete(
             Long fittingJobId,
             AiFittingResultData result
     ) {
         FittingJob fittingJob = getFittingJobForUpdate(fittingJobId);
         if (!isGenerating(fittingJob)) {
-            return;
+            return Optional.empty();
         }
 
         fittingTempResultRepository.save(FittingTempResult.create(
@@ -34,20 +47,40 @@ public class FittingGenerationResultService {
                 result.getLlmComment()
         ));
         fittingJob.completeGeneration();
+        return Optional.of(createNotificationEvent(Notification.fittingSuccess(
+                fittingJob.getMember(),
+                fittingJob.getId(),
+                result.getLlmTitle()
+        )));
     }
 
     @Transactional
-    public void fail(Long fittingJobId) {
-        fittingJobRepository.updateStatusIfCurrent(
-                fittingJobId,
-                FittingJobStatus.GENERATING,
-                FittingJobStatus.FAILED
-        );
+    public Optional<FittingNotificationCreatedEvent> fail(Long fittingJobId) {
+        return fail(fittingJobId, null, null);
+    }
+
+    @Transactional
+    public Optional<FittingNotificationCreatedEvent> fail(
+            Long fittingJobId,
+            String failureCode,
+            String failureMessage
+    ) {
+        FittingJob fittingJob = getFittingJobForUpdate(fittingJobId);
+        if (!isGenerating(fittingJob)) {
+            return Optional.empty();
+        }
+
+        fittingJob.failGeneration(failureCode, failureMessage);
+        refundQuotaIfNeeded(fittingJob);
+        return Optional.of(createNotificationEvent(Notification.fittingFailure(
+                fittingJob.getMember(),
+                fittingJob.getId()
+        )));
     }
 
     private FittingJob getFittingJobForUpdate(Long fittingJobId) {
         return fittingJobRepository
-                .findByIdForGenerationUpdate(fittingJobId)
+                .findByIdWithMemberForResultSave(fittingJobId)
                 .orElseThrow(() -> new IllegalStateException(
                         "AI 결과를 연결할 가상피팅 작업이 없습니다."
                 ));
@@ -55,5 +88,35 @@ public class FittingGenerationResultService {
 
     private boolean isGenerating(FittingJob fittingJob) {
         return fittingJob.getStatus() == FittingJobStatus.GENERATING;
+    }
+
+    private void refundQuotaIfNeeded(FittingJob fittingJob) {
+        LocalDate quotaChargedDate = fittingJob.getQuotaChargedDate();
+        if (quotaChargedDate == null) {
+            return;
+        }
+
+        Member member = memberRepository.findActiveByIdForUpdate(
+                        fittingJob.getMember().getId()
+                )
+                .orElseThrow(() -> new IllegalStateException(
+                        "가상피팅 이용권을 환불할 회원이 없습니다."
+                ));
+
+        if (fittingJob.refundQuota(LocalDateTime.now(clock))) {
+            member.refundFittingRequestQuota(quotaChargedDate);
+        }
+    }
+
+    private FittingNotificationCreatedEvent createNotificationEvent(
+            Notification notification
+    ) {
+        Notification savedNotification = notificationRepository.save(notification);
+        return new FittingNotificationCreatedEvent(
+                savedNotification.getId(),
+                savedNotification.getMember().getId(),
+                savedNotification.getTargetId(),
+                savedNotification.getType()
+        );
     }
 }

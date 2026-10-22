@@ -1,5 +1,7 @@
 package com.ktb.lookddak.domain.chat.service;
 
+import com.ktb.lookddak.domain.chat.dto.ChatSseDoneResponse;
+import com.ktb.lookddak.domain.chat.dto.RecommendedProductResponse;
 import com.ktb.lookddak.domain.chat.entity.ChatGenerationStatus;
 import com.ktb.lookddak.domain.chat.entity.ChatMessage;
 import com.ktb.lookddak.domain.chat.entity.ChatRoom;
@@ -30,15 +32,17 @@ public class ChatGenerationResultService {
     private final ProductRepository productRepository;
     private final RecommendationRepository recommendationRepository;
     private final RecommendationProductRepository recommendationProductRepository;
+    private final RecommendedProductResponseAssembler
+            recommendedProductResponseAssembler;
 
     @Transactional
-    public void complete(
+    public ChatSseDoneResponse complete(
             Long userMessageId,
             AiChatDoneResponse response
     ) {
         ChatMessage userMessage = getUserMessageForUpdate(userMessageId);
         if (!isGenerating(userMessage)) {
-            return;
+            return null;
         }
 
         ChatRoom chatRoom = userMessage.getChatRoom();
@@ -54,8 +58,9 @@ public class ChatGenerationResultService {
                 aiMessage
         );
 
+        List<RecommendationProduct> recommendationProducts = List.of();
         if (!response.getProducts().isEmpty()) {
-            saveRecommendation(
+            recommendationProducts = saveRecommendation(
                     chatRoom,
                     savedAiMessage,
                     response.getProducts()
@@ -64,6 +69,19 @@ public class ChatGenerationResultService {
 
         userMessage.completeGeneration();
         chatRoom.updateLastMessageAt(savedAiMessage.getCreatedAt());
+
+        List<RecommendedProductResponse> products =
+                new ArrayList<>(recommendedProductResponseAssembler
+                        .assemble(
+                                chatRoom.getMember().getId(),
+                                recommendationProducts
+                        )
+                        .values());
+        return new ChatSseDoneResponse(
+                userMessageId,
+                savedAiMessage.getContent(),
+                products
+        );
     }
 
     @Transactional
@@ -76,7 +94,7 @@ public class ChatGenerationResultService {
         );
     }
 
-    private void saveRecommendation(
+    private List<RecommendationProduct> saveRecommendation(
             ChatRoom chatRoom,
             ChatMessage aiMessage,
             List<AiRecommendedProductResponse> aiProducts
@@ -111,11 +129,11 @@ public class ChatGenerationResultService {
             recommendationProducts.add(RecommendationProduct.create(
                     recommendation,
                     product,
-                    aiProduct.getPrice(),
-                    aiProduct.getLlmComment()
+                    aiProduct.getCurrentPrice(),
+                    aiProduct.getRecommendedReason()
             ));
         }
-        recommendationProductRepository.saveAll(recommendationProducts);
+        return recommendationProductRepository.saveAll(recommendationProducts);
     }
 
     private Map<String, AiRecommendedProductResponse> createUniqueProductMap(
@@ -150,11 +168,11 @@ public class ChatGenerationResultService {
         return Product.create(
                 aiProduct.getProductCode(),
                 aiProduct.getProductName(),
-                aiProduct.getImageUrl(),
-                aiProduct.getPrice(),
+                aiProduct.getProductImageUrl(),
+                aiProduct.getCurrentPrice(),
                 aiProduct.getColor(),
                 aiProduct.getItemType(),
-                aiProduct.getDetailUrl()
+                aiProduct.getPurchaseUrl()
         );
     }
 

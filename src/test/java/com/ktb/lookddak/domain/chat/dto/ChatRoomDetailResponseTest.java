@@ -40,7 +40,7 @@ class ChatRoomDetailResponseTest {
         RecommendedProductResponse response =
                 RecommendedProductResponse.from(
                         recommendationProduct,
-                        true,
+                        31L,
                         25L
                 );
 
@@ -56,6 +56,7 @@ class ChatRoomDetailResponseTest {
         assertThat(response.getRecommendedReason())
                 .isEqualTo("추천 당시 이유");
         assertThat(response.isWishlisted()).isTrue();
+        assertThat(response.getWishlistId()).isEqualTo(31L);
         assertThat(response.isFittingCandidate()).isTrue();
         assertThat(response.getFittingCandidateId()).isEqualTo(25L);
     }
@@ -86,7 +87,7 @@ class ChatRoomDetailResponseTest {
                                         49_000,
                                         "추천 당시 이유"
                                 ),
-                                true,
+                                31L,
                                 null
                         ))
                 );
@@ -155,7 +156,7 @@ class ChatRoomDetailResponseTest {
                                         49_000,
                                         "추천 당시 이유"
                                 ),
-                                true,
+                                31L,
                                 null
                         ))
                 );

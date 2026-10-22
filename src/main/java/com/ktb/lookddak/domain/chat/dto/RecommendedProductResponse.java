@@ -18,6 +18,7 @@ import lombok.Getter;
         "purchaseUrl",
         "recommendedReason",
         "isWishlisted",
+        "wishlistId",
         "isFittingCandidate",
         "fittingCandidateId"
 })
@@ -35,6 +36,8 @@ public class RecommendedProductResponse {
     @JsonProperty("isWishlisted")
     private final boolean wishlisted;
 
+    private final Long wishlistId;
+
     @JsonProperty("isFittingCandidate")
     private final boolean fittingCandidate;
 
@@ -49,7 +52,7 @@ public class RecommendedProductResponse {
             ProductItemType itemType,
             String purchaseUrl,
             String recommendedReason,
-            boolean wishlisted,
+            Long wishlistId,
             Long fittingCandidateId
     ) {
         this.productId = productId;
@@ -60,14 +63,15 @@ public class RecommendedProductResponse {
         this.itemType = itemType;
         this.purchaseUrl = purchaseUrl;
         this.recommendedReason = recommendedReason;
-        this.wishlisted = wishlisted;
+        this.wishlisted = wishlistId != null;
+        this.wishlistId = wishlistId;
         this.fittingCandidate = fittingCandidateId != null;
         this.fittingCandidateId = fittingCandidateId;
     }
 
     public static RecommendedProductResponse from(
             RecommendationProduct recommendationProduct,
-            boolean wishlisted,
+            Long wishlistId,
             Long fittingCandidateId
     ) {
         Product product = recommendationProduct.getProduct();
@@ -81,7 +85,7 @@ public class RecommendedProductResponse {
                 product.getItemType(),
                 product.getPurchaseUrl(),
                 recommendationProduct.getRecommendedReason(),
-                wishlisted,
+                wishlistId,
                 fittingCandidateId
         );
     }

@@ -18,6 +18,9 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
 @Getter
 @Entity
 @Table(
@@ -42,6 +45,21 @@ public class FittingJob extends BaseEntity {
     @Column(nullable = false, length = 20)
     private FittingJobStatus status;
 
+    @Column(name = "result_viewed_at")
+    private LocalDateTime resultViewedAt;
+
+    @Column(name = "failure_code", length = 100)
+    private String failureCode;
+
+    @Column(name = "failure_message", columnDefinition = "TEXT")
+    private String failureMessage;
+
+    @Column(name = "quota_charged_date")
+    private LocalDate quotaChargedDate;
+
+    @Column(name = "quota_refunded_at")
+    private LocalDateTime quotaRefundedAt;
+
     private FittingJob(Member member) {
         this.member = member;
         this.status = FittingJobStatus.GENERATING;
@@ -49,6 +67,12 @@ public class FittingJob extends BaseEntity {
 
     public static FittingJob create(Member member) {
         return new FittingJob(member);
+    }
+
+    public static FittingJob create(Member member, LocalDate quotaChargedDate) {
+        FittingJob fittingJob = new FittingJob(member);
+        fittingJob.quotaChargedDate = quotaChargedDate;
+        return fittingJob;
     }
 
     public boolean isOwnedBy(Long memberId) {
@@ -60,7 +84,32 @@ public class FittingJob extends BaseEntity {
     }
 
     public void failGeneration() {
+        failGeneration(null, null);
+    }
+
+    public void failGeneration(String failureCode, String failureMessage) {
         updateStatus(FittingJobStatus.FAILED);
+        this.failureCode = failureCode;
+        this.failureMessage = failureMessage;
+    }
+
+    public void markResultViewed(LocalDateTime viewedAt) {
+        if (resultViewedAt == null) {
+            resultViewedAt = viewedAt;
+        }
+    }
+
+    public boolean isResultViewed() {
+        return resultViewedAt != null;
+    }
+
+    public boolean refundQuota(LocalDateTime refundedAt) {
+        if (quotaRefundedAt != null) {
+            return false;
+        }
+
+        quotaRefundedAt = refundedAt;
+        return true;
     }
 
     private void updateStatus(FittingJobStatus status) {

@@ -13,6 +13,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.ColumnDefault;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
@@ -42,6 +43,9 @@ public class Member extends BaseEntity {
     @ColumnDefault("0")
     private int fittingRequestCount;
 
+    @Column(name = "fitting_request_date")
+    private LocalDate fittingRequestDate;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
@@ -60,11 +64,22 @@ public class Member extends BaseEntity {
         this.priceAlertEnabled = priceAlertEnabled;
     }
 
-    public boolean hasReachedFittingRequestLimit(int limit) {
-        return fittingRequestCount >= limit;
+    public boolean hasReachedFittingRequestLimit(LocalDate today, int limit) {
+        return today.equals(fittingRequestDate)
+                && fittingRequestCount >= limit;
     }
 
-    public void increaseFittingRequestCount() {
+    public void consumeFittingRequestQuota(LocalDate today) {
+        if (!today.equals(fittingRequestDate)) {
+            fittingRequestDate = today;
+            fittingRequestCount = 0;
+        }
         fittingRequestCount++;
+    }
+
+    public void refundFittingRequestQuota(LocalDate quotaDate) {
+        if (quotaDate.equals(fittingRequestDate) && fittingRequestCount > 0) {
+            fittingRequestCount--;
+        }
     }
 }

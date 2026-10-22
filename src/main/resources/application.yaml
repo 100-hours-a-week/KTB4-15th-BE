@@ -10,6 +10,9 @@ spring:
   jpa:
     open-in-view: false
 
+server:
+  sse-port: ${SSE_SERVER_PORT:8081}
+
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: 30m
@@ -19,6 +22,10 @@ auth:
   cookie:
     secure: true
     same-site: Lax
+
+internal:
+  api:
+    key: ${INTERNAL_API_KEY:}
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS}
@@ -46,19 +53,47 @@ ai:
     await-termination: ${AI_RESULT_PERSISTENCE_AWAIT_TERMINATION:30s}
 
 aws:
+  sqs:
+    region: ${AWS_REGION:ap-northeast-2}
+    fitting-request-queue-url: ${BE_FITTING_REQUEST_QUEUE_URL:}
+    fitting-response-queue-url: ${BE_FITTING_RESPONSE_QUEUE_URL:}
   s3:
     bucket: ${AWS_S3_BUCKET}
     region: ${AWS_REGION:ap-northeast-2}
     presigned-url-expiration: 10m
 
+fitting:
+  outbox:
+    enabled: ${FITTING_OUTBOX_ENABLED:false}
+    server-id: ${FITTING_OUTBOX_SERVER_ID:${HOSTNAME:local}}
+    poll-interval: ${FITTING_OUTBOX_POLL_INTERVAL:1s}
+    batch-size: ${FITTING_OUTBOX_BATCH_SIZE:20}
+    lease-duration: ${FITTING_OUTBOX_LEASE_DURATION:30s}
+  result-consumer:
+    enabled: ${FITTING_RESULT_CONSUMER_ENABLED:false}
+    poll-interval: ${FITTING_RESULT_CONSUMER_POLL_INTERVAL:1s}
+    max-messages: ${FITTING_RESULT_CONSUMER_MAX_MESSAGES:10}
+    wait-time-seconds: ${FITTING_RESULT_CONSUMER_WAIT_TIME_SECONDS:10}
+    visibility-timeout-seconds: ${FITTING_RESULT_CONSUMER_VISIBILITY_TIMEOUT_SECONDS:60}
+
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,prometheus
   endpoint:
     health:
       show-details: never
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      minimum-expected-value:
+        http.server.requests: 5ms
+      maximum-expected-value:
+        http.server.requests: 60s
+      slo:
+        http.server.requests: 500ms,1s,3s
 
 sentry:
   dsn: ${SENTRY_DSN:}

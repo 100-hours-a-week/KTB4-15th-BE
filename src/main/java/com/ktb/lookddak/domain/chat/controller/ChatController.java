@@ -10,12 +10,16 @@ import com.ktb.lookddak.domain.chat.dto.ChatRoomListResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateResponse;
 import com.ktb.lookddak.domain.chat.service.ChatService;
+import com.ktb.lookddak.domain.chat.service.ChatSseService;
+import com.ktb.lookddak.domain.chat.service.ChatV2GenerationStartService;
+import com.ktb.lookddak.domain.chat.service.ChatV2Service;
 import com.ktb.lookddak.global.response.ApiResponse;
 import com.ktb.lookddak.global.response.SuccessCode;
 import com.ktb.lookddak.global.security.principal.MemberPrincipal;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
@@ -28,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Validated
 @RestController
@@ -36,6 +41,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class ChatController {
 
     private final ChatService chatService;
+    private final ChatV2Service chatV2Service;
+    private final ChatSseService chatSseService;
+    private final ChatV2GenerationStartService chatV2GenerationStartService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<ChatRoomListResponse>> getChatRooms(
@@ -97,7 +105,7 @@ public class ChatController {
             @AuthenticationPrincipal MemberPrincipal principal,
             @Valid @RequestBody ChatRoomCreateRequest request
     ) {
-        ChatRoomCreateResponse response = chatService.createChatRoom(
+        ChatRoomCreateResponse response = chatV2Service.createChatRoom(
                 principal.getMemberId(),
                 request
         );
@@ -113,7 +121,7 @@ public class ChatController {
             @Positive @PathVariable Long chatRoomId,
             @Valid @RequestBody ChatMessageCreateRequest request
     ) {
-        ChatMessageCreateResponse response = chatService.createMessage(
+        ChatMessageCreateResponse response = chatV2Service.createMessage(
                 principal.getMemberId(),
                 chatRoomId,
                 request
@@ -122,6 +130,25 @@ public class ChatController {
         return ResponseEntity
                 .status(SuccessCode.CREATED.getStatus())
                 .body(ApiResponse.success(SuccessCode.CREATED, response));
+    }
+
+    @GetMapping(
+            value = "/{chatRoomId}/messages/{userMessageId}/stream",
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE
+    )
+    public SseEmitter connectStream(
+            @AuthenticationPrincipal MemberPrincipal principal,
+            @Positive @PathVariable Long chatRoomId,
+            @Positive @PathVariable Long userMessageId
+    ) {
+        SseEmitter emitter = chatSseService.connect(
+                principal.getMemberId(),
+                chatRoomId,
+                userMessageId
+        );
+        chatV2GenerationStartService.startIfPending(userMessageId);
+
+        return emitter;
     }
 
     @PatchMapping("/{chatRoomId}")

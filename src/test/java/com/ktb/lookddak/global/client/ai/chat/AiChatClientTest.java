@@ -38,7 +38,7 @@ class AiChatClientTest {
                 data: {"chat_id":123,"product":{"product_code":"0000001"}}
 
                 event: done
-                data: {"chat_id":123,"content":"조건에 맞는 상품을 찾아봤어요.","products":[{"product_code":"0000001","product_name":"오버핏 코튼 셔츠","image_url":"https://example.com/1.jpg","detail_url":"https://shop.example.com/1","color":"NAVY","item_type":"TOP","price":69000,"llm_comment":"소개팅 룩에 잘 어울립니다."}]}
+                data: {"chat_id":123,"content":"조건에 맞는 상품을 찾아봤어요.","products":[{"product_code":"0000001","product_name":"오버핏 코튼 셔츠","product_image_url":"https://example.com/1.jpg","purchase_url":"https://shop.example.com/1","color":"NAVY","item_type":"TOP","current_price":69000,"recommended_reason":"소개팅 룩에 잘 어울립니다."}]}
 
                 """), Duration.ofSeconds(1));
 
@@ -53,8 +53,8 @@ class AiChatClientTest {
                     assertThat(product.getProductCode()).isEqualTo("0000001");
                     assertThat(product.getItemType())
                             .isEqualTo(ProductItemType.TOP);
-                    assertThat(product.getPrice()).isEqualTo(69_000);
-                    assertThat(product.getLlmComment())
+                    assertThat(product.getCurrentPrice()).isEqualTo(69_000);
+                    assertThat(product.getRecommendedReason())
                             .isEqualTo("소개팅 룩에 잘 어울립니다.");
                 });
     }

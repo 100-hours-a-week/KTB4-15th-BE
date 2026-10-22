@@ -2,6 +2,7 @@ package com.ktb.lookddak.domain.member.controller;
 
 import com.ktb.lookddak.domain.member.dto.MemberProfileCreateResponse;
 import com.ktb.lookddak.domain.member.dto.MemberProfileGetResponse;
+import com.ktb.lookddak.domain.member.dto.MemberProfileUpdateResponse;
 import com.ktb.lookddak.domain.member.entity.Member;
 import com.ktb.lookddak.domain.member.entity.MemberProfile;
 import com.ktb.lookddak.domain.member.service.MemberProfileService;
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -88,6 +90,26 @@ class MemberProfileControllerTest {
                         .doesNotExist())
                 .andExpect(jsonPath("$.message")
                         .value("리소스가 성공적으로 생성되었습니다."));
+
+        verify(memberProfileService).createProfile(eq(1L), any());
+    }
+
+    @Test
+    @DisplayName("이름만 전달해도 기본정보를 등록할 수 있다")
+    void createProfileWithNameOnly() throws Exception {
+        given(memberProfileService.createProfile(any(), any()))
+                .willReturn(new MemberProfileCreateResponse(10L));
+
+        mockMvc.perform(post("/api/v1/members/me/profile")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "김민준",
+                                  "priceAlertEnabled": true
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value("CREATED"));
 
         verify(memberProfileService).createProfile(eq(1L), any());
     }
@@ -189,6 +211,48 @@ class MemberProfileControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code")
                         .value("INVALID_FULL_BODY_IMAGE"))
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    @DisplayName("전달한 기본정보만 수정하면 200 OK를 반환한다")
+    void updateProfile() throws Exception {
+        given(memberProfileService.updateProfile(eq(1L), any()))
+                .willReturn(new MemberProfileUpdateResponse(
+                        "Jane Doe",
+                        29,
+                        new BigDecimal("175.5"),
+                        new BigDecimal("70.3"),
+                        "https://presigned.example.com/current.png"
+                ));
+
+        mockMvc.perform(patch("/api/v1/members/me/profile")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Jane Doe"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.name").value("Jane Doe"))
+                .andExpect(jsonPath("$.data.age").value(29))
+                .andExpect(jsonPath("$.data.fullBodyImageUrl")
+                        .value("https://presigned.example.com/current.png"))
+                .andExpect(jsonPath("$.message")
+                        .value("요청이 성공적으로 처리되었습니다."));
+
+        verify(memberProfileService).updateProfile(eq(1L), any());
+    }
+
+    @Test
+    @DisplayName("수정할 필드가 없으면 400 Bad Request를 반환한다")
+    void rejectUpdateWithoutFields() throws Exception {
+        mockMvc.perform(patch("/api/v1/members/me/profile")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
                 .andExpect(jsonPath("$.data").isEmpty());
     }
 

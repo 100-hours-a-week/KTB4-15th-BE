@@ -73,8 +73,13 @@ class MemberProfileCreateRequestTest {
     }
 
     @Test
-    @DisplayName("나이와 검증 ID 및 가격 알림 값이 올바르지 않으면 거부한다")
-    void rejectInvalidRequiredValues() {
+    @DisplayName("프로필 선택 정보는 생략할 수 있고, 가격 알림 설정은 필수다")
+    void allowOmittedProfileOptionalValuesAndRequirePriceAlertEnabled() {
+        MemberProfileCreateRequest nameOnlyRequest = new MemberProfileCreateRequest(
+                "김민준", null, null, null, null, false
+        );
+        assertThat(invalidFields(nameOnlyRequest)).isEmpty();
+
         MemberProfileCreateRequest request = new MemberProfileCreateRequest(
                 "김민준",
                 0,

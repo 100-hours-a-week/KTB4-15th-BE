@@ -16,6 +16,8 @@ import org.springframework.stereotype.Component;
 public class AuthCookieManager {
 
     public static final String REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
+    private static final String BFF_REFRESH_TOKEN_COOKIE_PATH = "/bff/auth";
+    private static final String LEGACY_REFRESH_TOKEN_COOKIE_PATH = "/api/v1/auth";
 
     private final AuthCookieProperties cookieProperties;
     private final JwtProperties jwtProperties;
@@ -27,15 +29,22 @@ public class AuthCookieManager {
                 "/",
                 jwtProperties.getAccessTokenExpiration().toSeconds()
         );
-        ResponseCookie refreshTokenCookie = createCookie(
+        ResponseCookie bffRefreshTokenCookie = createCookie(
                 REFRESH_TOKEN_COOKIE_NAME,
                 tokens.getRefreshToken(),
-                "/api/v1/auth",
+                BFF_REFRESH_TOKEN_COOKIE_PATH,
+                jwtProperties.getRefreshTokenExpiration().toSeconds()
+        );
+        ResponseCookie legacyRefreshTokenCookie = createCookie(
+                REFRESH_TOKEN_COOKIE_NAME,
+                tokens.getRefreshToken(),
+                LEGACY_REFRESH_TOKEN_COOKIE_PATH,
                 jwtProperties.getRefreshTokenExpiration().toSeconds()
         );
 
         response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
-        response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, bffRefreshTokenCookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, legacyRefreshTokenCookie.toString());
     }
 
     public String resolveRefreshToken(HttpServletRequest request) {
@@ -61,15 +70,22 @@ public class AuthCookieManager {
                 "/",
                 0
         );
-        ResponseCookie refreshTokenCookie = createCookie(
+        ResponseCookie bffRefreshTokenCookie = createCookie(
                 REFRESH_TOKEN_COOKIE_NAME,
                 "",
-                "/api/v1/auth",
+                BFF_REFRESH_TOKEN_COOKIE_PATH,
+                0
+        );
+        ResponseCookie legacyRefreshTokenCookie = createCookie(
+                REFRESH_TOKEN_COOKIE_NAME,
+                "",
+                LEGACY_REFRESH_TOKEN_COOKIE_PATH,
                 0
         );
 
         response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
-        response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, bffRefreshTokenCookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, legacyRefreshTokenCookie.toString());
     }
 
     private ResponseCookie createCookie(

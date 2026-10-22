@@ -17,6 +17,7 @@ import com.ktb.lookddak.domain.recommendation.entity.RecommendationProduct;
 import com.ktb.lookddak.domain.recommendation.repository.RecommendationProductRepository;
 import com.ktb.lookddak.domain.recommendation.repository.RecommendationRepository;
 import com.ktb.lookddak.domain.wishlist.repository.WishlistRepository;
+import com.ktb.lookddak.domain.wishlist.entity.Wishlist;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,7 +81,10 @@ class ChatGenerationStatusServiceTest {
                 recommendationRepository,
                 recommendationProductRepository,
                 wishlistRepository,
-                fittingCandidateRepository,
+                new RecommendedProductResponseAssembler(
+                        wishlistRepository,
+                        fittingCandidateRepository
+                ),
                 eventPublisher
         );
         member = createMember(1L);
@@ -201,10 +205,12 @@ class ChatGenerationStatusServiceTest {
         given(recommendationProductRepository
                 .findAllWithProductByRecommendationIdIn(List.of(15L)))
                 .willReturn(List.of(recommendationProduct));
-        given(wishlistRepository.findProductIdsByMemberIdAndProductIdIn(
+        Wishlist wishlist = Wishlist.create(member, product);
+        ReflectionTestUtils.setField(wishlist, "id", 301L);
+        given(wishlistRepository.findAllByMemberIdAndProductIdIn(
                 1L,
                 Set.of(201L)
-        )).willReturn(Set.of(201L));
+        )).willReturn(List.of(wishlist));
         given(fittingCandidateRepository
                 .findAllByMemberIdAndProductIdIn(
                         1L,
@@ -227,6 +233,7 @@ class ChatGenerationStatusServiceTest {
                     assertThat(productResponse.getRecommendedReason())
                             .isEqualTo("추천 당시 이유");
                     assertThat(productResponse.isWishlisted()).isTrue();
+                    assertThat(productResponse.getWishlistId()).isEqualTo(301L);
                     assertThat(productResponse.isFittingCandidate()).isFalse();
                     assertThat(productResponse.getFittingCandidateId()).isNull();
                 });

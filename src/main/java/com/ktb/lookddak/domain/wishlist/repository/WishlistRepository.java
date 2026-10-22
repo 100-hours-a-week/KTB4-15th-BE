@@ -1,6 +1,7 @@
 package com.ktb.lookddak.domain.wishlist.repository;
 
 import com.ktb.lookddak.domain.wishlist.entity.Wishlist;
+import com.ktb.lookddak.domain.product.dto.ProductRankingQueryResult;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -20,6 +21,43 @@ public interface WishlistRepository extends JpaRepository<Wishlist, Long> {
     long countByMemberId(Long memberId);
 
     @Query("""
+            select new com.ktb.lookddak.domain.product.dto.ProductRankingQueryResult(
+                wishlist.product,
+                count(wishlist.id)
+            )
+            from Wishlist wishlist
+            group by wishlist.product
+            order by count(wishlist.id) desc, wishlist.product.id asc
+            """)
+    List<ProductRankingQueryResult> findWishRankings(Pageable pageable);
+
+    @Query("""
+            select wishlist
+            from Wishlist wishlist
+            join fetch wishlist.product product
+            where wishlist.member.id = :memberId
+            order by wishlist.id desc
+            """)
+    List<Wishlist> findFirstPage(
+            @Param("memberId") Long memberId,
+            Pageable pageable
+    );
+
+    @Query("""
+            select wishlist
+            from Wishlist wishlist
+            join fetch wishlist.product product
+            where wishlist.member.id = :memberId
+              and wishlist.id < :cursor
+            order by wishlist.id desc
+            """)
+    List<Wishlist> findNextPage(
+            @Param("memberId") Long memberId,
+            @Param("cursor") Long cursor,
+            Pageable pageable
+    );
+
+    @Query("""
             select wishlist.product.productCode
             from Wishlist wishlist
             where wishlist.member.id = :memberId
@@ -37,6 +75,18 @@ public interface WishlistRepository extends JpaRepository<Wishlist, Long> {
               and wishlist.product.id in :productIds
             """)
     Set<Long> findProductIdsByMemberIdAndProductIdIn(
+            @Param("memberId") Long memberId,
+            @Param("productIds") Collection<Long> productIds
+    );
+
+    @Query("""
+            select wishlist
+            from Wishlist wishlist
+            join fetch wishlist.product
+            where wishlist.member.id = :memberId
+              and wishlist.product.id in :productIds
+            """)
+    List<Wishlist> findAllByMemberIdAndProductIdIn(
             @Param("memberId") Long memberId,
             @Param("productIds") Collection<Long> productIds
     );

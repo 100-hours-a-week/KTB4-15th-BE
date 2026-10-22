@@ -34,6 +34,9 @@ public class Product {
     @Column(name = "current_price", nullable = false)
     private Integer currentPrice;
 
+    @Column(name = "previous_price")
+    private Integer previousPrice;
+
     @Column(nullable = false, length = 100)
     private String color;
 
@@ -83,5 +86,10 @@ public class Product {
                 itemType,
                 purchaseUrl
         );
+    }
+
+    public void updatePrice(Integer newPrice) {
+        this.previousPrice = this.currentPrice;
+        this.currentPrice = newPrice;
     }
 }
