@@ -2,6 +2,7 @@ package com.ktb.lookddak.global.config;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -13,7 +14,7 @@ public class SseConnectorProperties {
     @Max(65535)
     private final int ssePort;
 
-    public SseConnectorProperties(int ssePort) {
+    public SseConnectorProperties(@DefaultValue("8081") int ssePort) {
         this.ssePort = ssePort;
     }
 
