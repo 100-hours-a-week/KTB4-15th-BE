@@ -7,7 +7,6 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.time.Duration;
-import java.util.concurrent.Executor;
 
 @EnableAsync
 @Configuration
@@ -19,7 +18,7 @@ import java.util.concurrent.Executor;
 public class AiAsyncConfig {
 
     @Bean(name = "chatTaskExecutor")
-    public Executor chatTaskExecutor(AiChatTaskProperties properties) {
+    public ThreadPoolTaskExecutor chatTaskExecutor(AiChatTaskProperties properties) {
         return createExecutor(
                 properties.getCorePoolSize(),
                 properties.getMaxPoolSize(),
@@ -30,7 +29,7 @@ public class AiAsyncConfig {
     }
 
     @Bean(name = "fittingTaskExecutor")
-    public Executor fittingTaskExecutor(AiFittingTaskProperties properties) {
+    public ThreadPoolTaskExecutor fittingTaskExecutor(AiFittingTaskProperties properties) {
         return createExecutor(
                 properties.getCorePoolSize(),
                 properties.getMaxPoolSize(),
@@ -41,7 +40,7 @@ public class AiAsyncConfig {
     }
 
     @Bean(name = "aiResultPersistenceExecutor")
-    public Executor aiResultPersistenceExecutor(
+    public ThreadPoolTaskExecutor aiResultPersistenceExecutor(
             AiResultPersistenceTaskProperties properties
     ) {
         return createExecutor(
@@ -53,7 +52,7 @@ public class AiAsyncConfig {
         );
     }
 
-    private Executor createExecutor(
+    private ThreadPoolTaskExecutor createExecutor(
             int corePoolSize,
             int maxPoolSize,
             int queueCapacity,
