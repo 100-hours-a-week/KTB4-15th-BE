@@ -1,11 +1,14 @@
 package com.ktb.lookddak.domain.image.controller;
 
+import com.ktb.lookddak.domain.image.dto.BodyImageWarmupResponse;
 import com.ktb.lookddak.domain.image.dto.FullBodyImageValidationResponse;
+import com.ktb.lookddak.domain.image.service.BodyImageWarmupService;
 import com.ktb.lookddak.domain.image.service.FullBodyImageValidationService;
 import com.ktb.lookddak.global.response.ApiResponse;
 import com.ktb.lookddak.global.response.SuccessCode;
 import com.ktb.lookddak.global.security.principal.MemberPrincipal;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,6 +24,30 @@ import org.springframework.web.multipart.MultipartFile;
 public class FullBodyImageValidationController {
 
     private final FullBodyImageValidationService validationService;
+    private final BodyImageWarmupService warmupService;
+
+    @PostMapping("/warmup")
+    public ResponseEntity<ApiResponse<Void>> warmup() {
+        BodyImageWarmupResponse response = warmupService.requestWarmup();
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(response.status());
+        if (response.retryAfterSeconds() != null) {
+            builder.header(
+                    HttpHeaders.RETRY_AFTER,
+                    response.retryAfterSeconds().toString()
+            );
+        }
+
+        if (response.status().is2xxSuccessful()) {
+            return builder.body(ApiResponse.success(
+                    SuccessCode.BODY_IMAGE_WARMUP_ACCEPTED,
+                    null
+            ));
+        }
+        return builder.body(ApiResponse.failure(
+                response.code(),
+                response.message()
+        ));
+    }
 
     @PostMapping(
             value = "/validate",
