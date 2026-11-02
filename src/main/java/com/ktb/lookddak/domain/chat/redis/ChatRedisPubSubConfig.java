@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.listener.PatternTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+import com.ktb.lookddak.domain.chat.service.ChatSseService;
 
 /** Redis 기능이 켜진 BE만 모든 채팅 이벤트 채널을 pattern 구독한다. */
 @Configuration
@@ -16,10 +17,12 @@ public class ChatRedisPubSubConfig {
     public RedisMessageListenerContainer chatRedisMessageListenerContainer(
             RedisConnectionFactory connectionFactory,
             ChatRedisEventSubscriber chatRedisEventSubscriber,
-            ChatRedisKeyFactory keyFactory
+            ChatRedisKeyFactory keyFactory,
+            ChatSseService chatSseService
     ) {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
+        container.setErrorHandler(error -> chatSseService.resynchronizeAllRedisConnections());
         container.addMessageListener(
                 chatRedisEventSubscriber,
                 new PatternTopic(keyFactory.eventChannelPattern())

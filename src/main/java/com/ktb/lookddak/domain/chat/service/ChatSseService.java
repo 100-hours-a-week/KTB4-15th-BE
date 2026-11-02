@@ -327,6 +327,28 @@ public class ChatSseService {
         }
     }
 
+    /**
+     * Redis Pub/Sub listener가 연결 오류 뒤 재구독할 때 호출한다.
+     * Pub/Sub은 단절 구간의 event를 재전달하지 않으므로 모든 활성 연결을 Snapshot으로
+     * 재동기화해 누락을 보정한다.
+     */
+    public void resynchronizeAllRedisConnections() {
+        redisConnections.forEach((userMessageId, connection) -> {
+            boolean shouldResynchronize = false;
+            synchronized (connection.lock) {
+                if (redisConnections.get(userMessageId) != connection
+                        || connection.recovering) {
+                    return;
+                }
+                connection.recovering = true;
+                shouldResynchronize = true;
+            }
+            if (shouldResynchronize) {
+                resynchronizeRedisConnection(userMessageId, connection);
+            }
+        });
+    }
+
     private void resynchronizeRedisConnection(Long userMessageId, RedisConnection connection) {
         Optional<ChatRedisSnapshot> snapshot;
         try {
