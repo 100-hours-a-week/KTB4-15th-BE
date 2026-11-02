@@ -5,6 +5,7 @@ import com.ktb.lookddak.domain.chat.entity.ChatRoom;
 import com.ktb.lookddak.domain.chat.entity.ChatSourceType;
 import com.ktb.lookddak.domain.chat.entity.ChatGenerationStatus;
 import com.ktb.lookddak.domain.chat.dto.ChatGenerationStatusResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatMessageDetailResponse;
 import com.ktb.lookddak.domain.chat.redis.ChatRedisProperties;
 import com.ktb.lookddak.domain.chat.redis.ChatRedisEvent;
 import com.ktb.lookddak.domain.chat.redis.ChatRedisSnapshot;
@@ -161,6 +162,64 @@ class ChatSseServiceTest {
         assertThat(emitter.getTimeout()).isEqualTo(300_000L);
         assertThat(service.hasConnection(100L)).isFalse();
         verify(chatRedisSnapshotRepository, never()).findByMessageId(100L);
+    }
+
+    @Test
+    @DisplayName("Redis Snapshot 조회 오류 시 연결을 등록 상태로 남기지 않는다")
+    void cleanUpConnectionWhenRedisSnapshotReadFails() {
+        ChatSseService service = service(true);
+        Member member = createMember(1L);
+        ChatRoom chatRoom = createChatRoom(10L, member);
+        ChatMessage message = ChatMessage.createPendingUserText(chatRoom, "가을 니트를 추천해줘");
+        ReflectionTestUtils.setField(message, "id", 100L);
+        given(chatRoomRepository.findActiveById(10L)).willReturn(Optional.of(chatRoom));
+        given(chatMessageRepository.findByIdAndChatRoomId(100L, 10L)).willReturn(Optional.of(message));
+        given(chatService.getGenerationStatus(1L, 10L, 100L))
+                .willReturn(new ChatGenerationStatusResponse(ChatGenerationStatus.GENERATING, null));
+        given(chatRedisSnapshotRepository.findByMessageId(100L))
+                .willThrow(new IllegalStateException("redis unavailable"));
+
+        assertThatThrownBy(() -> service.connect(1L, 10L, 100L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("redis unavailable");
+
+        assertThat(service.hasConnection(100L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("마지막 done PubSub을 유실해도 DB 완료 상태 재연결은 done으로 종료한다")
+    void recoverLostDoneFromCompletedDatabaseState() {
+        ChatSseService service = service(true);
+        Member member = createMember(1L);
+        ChatRoom chatRoom = createChatRoom(10L, member);
+        ChatMessage message = ChatMessage.createPendingUserText(chatRoom, "가을 니트를 추천해줘");
+        ReflectionTestUtils.setField(message, "id", 100L);
+        given(chatRoomRepository.findActiveById(10L)).willReturn(Optional.of(chatRoom));
+        given(chatMessageRepository.findByIdAndChatRoomId(100L, 10L)).willReturn(Optional.of(message));
+
+        ChatGenerationStatusResponse completed = org.mockito.Mockito.mock(ChatGenerationStatusResponse.class);
+        ChatMessageDetailResponse aiMessage = org.mockito.Mockito.mock(ChatMessageDetailResponse.class);
+        given(completed.getGenerationStatus()).willReturn(ChatGenerationStatus.COMPLETED);
+        given(completed.getMessage()).willReturn(aiMessage);
+        given(aiMessage.getContent()).willReturn("DB 최종 결과");
+        given(aiMessage.getRecommendation()).willReturn(null);
+        given(chatService.getGenerationStatus(1L, 10L, 100L)).willReturn(completed);
+
+        service.connect(1L, 10L, 100L);
+
+        assertThat(service.hasConnection(100L)).isFalse();
+        verify(chatRedisSnapshotRepository, never()).findByMessageId(100L);
+    }
+
+    @Test
+    @DisplayName("이미 종료된 연결에 늦게 도착한 Redis event는 무시한다")
+    void ignoreLateRedisEventAfterConnectionCompleted() {
+        ChatSseService service = service();
+
+        service.complete(100L);
+        service.handleRedisEvent(ChatRedisEvent.token(100L, 1L, "늦은 token"));
+
+        assertThat(service.hasConnection(100L)).isFalse();
     }
 
     private Member createMember(Long memberId) {
