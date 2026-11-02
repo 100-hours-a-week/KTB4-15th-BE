@@ -59,6 +59,14 @@ public class ChatSseService {
     ) {
         validateMessageAccess(memberId, chatRoomId, userMessageId);
         if (chatRedisProperties.isEnabled()) {
+            ChatGenerationStatusResponse generation = chatService.getGenerationStatus(
+                    memberId,
+                    chatRoomId,
+                    userMessageId
+            );
+            if (isTerminal(generation.getGenerationStatus())) {
+                return connectWithTerminalDatabaseResult(userMessageId, generation);
+            }
             return connectWithRedisSnapshot(memberId, chatRoomId, userMessageId);
         }
         return connectWithLocalSnapshot(userMessageId);
@@ -134,6 +142,40 @@ public class ChatSseService {
                         userMessageId,
                         connection
                 ));
+        return emitter;
+    }
+
+    /**
+     * 완료된 요청은 Redis 보관 기간과 무관하게 DB를 진실 공급원으로 사용한다.
+     * 따라서 마지막 Pub/Sub done/error를 놓쳤거나 Snapshot이 만료돼도 복구할 수 있다.
+     */
+    private SseEmitter connectWithTerminalDatabaseResult(
+            Long userMessageId,
+            ChatGenerationStatusResponse result
+    ) {
+        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MILLIS);
+        registerLocal(userMessageId, emitter);
+        send(userMessageId, emitter, "connected", new ChatSseConnectedResponse(userMessageId));
+
+        if (result.getGenerationStatus() == ChatGenerationStatus.COMPLETED
+                && result.getMessage() != null) {
+            ChatMessageDetailResponse message = result.getMessage();
+            List<RecommendedProductResponse> products = message.getRecommendation() == null
+                    ? List.of()
+                    : message.getRecommendation().getProducts();
+            send(userMessageId, emitter, "done", new ChatSseDoneResponse(
+                    userMessageId,
+                    message.getContent(),
+                    products
+            ));
+        } else {
+            send(userMessageId, emitter, "error", new ChatSseErrorResponse(
+                    userMessageId,
+                    "AI_GENERATION_FAILED",
+                    "AI 응답 생성에 실패했습니다. 다시 시도해 주세요."
+            ));
+        }
+        complete(userMessageId);
         return emitter;
     }
 

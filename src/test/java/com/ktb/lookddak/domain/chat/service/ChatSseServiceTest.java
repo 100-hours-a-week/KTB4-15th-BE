@@ -3,6 +3,8 @@ package com.ktb.lookddak.domain.chat.service;
 import com.ktb.lookddak.domain.chat.entity.ChatMessage;
 import com.ktb.lookddak.domain.chat.entity.ChatRoom;
 import com.ktb.lookddak.domain.chat.entity.ChatSourceType;
+import com.ktb.lookddak.domain.chat.entity.ChatGenerationStatus;
+import com.ktb.lookddak.domain.chat.dto.ChatGenerationStatusResponse;
 import com.ktb.lookddak.domain.chat.redis.ChatRedisProperties;
 import com.ktb.lookddak.domain.chat.redis.ChatRedisEvent;
 import com.ktb.lookddak.domain.chat.redis.ChatRedisSnapshot;
@@ -31,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class ChatSseServiceTest {
@@ -112,6 +115,8 @@ class ChatSseServiceTest {
         ReflectionTestUtils.setField(message, "id", 100L);
         given(chatRoomRepository.findActiveById(10L)).willReturn(Optional.of(chatRoom));
         given(chatMessageRepository.findByIdAndChatRoomId(100L, 10L)).willReturn(Optional.of(message));
+        given(chatService.getGenerationStatus(1L, 10L, 100L))
+                .willReturn(new ChatGenerationStatusResponse(ChatGenerationStatus.GENERATING, null));
 
         CountDownLatch snapshotReadStarted = new CountDownLatch(1);
         CountDownLatch releaseSnapshotRead = new CountDownLatch(1);
@@ -136,6 +141,26 @@ class ChatSseServiceTest {
         connection.get(1, TimeUnit.SECONDS);
 
         assertThat(service.hasConnection(100L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("완료·실패 상태 재연결은 Redis Snapshot 대신 DB 상태로 즉시 종료한다")
+    void recoverTerminalResultFromDatabaseBeforeRedisSnapshot() {
+        ChatSseService service = service(true);
+        Member member = createMember(1L);
+        ChatRoom chatRoom = createChatRoom(10L, member);
+        ChatMessage message = ChatMessage.createPendingUserText(chatRoom, "가을 니트를 추천해줘");
+        ReflectionTestUtils.setField(message, "id", 100L);
+        given(chatRoomRepository.findActiveById(10L)).willReturn(Optional.of(chatRoom));
+        given(chatMessageRepository.findByIdAndChatRoomId(100L, 10L)).willReturn(Optional.of(message));
+        given(chatService.getGenerationStatus(1L, 10L, 100L))
+                .willReturn(new ChatGenerationStatusResponse(ChatGenerationStatus.FAILED, null));
+
+        SseEmitter emitter = service.connect(1L, 10L, 100L);
+
+        assertThat(emitter.getTimeout()).isEqualTo(300_000L);
+        assertThat(service.hasConnection(100L)).isFalse();
+        verify(chatRedisSnapshotRepository, never()).findByMessageId(100L);
     }
 
     private Member createMember(Long memberId) {
