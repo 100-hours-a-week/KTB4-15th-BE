@@ -111,6 +111,29 @@ class ChatV2GenerationStreamListenerTest {
         verify(eventPublisher).publishEvent(any(ChatV2GenerationFailedEvent.class));
     }
 
+    @Test
+    @DisplayName("Redis Pub/Sub이 활성화되면 listener는 로컬 emitter에 token을 중복 전송하지 않는다")
+    void doNotSendTokenDirectlyWhenRedisIsEnabled() {
+        ChatV2GenerationStreamListener listener = new ChatV2GenerationStreamListener(
+                aiChatStreamingClient,
+                chatSseService,
+                chatRedisStreamingService,
+                eventPublisher
+        );
+        given(chatRedisStreamingService.isEnabled()).willReturn(true);
+        given(aiChatStreamingClient.stream(any(AiChatRequest.class)))
+                .willReturn(Flux.just(AiChatStreamEvent.token(
+                        new AiChatTokenResponse(10L, "추천을 찾고 있어요.")
+                )));
+
+        listener.handle(event());
+
+        verify(chatRedisStreamingService).recordToken(
+                eq(100L), any(String.class), eq("추천을 찾고 있어요.")
+        );
+        verify(chatSseService, never()).sendToken(100L, "추천을 찾고 있어요.");
+    }
+
     private ChatV2GenerationRequestedEvent event() {
         return new ChatV2GenerationRequestedEvent(
                 1L,

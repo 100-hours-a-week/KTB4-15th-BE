@@ -1,5 +1,6 @@
 package com.ktb.lookddak.domain.chat.redis;
 
+import com.ktb.lookddak.domain.chat.dto.ChatSseDoneResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +17,10 @@ public class ChatRedisStreamingService {
     private final ChatRedisProperties properties;
     private final ChatRedisSnapshotRepository snapshotRepository;
     private final ChatRedisEventPublisher eventPublisher;
+
+    public boolean isEnabled() {
+        return properties.isEnabled();
+    }
 
     public void initialize(Long userMessageId) {
         if (!properties.isEnabled()) {
@@ -43,6 +48,57 @@ public class ChatRedisStreamingService {
                     userMessageId,
                     result.seq(),
                     content
+            ));
+        }
+    }
+
+    /** DB 결과 저장이 성공한 뒤에만 완료 이벤트를 상태 전이와 함께 발행한다. */
+    public void complete(
+            Long userMessageId,
+            String eventId,
+            ChatSseDoneResponse response
+    ) {
+        if (!properties.isEnabled()) {
+            return;
+        }
+
+        ChatRedisSnapshotWriteResult result = snapshotRepository.transitionStatus(
+                userMessageId,
+                eventId,
+                com.ktb.lookddak.domain.chat.entity.ChatGenerationStatus.COMPLETED
+        );
+        if (result.applied()) {
+            eventPublisher.publish(ChatRedisEvent.done(
+                    userMessageId,
+                    result.seq(),
+                    response.getContent(),
+                    response.getProducts()
+            ));
+        }
+    }
+
+    /** DB의 FAILED 처리가 끝난 뒤 error 이벤트를 상태 전이와 함께 발행한다. */
+    public void fail(
+            Long userMessageId,
+            String eventId,
+            String code,
+            String message
+    ) {
+        if (!properties.isEnabled()) {
+            return;
+        }
+
+        ChatRedisSnapshotWriteResult result = snapshotRepository.transitionStatus(
+                userMessageId,
+                eventId,
+                com.ktb.lookddak.domain.chat.entity.ChatGenerationStatus.FAILED
+        );
+        if (result.applied()) {
+            eventPublisher.publish(ChatRedisEvent.error(
+                    userMessageId,
+                    result.seq(),
+                    code,
+                    message
             ));
         }
     }

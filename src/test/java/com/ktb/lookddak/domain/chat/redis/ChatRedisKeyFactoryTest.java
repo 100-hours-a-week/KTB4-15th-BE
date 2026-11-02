@@ -25,6 +25,8 @@ class ChatRedisKeyFactoryTest {
     void createEventChannel() {
         assertThat(keyFactory.eventChannel(4365L))
                 .isEqualTo("lookddak:chat:events:4365");
+        assertThat(keyFactory.eventChannelPattern())
+                .isEqualTo("lookddak:chat:events:*");
     }
 
     @Test

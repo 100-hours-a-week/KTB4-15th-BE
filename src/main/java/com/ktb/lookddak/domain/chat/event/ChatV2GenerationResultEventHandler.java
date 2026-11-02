@@ -2,6 +2,7 @@ package com.ktb.lookddak.domain.chat.event;
 
 import com.ktb.lookddak.domain.chat.dto.ChatSseDoneResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatSseErrorResponse;
+import com.ktb.lookddak.domain.chat.redis.ChatRedisStreamingService;
 import com.ktb.lookddak.domain.chat.service.ChatGenerationResultService;
 import com.ktb.lookddak.domain.chat.service.ChatSseService;
 import com.ktb.lookddak.global.client.ai.config.AiResultPersistenceExecutorMetrics;
@@ -12,6 +13,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.RejectedExecutionException;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -24,18 +26,21 @@ public class ChatV2GenerationResultEventHandler {
 
     private final ChatGenerationResultService resultService;
     private final ChatSseService chatSseService;
+    private final ChatRedisStreamingService chatRedisStreamingService;
     private final ThreadPoolTaskExecutor resultPersistenceExecutor;
     private final AiResultPersistenceExecutorMetrics executorMetrics;
 
     public ChatV2GenerationResultEventHandler(
             ChatGenerationResultService resultService,
             ChatSseService chatSseService,
+            ChatRedisStreamingService chatRedisStreamingService,
             @Qualifier("aiResultPersistenceExecutor")
             ThreadPoolTaskExecutor resultPersistenceExecutor,
             AiResultPersistenceExecutorMetrics executorMetrics
     ) {
         this.resultService = resultService;
         this.chatSseService = chatSseService;
+        this.chatRedisStreamingService = chatRedisStreamingService;
         this.resultPersistenceExecutor = resultPersistenceExecutor;
         this.executorMetrics = executorMetrics;
     }
@@ -55,11 +60,7 @@ public class ChatV2GenerationResultEventHandler {
                     event.getUserMessageId(), event.getResponse()
             );
             if (response != null) {
-                chatSseService.send(
-                        event.getUserMessageId(),
-                        "done",
-                        response
-                );
+                sendDone(event.getUserMessageId(), response);
             }
         } catch (Exception exception) {
             log.error(
@@ -68,17 +69,13 @@ public class ChatV2GenerationResultEventHandler {
                     exception
             );
             resultService.fail(event.getUserMessageId());
-            chatSseService.send(
+            sendError(
                     event.getUserMessageId(),
-                    "error",
-                    new ChatSseErrorResponse(
-                            event.getUserMessageId(),
-                            RESULT_PERSISTENCE_FAILED,
-                            "AI 응답 결과를 저장하지 못했습니다."
-                    )
+                    RESULT_PERSISTENCE_FAILED,
+                    "AI 응답 결과를 저장하지 못했습니다."
             );
         } finally {
-            chatSseService.complete(event.getUserMessageId());
+            completeLocalSseWhenRedisDisabled(event.getUserMessageId());
         }
     }
 
@@ -97,16 +94,8 @@ public class ChatV2GenerationResultEventHandler {
                     exception
             );
         } finally {
-            chatSseService.send(
-                    event.getUserMessageId(),
-                    "error",
-                    new ChatSseErrorResponse(
-                            event.getUserMessageId(),
-                            event.getCode(),
-                            event.getMessage()
-                    )
-            );
-            chatSseService.complete(event.getUserMessageId());
+            sendError(event.getUserMessageId(), event.getCode(), event.getMessage());
+            completeLocalSseWhenRedisDisabled(event.getUserMessageId());
         }
     }
 
@@ -139,15 +128,46 @@ public class ChatV2GenerationResultEventHandler {
                     exception
             );
         } finally {
-            chatSseService.send(
+            sendError(
                     userMessageId,
-                    "error",
-                    new ChatSseErrorResponse(
-                            userMessageId,
-                            RESULT_PERSISTENCE_REJECTED,
-                            "요청이 많아 응답 결과를 처리하지 못했습니다. 다시 시도해 주세요."
-                    )
+                    RESULT_PERSISTENCE_REJECTED,
+                    "요청이 많아 응답 결과를 처리하지 못했습니다. 다시 시도해 주세요."
             );
+            completeLocalSseWhenRedisDisabled(userMessageId);
+        }
+    }
+
+    private void sendDone(Long userMessageId, ChatSseDoneResponse response) {
+        if (chatRedisStreamingService.isEnabled()) {
+            chatRedisStreamingService.complete(
+                    userMessageId,
+                    UUID.randomUUID().toString(),
+                    response
+            );
+            return;
+        }
+        chatSseService.send(userMessageId, "done", response);
+    }
+
+    private void sendError(Long userMessageId, String code, String message) {
+        if (chatRedisStreamingService.isEnabled()) {
+            chatRedisStreamingService.fail(
+                    userMessageId,
+                    UUID.randomUUID().toString(),
+                    code,
+                    message
+            );
+            return;
+        }
+        chatSseService.send(
+                userMessageId,
+                "error",
+                new ChatSseErrorResponse(userMessageId, code, message)
+        );
+    }
+
+    private void completeLocalSseWhenRedisDisabled(Long userMessageId) {
+        if (!chatRedisStreamingService.isEnabled()) {
             chatSseService.complete(userMessageId);
         }
     }

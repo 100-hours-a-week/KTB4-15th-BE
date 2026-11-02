@@ -47,10 +47,12 @@ public class ChatV2GenerationStreamListener {
                     UUID.randomUUID().toString(),
                     streamEvent.getContent()
             );
-            chatSseService.sendToken(
-                    userMessageId,
-                    streamEvent.getContent()
-            );
+            if (!chatRedisStreamingService.isEnabled()) {
+                chatSseService.sendToken(
+                        userMessageId,
+                        streamEvent.getContent()
+                );
+            }
             return;
         }
 
