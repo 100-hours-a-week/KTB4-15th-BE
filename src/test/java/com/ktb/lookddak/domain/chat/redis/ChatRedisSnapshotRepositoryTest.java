@@ -26,25 +26,61 @@ class ChatRedisSnapshotRepositoryTest {
     );
 
     @Test
-    @DisplayName("토큰을 누적할 때 Lua script의 반환 seq를 사용한다")
-    void appendTokenReturnsRedisSequence() {
+    @DisplayName("새 token 이벤트는 Redis가 발급한 seq로 한 번만 반영한다")
+    void appendTokenReturnsAppliedSequence() {
         when(redisTemplate.execute(
-                any(DefaultRedisScript.class),
-                anyList(),
-                anyString(),
-                anyString()
-        )).thenReturn(7L);
+                any(DefaultRedisScript.class), anyList(), anyString(), anyString()
+        )).thenReturn(List.of("APPLIED", "7", "GENERATING"));
 
-        long seq = repository.appendToken(4365L, "추천");
+        ChatRedisSnapshotWriteResult result = repository.appendToken(4365L, "event-7", "추천");
 
-        assertThat(seq).isEqualTo(7L);
+        assertThat(result.seq()).isEqualTo(7L);
+        assertThat(result.applied()).isTrue();
+        assertThat(result.status()).isEqualTo(ChatGenerationStatus.GENERATING);
+    }
+
+    @Test
+    @DisplayName("같은 eventId 재시도는 기존 seq를 반환하고 다시 발행하지 않도록 표시한다")
+    void returnDuplicateForRetriedEvent() {
+        when(redisTemplate.execute(
+                any(DefaultRedisScript.class), anyList(), anyString(), anyString()
+        )).thenReturn(List.of("DUPLICATE", "7", "GENERATING"));
+
+        ChatRedisSnapshotWriteResult result = repository.appendToken(4365L, "event-7", "추천");
+
+        assertThat(result.seq()).isEqualTo(7L);
+        assertThat(result.applied()).isFalse();
+    }
+
+    @Test
+    @DisplayName("초기화되지 않은 Snapshot에 대한 token 추가는 명확히 거절한다")
+    void rejectUninitializedSnapshot() {
+        when(redisTemplate.execute(
+                any(DefaultRedisScript.class), anyList(), anyString(), anyString()
+        )).thenReturn(List.of("UNINITIALIZED", "", ""));
+
+        assertThatThrownBy(() -> repository.appendToken(4365L, "event-7", "추천"))
+                .isInstanceOf(ChatRedisSnapshotWriteRejectedException.class)
+                .hasMessageContaining("not initialized");
+    }
+
+    @Test
+    @DisplayName("종료 상태인 Snapshot에 다른 token을 적용하려 하면 거절한다")
+    void rejectInvalidState() {
+        when(redisTemplate.execute(
+                any(DefaultRedisScript.class), anyList(), anyString(), anyString()
+        )).thenReturn(List.of("INVALID_STATE", "10", "COMPLETED"));
+
+        assertThatThrownBy(() -> repository.appendToken(4365L, "event-11", "추가 토큰"))
+                .isInstanceOf(ChatRedisSnapshotWriteRejectedException.class)
+                .hasMessageContaining("COMPLETED");
     }
 
     @Test
     @DisplayName("원자적으로 읽은 content, seq, status를 Snapshot으로 변환한다")
     void findSnapshot() {
         when(redisTemplate.execute(any(DefaultRedisScript.class), anyList()))
-                .thenReturn(List.of("안녕하세요", "7", "GENERATING"));
+                .thenReturn(List.of("안녕하세요", "7", "GENERATING", "1"));
 
         ChatRedisSnapshot snapshot = repository.findByMessageId(4365L).orElseThrow();
 
@@ -54,10 +90,10 @@ class ChatRedisSnapshotRepositoryTest {
     }
 
     @Test
-    @DisplayName("Redis에 Snapshot이 없으면 빈 값으로 처리한다")
+    @DisplayName("Redis에 초기화된 Snapshot이 없으면 빈 값으로 처리한다")
     void findMissingSnapshot() {
         when(redisTemplate.execute(any(DefaultRedisScript.class), anyList()))
-                .thenReturn(List.of("", "", ""));
+                .thenReturn(List.of("", "", "", ""));
 
         assertThat(repository.findByMessageId(4365L)).isEmpty();
     }
@@ -65,20 +101,24 @@ class ChatRedisSnapshotRepositoryTest {
     @Test
     @DisplayName("완료나 실패가 아닌 상태 전이는 거절한다")
     void rejectNonTerminalStatus() {
-        assertThatThrownBy(() -> repository.transitionStatus(4365L, ChatGenerationStatus.GENERATING))
-                .isInstanceOf(IllegalArgumentException.class)
+        assertThatThrownBy(() -> repository.transitionStatus(
+                4365L, "event-8", ChatGenerationStatus.GENERATING
+        )).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("terminal");
     }
 
     @Test
-    @DisplayName("Lua script는 token append, seq 증가, 상태 갱신을 한 번에 수행한다")
-    void scriptsHaveAtomicOperations() {
+    @DisplayName("Lua script는 초기화와 eventId 중복을 검사한 뒤 token을 원자적으로 반영한다")
+    void scriptsHaveIdempotencyAndStateGuard() {
         assertThat(ChatRedisSnapshotRepository.appendTokenScript())
+                .contains("initialized")
+                .contains("GET', KEYS[3]")
                 .contains("HINCRBY")
                 .contains("APPEND")
-                .contains("HSET");
-        assertThat(ChatRedisSnapshotRepository.readScript())
-                .contains("GET")
-                .contains("HGET");
+                .contains("DUPLICATE")
+                .contains("INVALID_STATE");
+        assertThat(ChatRedisSnapshotRepository.transitionStatusScript())
+                .contains("currentStatus ~= 'GENERATING'")
+                .contains("DUPLICATE");
     }
 }

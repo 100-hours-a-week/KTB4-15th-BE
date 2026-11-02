@@ -28,6 +28,14 @@ public class ChatRedisKeyFactory {
         return keyPrefix + ":events:" + userMessageId;
     }
 
+    /**
+     * 같은 AI 이벤트의 Redis 쓰기 재시도를 식별하는 키다.
+     * messageId hash tag를 유지해 Snapshot 상태와 한 Lua script에서 다룬다.
+     */
+    public String appliedEventKey(Long userMessageId, String eventId) {
+        return messagePrefix(userMessageId) + ":event:" + eventId;
+    }
+
     private String messagePrefix(Long userMessageId) {
         return keyPrefix + ":{" + userMessageId + "}";
     }
