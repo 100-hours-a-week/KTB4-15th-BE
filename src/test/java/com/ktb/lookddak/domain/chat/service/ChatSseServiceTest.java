@@ -44,6 +44,9 @@ class ChatSseServiceTest {
     @Mock
     private ChatRedisSnapshotRepository chatRedisSnapshotRepository;
 
+    @Mock
+    private ChatService chatService;
+
     @Test
     @DisplayName("채팅방 소유자는 사용자 메시지 SSE 연결을 생성할 수 있다")
     void connect() {
@@ -153,6 +156,7 @@ class ChatSseServiceTest {
                 chatRoomRepository,
                 chatMessageRepository,
                 new ChatSseSnapshotStore(),
+                chatService,
                 new ChatRedisProperties(redisEnabled, "lookddak:chat"),
                 chatRedisSnapshotRepository
         );

@@ -5,6 +5,10 @@ import com.ktb.lookddak.domain.chat.dto.ChatSseDoneResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatSseErrorResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatSseSnapshotResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatSseTokenResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatGenerationStatusResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatMessageDetailResponse;
+import com.ktb.lookddak.domain.chat.dto.RecommendedProductResponse;
+import com.ktb.lookddak.domain.chat.entity.ChatGenerationStatus;
 import com.ktb.lookddak.domain.chat.entity.ChatMessage;
 import com.ktb.lookddak.domain.chat.entity.ChatRoom;
 import com.ktb.lookddak.domain.chat.entity.ChatSenderType;
@@ -38,6 +42,7 @@ public class ChatSseService {
     private final ChatRoomRepository chatRoomRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final ChatSseSnapshotStore snapshotStore;
+    private final ChatService chatService;
     private final ChatRedisProperties chatRedisProperties;
     private final ChatRedisSnapshotRepository chatRedisSnapshotRepository;
     private final ConcurrentMap<Long, SseEmitter> emitters = new ConcurrentHashMap<>();
@@ -54,7 +59,7 @@ public class ChatSseService {
     ) {
         validateMessageAccess(memberId, chatRoomId, userMessageId);
         if (chatRedisProperties.isEnabled()) {
-            return connectWithRedisSnapshot(userMessageId);
+            return connectWithRedisSnapshot(memberId, chatRoomId, userMessageId);
         }
         return connectWithLocalSnapshot(userMessageId);
     }
@@ -79,9 +84,13 @@ public class ChatSseService {
      * 먼저 RECOVERING 연결을 등록한 뒤 Snapshot을 읽는다. 이 사이 도착한 Pub/Sub event는
      * connection 버퍼에 쌓고, snapshot의 seq보다 큰 event만 snapshot 뒤에 이어 보낸다.
      */
-    private SseEmitter connectWithRedisSnapshot(Long userMessageId) {
+    private SseEmitter connectWithRedisSnapshot(
+            Long memberId,
+            Long chatRoomId,
+            Long userMessageId
+    ) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MILLIS);
-        RedisConnection connection = new RedisConnection(emitter);
+        RedisConnection connection = new RedisConnection(emitter, memberId, chatRoomId);
         registerRedis(userMessageId, connection);
         synchronized (connection.lock) {
             send(userMessageId, emitter, "connected", new ChatSseConnectedResponse(userMessageId));
@@ -118,7 +127,61 @@ public class ChatSseService {
             }
             connection.recovering = false;
         }
+        snapshot.filter(value -> isTerminal(value.status()))
+                .ifPresent(ignored -> sendTerminalResultFromDatabase(
+                        memberId,
+                        chatRoomId,
+                        userMessageId,
+                        connection
+                ));
         return emitter;
+    }
+
+    private void sendTerminalResultFromDatabase(
+            Long memberId,
+            Long chatRoomId,
+            Long userMessageId,
+            RedisConnection connection
+    ) {
+        if (redisConnections.get(userMessageId) != connection) {
+            return;
+        }
+        ChatGenerationStatusResponse result = chatService.getGenerationStatus(
+                memberId,
+                chatRoomId,
+                userMessageId
+        );
+        synchronized (connection.lock) {
+            if (redisConnections.get(userMessageId) != connection) {
+                return;
+            }
+            if (result.getGenerationStatus() == ChatGenerationStatus.COMPLETED
+                    && result.getMessage() != null) {
+                ChatMessageDetailResponse message = result.getMessage();
+                List<RecommendedProductResponse> products = message.getRecommendation() == null
+                        ? List.of()
+                        : message.getRecommendation().getProducts();
+                send(userMessageId, connection.emitter, "done", new ChatSseDoneResponse(
+                        userMessageId,
+                        message.getContent(),
+                        products
+                ));
+                completeRedisConnection(userMessageId, connection);
+                return;
+            }
+            if (result.getGenerationStatus() == ChatGenerationStatus.FAILED) {
+                send(userMessageId, connection.emitter, "error", new ChatSseErrorResponse(
+                        userMessageId,
+                        "AI_GENERATION_FAILED",
+                        "AI 응답 생성에 실패했습니다. 다시 시도해 주세요."
+                ));
+                completeRedisConnection(userMessageId, connection);
+            }
+        }
+    }
+
+    private boolean isTerminal(ChatGenerationStatus status) {
+        return status == ChatGenerationStatus.COMPLETED || status == ChatGenerationStatus.FAILED;
     }
 
     private void validateMessageAccess(
@@ -198,6 +261,7 @@ public class ChatSseService {
         if (connection == null) {
             return;
         }
+        boolean shouldResynchronize = false;
         synchronized (connection.lock) {
             if (redisConnections.get(event.userMessageId()) != connection) {
                 return;
@@ -206,7 +270,72 @@ public class ChatSseService {
                 connection.buffer.add(event);
                 return;
             }
-            forwardRedisEventLocked(event.userMessageId(), connection, event);
+            if (event.seq() > connection.lastSeq + 1) {
+                // Pub/Sub은 보관하지 않으므로 seq gap은 누락 가능성으로 간주한다.
+                // 먼저 event를 버퍼에 넣고 Snapshot을 다시 읽어 정합성을 맞춘다.
+                connection.recovering = true;
+                connection.buffer.add(event);
+                shouldResynchronize = true;
+            } else {
+                forwardRedisEventLocked(event.userMessageId(), connection, event);
+            }
+        }
+        if (shouldResynchronize) {
+            resynchronizeRedisConnection(event.userMessageId(), connection);
+        }
+    }
+
+    private void resynchronizeRedisConnection(Long userMessageId, RedisConnection connection) {
+        Optional<ChatRedisSnapshot> snapshot;
+        try {
+            snapshot = chatRedisSnapshotRepository.findByMessageId(userMessageId);
+        } catch (RuntimeException exception) {
+            completeRedisConnection(userMessageId, connection);
+            return;
+        }
+
+        boolean needsAnotherResynchronization = false;
+        synchronized (connection.lock) {
+            if (redisConnections.get(userMessageId) != connection) {
+                return;
+            }
+            connection.lastSeq = snapshot.map(ChatRedisSnapshot::seq).orElse(connection.lastSeq);
+            snapshot.map(ChatRedisSnapshot::content)
+                    .filter(content -> !content.isBlank())
+                    .ifPresent(content -> send(
+                            userMessageId,
+                            connection.emitter,
+                            "snapshot",
+                            new ChatSseSnapshotResponse(userMessageId, content)
+                    ));
+
+            connection.buffer.sort(Comparator.comparingLong(ChatRedisEvent::seq));
+            List<ChatRedisEvent> bufferedEvents = new ArrayList<>(connection.buffer);
+            connection.buffer.clear();
+            for (int index = 0; index < bufferedEvents.size(); index++) {
+                ChatRedisEvent bufferedEvent = bufferedEvents.get(index);
+                if (bufferedEvent.seq() > connection.lastSeq + 1) {
+                    // Snapshot 이후 버퍼 자체에 gap이 있으면 이 회차의 재생을 멈춘다.
+                    // 아직 보내지 않은 event는 다음 Snapshot 재조회 뒤 다시 판정한다.
+                    connection.buffer.addAll(bufferedEvents.subList(index, bufferedEvents.size()));
+                    needsAnotherResynchronization = true;
+                    break;
+                }
+                forwardRedisEventLocked(userMessageId, connection, bufferedEvent);
+            }
+            connection.recovering = needsAnotherResynchronization;
+        }
+        if (needsAnotherResynchronization) {
+            resynchronizeRedisConnection(userMessageId, connection);
+            return;
+        }
+        if (snapshot.map(ChatRedisSnapshot::status).filter(this::isTerminal).isPresent()) {
+            sendTerminalResultFromDatabase(
+                    connection.memberId,
+                    connection.chatRoomId,
+                    userMessageId,
+                    connection
+            );
         }
     }
 
@@ -300,12 +429,16 @@ public class ChatSseService {
     private static class RedisConnection {
         private final Object lock = new Object();
         private final SseEmitter emitter;
+        private final Long memberId;
+        private final Long chatRoomId;
         private final List<ChatRedisEvent> buffer = new ArrayList<>();
         private boolean recovering = true;
         private long lastSeq;
 
-        private RedisConnection(SseEmitter emitter) {
+        private RedisConnection(SseEmitter emitter, Long memberId, Long chatRoomId) {
             this.emitter = emitter;
+            this.memberId = memberId;
+            this.chatRoomId = chatRoomId;
         }
     }
 }
