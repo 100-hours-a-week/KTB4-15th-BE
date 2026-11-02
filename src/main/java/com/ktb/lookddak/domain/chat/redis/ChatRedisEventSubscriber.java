@@ -1,8 +1,5 @@
 package com.ktb.lookddak.domain.chat.redis;
 
-import com.ktb.lookddak.domain.chat.dto.ChatSseDoneResponse;
-import com.ktb.lookddak.domain.chat.dto.ChatSseErrorResponse;
-import com.ktb.lookddak.domain.chat.dto.ChatSseTokenResponse;
 import com.ktb.lookddak.domain.chat.service.ChatSseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,46 +43,6 @@ public class ChatRedisEventSubscriber implements MessageListener {
     }
 
     private void forward(ChatRedisEvent event) {
-        if (event.type() == ChatRedisEventType.TOKEN) {
-            chatSseService.sendToken(
-                    event.userMessageId(),
-                    event.content()
-            );
-            return;
-        }
-
-        if (event.type() == ChatRedisEventType.DONE) {
-            chatSseService.send(
-                    event.userMessageId(),
-                    "done",
-                    new ChatSseDoneResponse(
-                            event.userMessageId(),
-                            event.content(),
-                            event.products()
-                    )
-            );
-            chatSseService.complete(event.userMessageId());
-            return;
-        }
-
-        if (event.type() == ChatRedisEventType.ERROR) {
-            chatSseService.send(
-                    event.userMessageId(),
-                    "error",
-                    new ChatSseErrorResponse(
-                            event.userMessageId(),
-                            event.code(),
-                            event.message()
-                    )
-            );
-            chatSseService.complete(event.userMessageId());
-            return;
-        }
-
-        log.debug(
-                "Ignoring unsupported Redis chat event type={} userMessageId={}",
-                event.type(),
-                event.userMessageId()
-        );
+        chatSseService.handleRedisEvent(event);
     }
 }

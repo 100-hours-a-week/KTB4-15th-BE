@@ -3,6 +3,10 @@ package com.ktb.lookddak.domain.chat.service;
 import com.ktb.lookddak.domain.chat.entity.ChatMessage;
 import com.ktb.lookddak.domain.chat.entity.ChatRoom;
 import com.ktb.lookddak.domain.chat.entity.ChatSourceType;
+import com.ktb.lookddak.domain.chat.redis.ChatRedisProperties;
+import com.ktb.lookddak.domain.chat.redis.ChatRedisEvent;
+import com.ktb.lookddak.domain.chat.redis.ChatRedisSnapshot;
+import com.ktb.lookddak.domain.chat.redis.ChatRedisSnapshotRepository;
 import com.ktb.lookddak.domain.chat.repository.ChatMessageRepository;
 import com.ktb.lookddak.domain.chat.repository.ChatRoomRepository;
 import com.ktb.lookddak.domain.member.entity.Member;
@@ -18,6 +22,10 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,14 +41,13 @@ class ChatSseServiceTest {
     @Mock
     private ChatMessageRepository chatMessageRepository;
 
+    @Mock
+    private ChatRedisSnapshotRepository chatRedisSnapshotRepository;
+
     @Test
     @DisplayName("채팅방 소유자는 사용자 메시지 SSE 연결을 생성할 수 있다")
     void connect() {
-        ChatSseService service = new ChatSseService(
-                chatRoomRepository,
-                chatMessageRepository,
-                new ChatSseSnapshotStore()
-        );
+        ChatSseService service = service();
         Member member = createMember(1L);
         ChatRoom chatRoom = createChatRoom(10L, member);
         ChatMessage message = ChatMessage.createPendingUserText(
@@ -62,11 +69,7 @@ class ChatSseServiceTest {
     @Test
     @DisplayName("다른 회원의 채팅방에는 SSE 연결할 수 없다")
     void rejectWhenChatRoomIsNotOwned() {
-        ChatSseService service = new ChatSseService(
-                chatRoomRepository,
-                chatMessageRepository,
-                new ChatSseSnapshotStore()
-        );
+        ChatSseService service = service();
         ChatRoom chatRoom = createChatRoom(10L, createMember(2L));
         given(chatRoomRepository.findActiveById(10L))
                 .willReturn(Optional.of(chatRoom));
@@ -81,11 +84,7 @@ class ChatSseServiceTest {
     @Test
     @DisplayName("채팅방에 속하지 않는 메시지에는 SSE 연결할 수 없다")
     void rejectWhenMessageDoesNotExist() {
-        ChatSseService service = new ChatSseService(
-                chatRoomRepository,
-                chatMessageRepository,
-                new ChatSseSnapshotStore()
-        );
+        ChatSseService service = service();
         ChatRoom chatRoom = createChatRoom(10L, createMember(1L));
         given(chatRoomRepository.findActiveById(10L))
                 .willReturn(Optional.of(chatRoom));
@@ -100,6 +99,42 @@ class ChatSseServiceTest {
         verify(chatMessageRepository).findByIdAndChatRoomId(100L, 10L);
     }
 
+    @Test
+    @DisplayName("Snapshot 조회 중 도착한 done event는 버퍼링 후 Snapshot 뒤에 전달되어 연결을 종료한다")
+    void bufferRedisEventWhileRecovering() throws Exception {
+        ChatSseService service = service(true);
+        Member member = createMember(1L);
+        ChatRoom chatRoom = createChatRoom(10L, member);
+        ChatMessage message = ChatMessage.createPendingUserText(chatRoom, "가을 니트를 추천해줘");
+        ReflectionTestUtils.setField(message, "id", 100L);
+        given(chatRoomRepository.findActiveById(10L)).willReturn(Optional.of(chatRoom));
+        given(chatMessageRepository.findByIdAndChatRoomId(100L, 10L)).willReturn(Optional.of(message));
+
+        CountDownLatch snapshotReadStarted = new CountDownLatch(1);
+        CountDownLatch releaseSnapshotRead = new CountDownLatch(1);
+        given(chatRedisSnapshotRepository.findByMessageId(100L)).willAnswer(invocation -> {
+            snapshotReadStarted.countDown();
+            releaseSnapshotRead.await(1, TimeUnit.SECONDS);
+            return Optional.of(new ChatRedisSnapshot(
+                    100L,
+                    "기존 본문",
+                    1L,
+                    com.ktb.lookddak.domain.chat.entity.ChatGenerationStatus.GENERATING
+            ));
+        });
+
+        CompletableFuture<SseEmitter> connection = CompletableFuture.supplyAsync(
+                () -> service.connect(1L, 10L, 100L)
+        );
+        assertThat(snapshotReadStarted.await(1, TimeUnit.SECONDS)).isTrue();
+
+        service.handleRedisEvent(ChatRedisEvent.done(100L, 2L, "최종 본문", List.of()));
+        releaseSnapshotRead.countDown();
+        connection.get(1, TimeUnit.SECONDS);
+
+        assertThat(service.hasConnection(100L)).isFalse();
+    }
+
     private Member createMember(Long memberId) {
         Member member = Member.create(
                 "member" + memberId + "@lookddak.com",
@@ -107,6 +142,20 @@ class ChatSseServiceTest {
         );
         ReflectionTestUtils.setField(member, "id", memberId);
         return member;
+    }
+
+    private ChatSseService service() {
+        return service(false);
+    }
+
+    private ChatSseService service(boolean redisEnabled) {
+        return new ChatSseService(
+                chatRoomRepository,
+                chatMessageRepository,
+                new ChatSseSnapshotStore(),
+                new ChatRedisProperties(redisEnabled, "lookddak:chat"),
+                chatRedisSnapshotRepository
+        );
     }
 
     private ChatRoom createChatRoom(Long chatRoomId, Member member) {
