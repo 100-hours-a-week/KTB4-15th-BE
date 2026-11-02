@@ -40,6 +40,7 @@ chat:
   redis:
     enabled: ${CHAT_REDIS_ENABLED:false}
     key-prefix: ${CHAT_REDIS_KEY_PREFIX:lookddak:chat}
+    recovery-buffer-max-events: ${CHAT_REDIS_RECOVERY_BUFFER_MAX_EVENTS:512}
 
 ai:
   server:

@@ -38,6 +38,7 @@ import java.util.concurrent.ConcurrentMap;
 public class ChatSseService {
 
     private static final long SSE_TIMEOUT_MILLIS = 5 * 60 * 1000L;
+    private static final String RECOVERY_OVERFLOW_CODE = "CHAT_STREAM_RECOVERY_OVERFLOW";
 
     private final ChatRoomRepository chatRoomRepository;
     private final ChatMessageRepository chatMessageRepository;
@@ -114,6 +115,11 @@ public class ChatSseService {
         }
         synchronized (connection.lock) {
             if (redisConnections.get(userMessageId) != connection) {
+                return emitter;
+            }
+
+            if (connection.bufferOverflowed) {
+                sendRecoveryOverflow(userMessageId, connection);
                 return emitter;
             }
 
@@ -309,14 +315,14 @@ public class ChatSseService {
                 return;
             }
             if (connection.recovering) {
-                connection.buffer.add(event);
+                bufferRedisEvent(connection, event);
                 return;
             }
             if (event.seq() > connection.lastSeq + 1) {
                 // Pub/Sub은 보관하지 않으므로 seq gap은 누락 가능성으로 간주한다.
                 // 먼저 event를 버퍼에 넣고 Snapshot을 다시 읽어 정합성을 맞춘다.
                 connection.recovering = true;
-                connection.buffer.add(event);
+                bufferRedisEvent(connection, event);
                 shouldResynchronize = true;
             } else {
                 forwardRedisEventLocked(event.userMessageId(), connection, event);
@@ -361,6 +367,10 @@ public class ChatSseService {
         boolean needsAnotherResynchronization = false;
         synchronized (connection.lock) {
             if (redisConnections.get(userMessageId) != connection) {
+                return;
+            }
+            if (connection.bufferOverflowed) {
+                sendRecoveryOverflow(userMessageId, connection);
                 return;
             }
             connection.lastSeq = snapshot.map(ChatRedisSnapshot::seq).orElse(connection.lastSeq);
@@ -433,6 +443,23 @@ public class ChatSseService {
         }
     }
 
+    private void bufferRedisEvent(RedisConnection connection, ChatRedisEvent event) {
+        if (connection.buffer.size() >= chatRedisProperties.getRecoveryBufferMaxEvents()) {
+            connection.bufferOverflowed = true;
+            return;
+        }
+        connection.buffer.add(event);
+    }
+
+    private void sendRecoveryOverflow(Long userMessageId, RedisConnection connection) {
+        send(userMessageId, connection.emitter, "error", new ChatSseErrorResponse(
+                userMessageId,
+                RECOVERY_OVERFLOW_CODE,
+                "응답 복구 버퍼가 가득 찼습니다. 다시 연결해 주세요."
+        ));
+        completeRedisConnection(userMessageId, connection);
+    }
+
     private void send(Long userMessageId, SseEmitter emitter, String eventName, Object data) {
         try {
             emitter.send(SseEmitter.event().name(eventName).data(data));
@@ -497,6 +524,7 @@ public class ChatSseService {
         private final Long chatRoomId;
         private final List<ChatRedisEvent> buffer = new ArrayList<>();
         private boolean recovering = true;
+        private boolean bufferOverflowed;
         private long lastSeq;
 
         private RedisConnection(SseEmitter emitter, Long memberId, Long chatRoomId) {
