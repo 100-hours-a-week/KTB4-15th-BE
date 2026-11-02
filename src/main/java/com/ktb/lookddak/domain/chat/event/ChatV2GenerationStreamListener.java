@@ -1,5 +1,6 @@
 package com.ktb.lookddak.domain.chat.event;
 
+import com.ktb.lookddak.domain.chat.redis.ChatRedisStreamingService;
 import com.ktb.lookddak.domain.chat.service.ChatSseService;
 import com.ktb.lookddak.global.client.ai.chat.AiChatStreamEvent;
 import com.ktb.lookddak.global.client.ai.chat.AiChatStreamEventType;
@@ -12,6 +13,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import java.util.UUID;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -19,6 +22,7 @@ public class ChatV2GenerationStreamListener {
 
     private final AiChatStreamingClient aiChatStreamingClient;
     private final ChatSseService chatSseService;
+    private final ChatRedisStreamingService chatRedisStreamingService;
     private final ApplicationEventPublisher eventPublisher;
 
     /**
@@ -27,6 +31,7 @@ public class ChatV2GenerationStreamListener {
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(ChatV2GenerationRequestedEvent event) {
+        chatRedisStreamingService.initialize(event.getUserMessageId());
         aiChatStreamingClient.stream(event.toAiRequest())
                 .subscribe(
                         streamEvent -> forward(event.getUserMessageId(), streamEvent),
@@ -36,6 +41,12 @@ public class ChatV2GenerationStreamListener {
 
     private void forward(Long userMessageId, AiChatStreamEvent streamEvent) {
         if (streamEvent.getType() == AiChatStreamEventType.TOKEN) {
+            // Redis write timeout 재시도 시에는 이 eventId를 그대로 다시 사용해야 한다.
+            chatRedisStreamingService.recordToken(
+                    userMessageId,
+                    UUID.randomUUID().toString(),
+                    streamEvent.getContent()
+            );
             chatSseService.sendToken(
                     userMessageId,
                     streamEvent.getContent()

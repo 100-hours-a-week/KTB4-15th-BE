@@ -1,5 +1,6 @@
 package com.ktb.lookddak.domain.chat.event;
 
+import com.ktb.lookddak.domain.chat.redis.ChatRedisStreamingService;
 import com.ktb.lookddak.domain.chat.service.ChatSseService;
 import com.ktb.lookddak.global.client.ai.chat.AiChatStreamEvent;
 import com.ktb.lookddak.global.client.ai.chat.AiChatStreamingClient;
@@ -35,6 +36,9 @@ class ChatV2GenerationStreamListenerTest {
     private ChatSseService chatSseService;
 
     @Mock
+    private ChatRedisStreamingService chatRedisStreamingService;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     @Test
@@ -43,6 +47,7 @@ class ChatV2GenerationStreamListenerTest {
         ChatV2GenerationStreamListener listener = new ChatV2GenerationStreamListener(
                 aiChatStreamingClient,
                 chatSseService,
+                chatRedisStreamingService,
                 eventPublisher
         );
         given(aiChatStreamingClient.stream(any(AiChatRequest.class)))
@@ -70,6 +75,12 @@ class ChatV2GenerationStreamListenerTest {
 
         listener.handle(event());
 
+        verify(chatRedisStreamingService).initialize(100L);
+        verify(chatRedisStreamingService).recordToken(
+                eq(100L),
+                any(String.class),
+                eq("추천을 찾고 있어요.")
+        );
         verify(chatSseService).sendToken(100L, "추천을 찾고 있어요.");
         verify(chatSseService, never()).send(
                 eq(100L),
@@ -85,6 +96,7 @@ class ChatV2GenerationStreamListenerTest {
         ChatV2GenerationStreamListener listener = new ChatV2GenerationStreamListener(
                 aiChatStreamingClient,
                 chatSseService,
+                chatRedisStreamingService,
                 eventPublisher
         );
         given(aiChatStreamingClient.stream(any(AiChatRequest.class)))
