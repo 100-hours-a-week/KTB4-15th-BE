@@ -289,7 +289,7 @@ public class ChatService {
                     pageRequest
             );
         } else {
-            ChatRoom cursorRoom = chatRoomRepository.findActiveSearchCursor(
+            ChatMessage cursorMessage = chatMessageRepository.findActiveSearchCursor(
                     memberId,
                     cursor,
                     escapedKeyword
@@ -299,8 +299,8 @@ public class ChatService {
             messages = chatMessageRepository.findNextSearchPage(
                     memberId,
                     escapedKeyword,
-                    cursorRoom.getLastMessageAt(),
-                    cursorRoom.getId(),
+                    cursorMessage.getCreatedAt(),
+                    cursorMessage.getId(),
                     pageRequest
             );
         }
@@ -314,7 +314,7 @@ public class ChatService {
                 .toList();
         Long nextCursor = hasNext
                 ? responseMessages.get(responseMessages.size() - 1)
-                .getChatRoom().getId()
+                .getId()
                 : null;
 
         return new ChatRoomSearchResponse(items, nextCursor, hasNext);

@@ -572,18 +572,13 @@ class ChatServiceTest {
     }
 
     @Test
-    @DisplayName("메시지 내용 검색의 첫 페이지에서 채팅방별 최신 일치 메시지와 다음 Cursor를 반환한다")
+    @DisplayName("메시지 내용 검색의 첫 페이지에서 일치한 메시지와 다음 Cursor를 반환한다")
     void searchFirstChatRoomPage() {
         Member member = createMember(1L);
         ChatRoom firstRoom = createChatRoom(
                 30L,
                 member,
                 LocalDateTime.of(2026, 11, 3, 15, 0)
-        );
-        ChatRoom secondRoom = createChatRoom(
-                20L,
-                member,
-                LocalDateTime.of(2026, 11, 3, 14, 0)
         );
         ChatRoom nextRoom = createChatRoom(
                 10L,
@@ -597,7 +592,7 @@ class ChatServiceTest {
         );
         ChatMessage secondMessage = createChatMessage(
                 201L,
-                secondRoom,
+                firstRoom,
                 "하얀 반바지랑 어울리면 좋겠어요."
         );
         ChatMessage nextMessage = createChatMessage(
@@ -620,11 +615,11 @@ class ChatServiceTest {
 
         assertThat(response.getItems())
                 .extracting(item -> item.getChatRoomId())
-                .containsExactly(30L, 20L);
+                .containsExactly(30L, 30L);
         assertThat(response.getItems())
                 .extracting(item -> item.getMessageId())
                 .containsExactly(301L, 201L);
-        assertThat(response.getNextCursor()).isEqualTo(20L);
+        assertThat(response.getNextCursor()).isEqualTo(201L);
         assertThat(response.isHasNext()).isTrue();
 
         ArgumentCaptor<Pageable> pageableCaptor =
@@ -638,7 +633,7 @@ class ChatServiceTest {
     }
 
     @Test
-    @DisplayName("검색 Cursor는 같은 사용자와 검색어에 속한 채팅방만 사용할 수 있다")
+    @DisplayName("검색 Cursor는 같은 사용자와 검색어에 속한 메시지만 사용할 수 있다")
     void searchNextChatRoomPage() {
         Member member = createMember(1L);
         LocalDateTime cursorTime = LocalDateTime.of(2026, 11, 3, 14, 0);
@@ -653,8 +648,14 @@ class ChatServiceTest {
                 nextRoom,
                 "반바지와 잘 어울리는 셔츠"
         );
-        given(chatRoomRepository.findActiveSearchCursor(1L, 25L, "반바지"))
-                .willReturn(Optional.of(cursorRoom));
+        ChatMessage cursorMessage = createChatMessage(
+                25L,
+                cursorRoom,
+                "반바지를 찾고 있어요"
+        );
+        ReflectionTestUtils.setField(cursorMessage, "createdAt", cursorTime);
+        given(chatMessageRepository.findActiveSearchCursor(1L, 25L, "반바지"))
+                .willReturn(Optional.of(cursorMessage));
         given(chatMessageRepository.findNextSearchPage(
                 eq(1L),
                 eq("반바지"),
@@ -724,9 +725,9 @@ class ChatServiceTest {
     }
 
     @Test
-    @DisplayName("검색 결과에 없는 Cursor 채팅방은 다음 검색 페이지에 사용할 수 없다")
+    @DisplayName("검색 결과에 없는 Cursor 메시지는 다음 검색 페이지에 사용할 수 없다")
     void rejectSearchCursorOutsideResult() {
-        given(chatRoomRepository.findActiveSearchCursor(1L, 25L, "반바지"))
+        given(chatMessageRepository.findActiveSearchCursor(1L, 25L, "반바지"))
                 .willReturn(Optional.empty());
 
         assertSearchError(

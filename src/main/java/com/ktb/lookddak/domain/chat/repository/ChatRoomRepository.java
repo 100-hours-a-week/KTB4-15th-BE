@@ -52,25 +52,6 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
     @Query("""
             select chatRoom
             from ChatRoom chatRoom
-            where chatRoom.id = :cursorId
-              and chatRoom.member.id = :memberId
-              and chatRoom.deletedAt is null
-              and exists (
-                  select message
-                  from ChatMessage message
-                  where message.chatRoom.id = chatRoom.id
-                    and message.content like concat('%', :escapedKeyword, '%') escape '\\'
-              )
-            """)
-    Optional<ChatRoom> findActiveSearchCursor(
-            @Param("memberId") Long memberId,
-            @Param("cursorId") Long cursorId,
-            @Param("escapedKeyword") String escapedKeyword
-    );
-
-    @Query("""
-            select chatRoom
-            from ChatRoom chatRoom
             where chatRoom.member.id = :memberId
               and chatRoom.deletedAt is null
             order by chatRoom.lastMessageAt desc, chatRoom.id desc

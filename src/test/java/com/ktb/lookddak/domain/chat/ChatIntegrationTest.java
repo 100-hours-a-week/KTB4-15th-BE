@@ -373,7 +373,7 @@ class ChatIntegrationTest {
     }
 
     @Test
-    @DisplayName("메시지 내용만 검색하고 채팅방별 최신 일치 메시지를 Cursor로 조회한다")
+    @DisplayName("메시지 내용만 검색하고 일치한 모든 메시지를 Cursor로 조회한다")
     void searchChatRoomsWithCursor() throws Exception {
         String accessToken = loginAndGetAccessToken();
         LocalDateTime sameTime = LocalDateTime.of(2026, 11, 3, 15, 0);
@@ -396,7 +396,10 @@ class ChatIntegrationTest {
                 olderRoom,
                 "반바지에 어울리는 셔츠를 찾아줘"
         );
-        saveCompletedUserMessage(newerRoom, "반바지를 입고 싶어요");
+        ChatMessage firstNewerMatchedMessage = saveCompletedUserMessage(
+                newerRoom,
+                "반바지를 입고 싶어요"
+        );
         ChatMessage newerMatchedMessage = saveCompletedUserMessage(
                 newerRoom,
                 "검정 반바지로 다시 추천해줘"
@@ -407,25 +410,32 @@ class ChatIntegrationTest {
         mockMvc.perform(get("/api/v1/chat-rooms/search")
                         .cookie(new Cookie("accessToken", accessToken))
                         .queryParam("keyword", "반바지")
-                        .queryParam("size", "1"))
+                        .queryParam("size", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"))
-                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.items.length()").value(2))
                 .andExpect(jsonPath("$.data.items[0].chatRoomId")
                         .value(newerRoom.getId()))
                 .andExpect(jsonPath("$.data.items[0].messageId")
                         .value(newerMatchedMessage.getId()))
                 .andExpect(jsonPath("$.data.items[0].message")
                         .value("검정 반바지로 다시 추천해줘"))
-                .andExpect(jsonPath("$.data.nextCursor")
+                .andExpect(jsonPath("$.data.items[1].chatRoomId")
                         .value(newerRoom.getId()))
+                .andExpect(jsonPath("$.data.items[1].messageId")
+                        .value(firstNewerMatchedMessage.getId()))
+                .andExpect(jsonPath("$.data.nextCursor")
+                        .value(firstNewerMatchedMessage.getId()))
                 .andExpect(jsonPath("$.data.hasNext").value(true));
 
         mockMvc.perform(get("/api/v1/chat-rooms/search")
                         .cookie(new Cookie("accessToken", accessToken))
                         .queryParam("keyword", "반바지")
-                        .queryParam("cursor", newerRoom.getId().toString())
-                        .queryParam("size", "1"))
+                        .queryParam(
+                                "cursor",
+                                firstNewerMatchedMessage.getId().toString()
+                        )
+                        .queryParam("size", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items.length()").value(1))
                 .andExpect(jsonPath("$.data.items[0].chatRoomId")

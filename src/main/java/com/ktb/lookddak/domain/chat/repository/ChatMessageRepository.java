@@ -117,13 +117,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             where chatRoom.member.id = :memberId
               and chatRoom.deletedAt is null
               and message.content like concat('%', :escapedKeyword, '%') escape '\\'
-              and message.id = (
-                  select max(latestMessage.id)
-                  from ChatMessage latestMessage
-                  where latestMessage.chatRoom.id = chatRoom.id
-                    and latestMessage.content like concat('%', :escapedKeyword, '%') escape '\\'
-              )
-            order by chatRoom.lastMessageAt desc, chatRoom.id desc
+            order by message.createdAt desc, message.id desc
             """)
     List<ChatMessage> findFirstSearchPage(
             @Param("memberId") Long memberId,
@@ -138,26 +132,35 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             where chatRoom.member.id = :memberId
               and chatRoom.deletedAt is null
               and message.content like concat('%', :escapedKeyword, '%') escape '\\'
-              and message.id = (
-                  select max(latestMessage.id)
-                  from ChatMessage latestMessage
-                  where latestMessage.chatRoom.id = chatRoom.id
-                    and latestMessage.content like concat('%', :escapedKeyword, '%') escape '\\'
-              )
               and (
-                  chatRoom.lastMessageAt < :cursorLastMessageAt
+                  message.createdAt < :cursorCreatedAt
                   or (
-                      chatRoom.lastMessageAt = :cursorLastMessageAt
-                      and chatRoom.id < :cursorId
+                      message.createdAt = :cursorCreatedAt
+                      and message.id < :cursorId
                   )
               )
-            order by chatRoom.lastMessageAt desc, chatRoom.id desc
+            order by message.createdAt desc, message.id desc
             """)
     List<ChatMessage> findNextSearchPage(
             @Param("memberId") Long memberId,
             @Param("escapedKeyword") String escapedKeyword,
-            @Param("cursorLastMessageAt") LocalDateTime cursorLastMessageAt,
+            @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
             @Param("cursorId") Long cursorId,
             Pageable pageable
+    );
+
+    @Query("""
+            select message
+            from ChatMessage message
+            join fetch message.chatRoom chatRoom
+            where message.id = :cursorId
+              and chatRoom.member.id = :memberId
+              and chatRoom.deletedAt is null
+              and message.content like concat('%', :escapedKeyword, '%') escape '\\'
+            """)
+    Optional<ChatMessage> findActiveSearchCursor(
+            @Param("memberId") Long memberId,
+            @Param("cursorId") Long cursorId,
+            @Param("escapedKeyword") String escapedKeyword
     );
 }
