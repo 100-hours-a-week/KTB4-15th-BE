@@ -110,8 +110,9 @@ public class ChatSseService {
             snapshot = chatRedisSnapshotRepository.findByMessageId(userMessageId);
         } catch (RuntimeException exception) {
             removeConnection(userMessageId, emitter);
-            emitter.completeWithError(exception);
-            throw exception;
+            // Redis 장애 중에도 같은 JVM에 남아 있는 local Snapshot으로 현재 SSE를 유지한다.
+            // 다른 JVM에는 누적본이 없을 수 있으므로, FE는 별도의 상태 조회로 완료 결과를 보완한다.
+            return connectWithLocalSnapshot(userMessageId);
         }
         synchronized (connection.lock) {
             if (redisConnections.get(userMessageId) != connection) {
@@ -303,6 +304,19 @@ public class ChatSseService {
         }
     }
 
+    /** Redis 장애 fallback을 위해 생성 BE에 누적 본문만 유지한다. */
+    public void appendLocalSnapshot(Long userMessageId, String content) {
+        ChatSseSnapshotStore.SnapshotState state = snapshotStore.getOrCreate(userMessageId);
+        synchronized (state.getLock()) {
+            state.append(content);
+        }
+    }
+
+    /** 이미 local Snapshot에 기록한 token을 현재 JVM의 SSE 연결에만 직접 전달한다. */
+    public void sendLocalToken(Long userMessageId, String content) {
+        sendToCurrentEmitter(userMessageId, "token", new ChatSseTokenResponse(userMessageId, content));
+    }
+
     /** Redis Pub/Sub subscriber가 호출하는 다중 인스턴스 이벤트 전달 진입점이다. */
     public void handleRedisEvent(ChatRedisEvent event) {
         RedisConnection connection = redisConnections.get(event.userMessageId());
@@ -360,7 +374,9 @@ public class ChatSseService {
         try {
             snapshot = chatRedisSnapshotRepository.findByMessageId(userMessageId);
         } catch (RuntimeException exception) {
-            completeRedisConnection(userMessageId, connection);
+            // Redis가 잠시 내려가도 현재 SSE를 닫지 않는다. 생성 BE는 local fallback으로
+            // token을 계속 보낼 수 있고, 다른 BE 연결은 완료 뒤 DB 상태 조회로 복구한다.
+            switchRedisConnectionToLocal(userMessageId, connection);
             return;
         }
 
@@ -499,11 +515,29 @@ public class ChatSseService {
         snapshotStore.remove(userMessageId, state);
     }
 
+    /**
+     * Redis 자체를 사용할 수 없는 비상 경로다. Pub/Sub을 거치지 않고 현재 JVM에 연결된
+     * 클라이언트에 terminal event를 보낸 뒤 정리한다. 다른 인스턴스의 연결은 DB 상태를
+     * 조회하는 다음 재연결에서 terminal 결과를 받는다.
+     */
+    public void sendDirectTerminalAndComplete(Long userMessageId, String eventName, Object data) {
+        send(userMessageId, eventName, data);
+        complete(userMessageId);
+    }
+
     private void completeRedisConnection(Long userMessageId, RedisConnection connection) {
         if (emitters.remove(userMessageId, connection.emitter)) {
             connection.emitter.complete();
         }
         redisConnections.remove(userMessageId, connection);
+    }
+
+    private void switchRedisConnectionToLocal(Long userMessageId, RedisConnection connection) {
+        synchronized (connection.lock) {
+            if (redisConnections.remove(userMessageId, connection)) {
+                connection.buffer.clear();
+            }
+        }
     }
 
     private void removeConnection(Long userMessageId, SseEmitter emitter) {

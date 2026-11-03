@@ -165,8 +165,8 @@ class ChatSseServiceTest {
     }
 
     @Test
-    @DisplayName("Redis Snapshot 조회 오류 시 연결을 등록 상태로 남기지 않는다")
-    void cleanUpConnectionWhenRedisSnapshotReadFails() {
+    @DisplayName("Redis Snapshot 조회 오류 시 local fallback SSE 연결로 전환한다")
+    void fallBackToLocalConnectionWhenRedisSnapshotReadFails() {
         ChatSseService service = service(true);
         Member member = createMember(1L);
         ChatRoom chatRoom = createChatRoom(10L, member);
@@ -179,11 +179,10 @@ class ChatSseServiceTest {
         given(chatRedisSnapshotRepository.findByMessageId(100L))
                 .willThrow(new IllegalStateException("redis unavailable"));
 
-        assertThatThrownBy(() -> service.connect(1L, 10L, 100L))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("redis unavailable");
+        SseEmitter emitter = service.connect(1L, 10L, 100L);
 
-        assertThat(service.hasConnection(100L)).isFalse();
+        assertThat(emitter.getTimeout()).isEqualTo(300_000L);
+        assertThat(service.hasConnection(100L)).isTrue();
     }
 
     @Test

@@ -14,6 +14,8 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
 
 @Slf4j
 @Component
@@ -24,6 +26,8 @@ public class ChatV2GenerationStreamListener {
     private final ChatSseService chatSseService;
     private final ChatRedisStreamingService chatRedisStreamingService;
     private final ApplicationEventPublisher eventPublisher;
+    /** Redis가 중간에 실패한 메시지는 종료까지 로컬 Snapshot + 직접 SSE 경로를 유지한다. */
+    private final Set<Long> locallyDegradedMessages = ConcurrentHashMap.newKeySet();
 
     /**
      * DB의 GENERATING 상태가 커밋된 이후에만 AI SSE 연결을 시작한다.
@@ -31,7 +35,11 @@ public class ChatV2GenerationStreamListener {
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(ChatV2GenerationRequestedEvent event) {
-        chatRedisStreamingService.initialize(event.getUserMessageId());
+        try {
+            chatRedisStreamingService.initialize(event.getUserMessageId());
+        } catch (RuntimeException exception) {
+            enterLocalDegradedMode(event.getUserMessageId(), exception);
+        }
         aiChatStreamingClient.stream(event.toAiRequest())
                 .subscribe(
                         streamEvent -> forward(event.getUserMessageId(), streamEvent),
@@ -41,12 +49,24 @@ public class ChatV2GenerationStreamListener {
 
     private void forward(Long userMessageId, AiChatStreamEvent streamEvent) {
         if (streamEvent.getType() == AiChatStreamEventType.TOKEN) {
+            // Redis가 정상일 때도 fallback 전환에 대비해 생성 BE에 로컬 누적본을 유지한다.
+            chatSseService.appendLocalSnapshot(userMessageId, streamEvent.getContent());
+            if (locallyDegradedMessages.contains(userMessageId)) {
+                chatSseService.sendLocalToken(userMessageId, streamEvent.getContent());
+                return;
+            }
             // Redis write timeout 재시도 시에는 이 eventId를 그대로 다시 사용해야 한다.
-            chatRedisStreamingService.recordToken(
-                    userMessageId,
-                    UUID.randomUUID().toString(),
-                    streamEvent.getContent()
-            );
+            try {
+                chatRedisStreamingService.recordToken(
+                        userMessageId,
+                        UUID.randomUUID().toString(),
+                        streamEvent.getContent()
+                );
+            } catch (RuntimeException exception) {
+                enterLocalDegradedMode(userMessageId, exception);
+                chatSseService.sendLocalToken(userMessageId, streamEvent.getContent());
+                return;
+            }
             if (!chatRedisStreamingService.isEnabled()) {
                 chatSseService.sendToken(
                         userMessageId,
@@ -57,6 +77,7 @@ public class ChatV2GenerationStreamListener {
         }
 
         if (streamEvent.getType() == AiChatStreamEventType.DONE) {
+            locallyDegradedMessages.remove(userMessageId);
             eventPublisher.publishEvent(new ChatV2GenerationSucceededEvent(
                     userMessageId,
                     streamEvent.getDoneResponse()
@@ -65,6 +86,7 @@ public class ChatV2GenerationStreamListener {
     }
 
     private void sendError(Long userMessageId, Throwable throwable) {
+        locallyDegradedMessages.remove(userMessageId);
         if (throwable instanceof AiChatException exception) {
             log.warn(
                     "V2 AI chat stream failed userMessageId={} code={}",
@@ -85,5 +107,13 @@ public class ChatV2GenerationStreamListener {
                     "AI 응답 생성 중 오류가 발생했습니다."
             ));
         }
+    }
+
+    private void enterLocalDegradedMode(Long userMessageId, RuntimeException exception) {
+        if (!locallyDegradedMessages.add(userMessageId)) {
+            return;
+        }
+        log.warn("Redis chat stream unavailable; switch to local fallback userMessageId={}",
+                userMessageId, exception);
     }
 }

@@ -139,11 +139,16 @@ public class ChatV2GenerationResultEventHandler {
 
     private void sendDone(Long userMessageId, ChatSseDoneResponse response) {
         if (chatRedisStreamingService.isEnabled()) {
-            chatRedisStreamingService.complete(
-                    userMessageId,
-                    UUID.randomUUID().toString(),
-                    response
-            );
+            try {
+                chatRedisStreamingService.complete(
+                        userMessageId,
+                        UUID.randomUUID().toString(),
+                        response
+                );
+            } catch (RuntimeException exception) {
+                log.error("Redis terminal publish failed userMessageId={}", userMessageId, exception);
+                chatSseService.sendDirectTerminalAndComplete(userMessageId, "done", response);
+            }
             return;
         }
         chatSseService.send(userMessageId, "done", response);
@@ -151,12 +156,21 @@ public class ChatV2GenerationResultEventHandler {
 
     private void sendError(Long userMessageId, String code, String message) {
         if (chatRedisStreamingService.isEnabled()) {
-            chatRedisStreamingService.fail(
-                    userMessageId,
-                    UUID.randomUUID().toString(),
-                    code,
-                    message
-            );
+            try {
+                chatRedisStreamingService.fail(
+                        userMessageId,
+                        UUID.randomUUID().toString(),
+                        code,
+                        message
+                );
+            } catch (RuntimeException exception) {
+                log.error("Redis error publish failed userMessageId={}", userMessageId, exception);
+                chatSseService.sendDirectTerminalAndComplete(
+                        userMessageId,
+                        "error",
+                        new ChatSseErrorResponse(userMessageId, code, message)
+                );
+            }
             return;
         }
         chatSseService.send(
