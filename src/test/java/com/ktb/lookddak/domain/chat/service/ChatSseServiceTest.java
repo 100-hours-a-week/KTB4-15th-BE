@@ -196,6 +196,45 @@ class ChatSseServiceTest {
     }
 
     @Test
+    @DisplayName("Redis 장애로 degraded 된 기존 SSE는 DB 완료 상태를 감지해 done으로 종료한다")
+    void recoverDegradedRedisConnectionFromDatabaseTerminalState() {
+        ChatSseService service = service(true);
+        Member member = createMember(1L);
+        ChatRoom chatRoom = createChatRoom(10L, member);
+        ChatMessage message = ChatMessage.createPendingUserText(chatRoom, "가을 니트를 추천해줘");
+        ReflectionTestUtils.setField(message, "id", 100L);
+        given(chatRoomRepository.findActiveById(10L)).willReturn(Optional.of(chatRoom));
+        given(chatMessageRepository.findByIdAndChatRoomId(100L, 10L)).willReturn(Optional.of(message));
+
+        ChatGenerationStatusResponse generating = new ChatGenerationStatusResponse(
+                ChatGenerationStatus.GENERATING,
+                null
+        );
+        ChatGenerationStatusResponse completed = org.mockito.Mockito.mock(ChatGenerationStatusResponse.class);
+        ChatMessageDetailResponse completedMessage = org.mockito.Mockito.mock(ChatMessageDetailResponse.class);
+        given(completed.getGenerationStatus()).willReturn(ChatGenerationStatus.COMPLETED);
+        given(completed.getMessage()).willReturn(completedMessage);
+        given(completedMessage.getContent()).willReturn("DB 최종 결과");
+        given(completedMessage.getRecommendation()).willReturn(null);
+        given(chatService.getGenerationStatus(1L, 10L, 100L))
+                .willReturn(generating, completed);
+        given(chatRedisSnapshotRepository.findByMessageId(100L))
+                .willReturn(Optional.of(new ChatRedisSnapshot(
+                        100L,
+                        "진행 중 본문",
+                        1L,
+                        ChatGenerationStatus.GENERATING
+                )));
+        given(chatRedisSnapshotRepository.isAvailable()).willReturn(false);
+
+        service.connect(1L, 10L, 100L);
+        // Pub/Sub listener의 error callback 없이도 PING 실패가 기존 Redis SSE를 degraded로 전환한다.
+        service.recoverDegradedConnectionsFromDatabase();
+
+        assertThat(service.hasConnection(100L)).isFalse();
+    }
+
+    @Test
     @DisplayName("마지막 done PubSub을 유실해도 DB 완료 상태 재연결은 done으로 종료한다")
     void recoverLostDoneFromCompletedDatabaseState() {
         ChatSseService service = service(true);

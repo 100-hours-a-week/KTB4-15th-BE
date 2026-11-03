@@ -22,7 +22,9 @@ import com.ktb.lookddak.domain.chat.repository.ChatRoomRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
@@ -35,6 +37,7 @@ import java.util.concurrent.ConcurrentMap;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ChatSseService {
 
     private static final long SSE_TIMEOUT_MILLIS = 5 * 60 * 1000L;
@@ -48,6 +51,8 @@ public class ChatSseService {
     private final ChatRedisSnapshotRepository chatRedisSnapshotRepository;
     private final ConcurrentMap<Long, SseEmitter> emitters = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, RedisConnection> redisConnections = new ConcurrentHashMap<>();
+    /** Redis가 내려간 동안에는 Pub/Sub 대신 DB terminal 상태만 확인하는 SSE 연결이다. */
+    private final ConcurrentMap<Long, RedisConnection> degradedRedisConnections = new ConcurrentHashMap<>();
 
     /**
      * SSE 연결을 생성하고, 현재 로그인한 회원이 요청한 메시지를 조회할 권한이 있는지 확인한다.
@@ -109,10 +114,11 @@ public class ChatSseService {
         try {
             snapshot = chatRedisSnapshotRepository.findByMessageId(userMessageId);
         } catch (RuntimeException exception) {
-            removeConnection(userMessageId, emitter);
-            // Redis 장애 중에도 같은 JVM에 남아 있는 local Snapshot으로 현재 SSE를 유지한다.
-            // 다른 JVM에는 누적본이 없을 수 있으므로, FE는 별도의 상태 조회로 완료 결과를 보완한다.
-            return connectWithLocalSnapshot(userMessageId);
+            // Redis 장애 중에도 같은 JVM의 local Snapshot은 전송할 수 있다. 동시에 이 연결을
+            // degraded 목록에 보관해, 생성 BE가 DB에 terminal 결과를 저장하면 기존 SSE로 보낸다.
+            switchRedisConnectionToLocal(userMessageId, connection);
+            sendLocalSnapshot(userMessageId, emitter);
+            return emitter;
         }
         synchronized (connection.lock) {
             if (redisConnections.get(userMessageId) != connection) {
@@ -254,6 +260,7 @@ public class ChatSseService {
     private void registerLocal(Long userMessageId, SseEmitter emitter) {
         SseEmitter previousEmitter = emitters.put(userMessageId, emitter);
         RedisConnection previousConnection = redisConnections.remove(userMessageId);
+        RedisConnection previousDegradedConnection = degradedRedisConnections.remove(userMessageId);
         if (previousEmitter != null) {
             previousEmitter.complete();
         }
@@ -263,17 +270,28 @@ public class ChatSseService {
                 previousConnection.buffer.clear();
             }
         }
+        if (previousDegradedConnection != null) {
+            synchronized (previousDegradedConnection.lock) {
+                previousDegradedConnection.buffer.clear();
+            }
+        }
     }
 
     private void registerRedis(Long userMessageId, RedisConnection connection) {
         SseEmitter previousEmitter = emitters.put(userMessageId, connection.emitter);
         RedisConnection previousConnection = redisConnections.put(userMessageId, connection);
+        RedisConnection previousDegradedConnection = degradedRedisConnections.remove(userMessageId);
         if (previousEmitter != null) {
             previousEmitter.complete();
         }
         if (previousConnection != null) {
             synchronized (previousConnection.lock) {
                 previousConnection.buffer.clear();
+            }
+        }
+        if (previousDegradedConnection != null) {
+            synchronized (previousDegradedConnection.lock) {
+                previousDegradedConnection.buffer.clear();
             }
         }
         registerCallbacks(userMessageId, connection.emitter, connection);
@@ -288,6 +306,7 @@ public class ChatSseService {
             emitters.remove(userMessageId, emitter);
             if (connection != null) {
                 redisConnections.remove(userMessageId, connection);
+                degradedRedisConnections.remove(userMessageId, connection);
             }
         };
         emitter.onCompletion(cleanup);
@@ -503,12 +522,18 @@ public class ChatSseService {
     public void complete(Long userMessageId) {
         SseEmitter emitter = emitters.remove(userMessageId);
         RedisConnection connection = redisConnections.remove(userMessageId);
+        RedisConnection degradedConnection = degradedRedisConnections.remove(userMessageId);
         if (emitter != null) {
             emitter.complete();
         }
         if (connection != null) {
             synchronized (connection.lock) {
                 connection.buffer.clear();
+            }
+        }
+        if (degradedConnection != null && degradedConnection != connection) {
+            synchronized (degradedConnection.lock) {
+                degradedConnection.buffer.clear();
             }
         }
         ChatSseSnapshotStore.SnapshotState state = snapshotStore.getOrCreate(userMessageId);
@@ -530,12 +555,14 @@ public class ChatSseService {
             connection.emitter.complete();
         }
         redisConnections.remove(userMessageId, connection);
+        degradedRedisConnections.remove(userMessageId, connection);
     }
 
     private void switchRedisConnectionToLocal(Long userMessageId, RedisConnection connection) {
         synchronized (connection.lock) {
             if (redisConnections.remove(userMessageId, connection)) {
                 connection.buffer.clear();
+                degradedRedisConnections.put(userMessageId, connection);
             }
         }
     }
@@ -545,6 +572,90 @@ public class ChatSseService {
         redisConnections.computeIfPresent(userMessageId, (ignored, connection) ->
                 connection.emitter == emitter ? null : connection
         );
+        degradedRedisConnections.computeIfPresent(userMessageId, (ignored, connection) ->
+                connection.emitter == emitter ? null : connection
+        );
+    }
+
+    /**
+     * Redis 장애로 Pub/Sub을 받을 수 없게 된 기존 SSE 연결만 DB terminal 상태를 확인한다.
+     * 프런트는 계속 같은 SSE를 기다리며, 완료되면 기존 done/error 계약으로 결과를 받는다.
+     */
+    @Scheduled(fixedDelayString = "${chat.redis.degraded-terminal-poll-interval:1s}")
+    void recoverDegradedConnectionsFromDatabase() {
+        detectRedisOutageForActiveConnections();
+        degradedRedisConnections.forEach((userMessageId, connection) -> {
+            if (emitters.get(userMessageId) != connection.emitter) {
+                degradedRedisConnections.remove(userMessageId, connection);
+                return;
+            }
+            try {
+                ChatGenerationStatusResponse result = chatService.getGenerationStatus(
+                        connection.memberId,
+                        connection.chatRoomId,
+                        userMessageId
+                );
+                if (isTerminal(result.getGenerationStatus())) {
+                    sendTerminalResultFromDatabaseResult(userMessageId, connection, result);
+                }
+            } catch (RuntimeException exception) {
+                // DB도 일시적으로 확인할 수 없으면 SSE를 끊지 않고 다음 주기에 다시 확인한다.
+                log.warn("Failed to poll terminal chat status for degraded SSE userMessageId={}",
+                        userMessageId, exception);
+            }
+        });
+    }
+
+    private void detectRedisOutageForActiveConnections() {
+        if (redisConnections.isEmpty() || chatRedisSnapshotRepository.isAvailable()) {
+            return;
+        }
+        // Pub/Sub listener가 재연결을 시도하면서 error callback을 늦게 호출하더라도,
+        // 활성 SSE는 PING 실패를 기준으로 즉시 local/DB fallback 경로로 전환한다.
+        redisConnections.forEach(this::switchRedisConnectionToLocal);
+    }
+
+    private void sendTerminalResultFromDatabaseResult(
+            Long userMessageId,
+            RedisConnection connection,
+            ChatGenerationStatusResponse result
+    ) {
+        synchronized (connection.lock) {
+            if (degradedRedisConnections.get(userMessageId) != connection) {
+                return;
+            }
+            if (result.getGenerationStatus() == ChatGenerationStatus.COMPLETED
+                    && result.getMessage() != null) {
+                ChatMessageDetailResponse message = result.getMessage();
+                List<RecommendedProductResponse> products = message.getRecommendation() == null
+                        ? List.of()
+                        : message.getRecommendation().getProducts();
+                send(userMessageId, connection.emitter, "done", new ChatSseDoneResponse(
+                        userMessageId, message.getContent(), products
+                ));
+                completeRedisConnection(userMessageId, connection);
+                return;
+            }
+            if (result.getGenerationStatus() == ChatGenerationStatus.FAILED) {
+                send(userMessageId, connection.emitter, "error", new ChatSseErrorResponse(
+                        userMessageId,
+                        "AI_GENERATION_FAILED",
+                        "AI 응답 생성에 실패했습니다. 다시 시도해 주세요."
+                ));
+                completeRedisConnection(userMessageId, connection);
+            }
+        }
+    }
+
+    private void sendLocalSnapshot(Long userMessageId, SseEmitter emitter) {
+        ChatSseSnapshotStore.SnapshotState state = snapshotStore.getOrCreate(userMessageId);
+        synchronized (state.getLock()) {
+            String snapshot = state.content();
+            if (!snapshot.isBlank()) {
+                send(userMessageId, emitter, "snapshot",
+                        new ChatSseSnapshotResponse(userMessageId, snapshot));
+            }
+        }
     }
 
     boolean hasConnection(Long userMessageId) {

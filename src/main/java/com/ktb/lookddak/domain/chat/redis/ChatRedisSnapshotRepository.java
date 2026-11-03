@@ -2,6 +2,7 @@ package com.ktb.lookddak.domain.chat.redis;
 
 import com.ktb.lookddak.domain.chat.entity.ChatGenerationStatus;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Repository;
 
@@ -186,6 +187,16 @@ public class ChatRedisSnapshotRepository {
             ));
         } catch (IllegalArgumentException exception) {
             throw new IllegalStateException("Invalid Redis chat snapshot for userMessageId=" + userMessageId, exception);
+        }
+    }
+
+    /** 활성 SSE가 있는 동안 Redis 연결 단절을 빠르게 감지하기 위한 가벼운 health check다. */
+    public boolean isAvailable() {
+        try {
+            String response = redisTemplate.execute((RedisCallback<String>) connection -> connection.ping());
+            return "PONG".equalsIgnoreCase(response);
+        } catch (RuntimeException exception) {
+            return false;
         }
     }
 
