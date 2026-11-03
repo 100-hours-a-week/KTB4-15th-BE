@@ -107,8 +107,8 @@ class ChatSseServiceTest {
     }
 
     @Test
-    @DisplayName("Snapshot 조회 중 도착한 done event는 버퍼링 후 Snapshot 뒤에 전달되어 연결을 종료한다")
-    void bufferRedisEventWhileRecovering() throws Exception {
+    @DisplayName("Snapshot 조회 중 burst token과 done은 버퍼링 후 순서대로 재생한다")
+    void replayBurstEventsArrivingWhileRecovering() throws Exception {
         ChatSseService service = service(true);
         Member member = createMember(1L);
         ChatRoom chatRoom = createChatRoom(10L, member);
@@ -137,10 +137,20 @@ class ChatSseServiceTest {
         );
         assertThat(snapshotReadStarted.await(1, TimeUnit.SECONDS)).isTrue();
 
-        service.handleRedisEvent(ChatRedisEvent.done(100L, 2L, "최종 본문", List.of()));
+        // Snapshot(seq=1)을 읽는 동안 token 두 개와 done이 빠르게 도착한 상황을 강제로 만든다.
+        // RECOVERING 연결은 이 이벤트들을 즉시 전송하지 않고 buffer에 쌓은 뒤 seq 순서로 재생해야 한다.
+        service.handleRedisEvent(ChatRedisEvent.token(100L, 2L, " + 첫 번째 burst token"));
+        service.handleRedisEvent(ChatRedisEvent.token(100L, 3L, " + 두 번째 burst token"));
+        service.handleRedisEvent(ChatRedisEvent.done(
+                100L,
+                4L,
+                "기존 본문 + 첫 번째 burst token + 두 번째 burst token",
+                List.of()
+        ));
         releaseSnapshotRead.countDown();
         connection.get(1, TimeUnit.SECONDS);
 
+        // done(seq=4)까지 buffer 재생이 끝나면 연결이 정상적으로 정리된다.
         assertThat(service.hasConnection(100L)).isFalse();
     }
 
