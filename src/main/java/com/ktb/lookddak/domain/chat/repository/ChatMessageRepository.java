@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -106,6 +107,57 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     List<ChatMessage> findPreviousPage(
             @Param("chatRoomId") Long chatRoomId,
             @Param("cursor") Long cursor,
+            Pageable pageable
+    );
+
+    @Query("""
+            select message
+            from ChatMessage message
+            join fetch message.chatRoom chatRoom
+            where chatRoom.member.id = :memberId
+              and chatRoom.deletedAt is null
+              and message.content like concat('%', :escapedKeyword, '%') escape '\\'
+              and message.id = (
+                  select max(latestMessage.id)
+                  from ChatMessage latestMessage
+                  where latestMessage.chatRoom.id = chatRoom.id
+                    and latestMessage.content like concat('%', :escapedKeyword, '%') escape '\\'
+              )
+            order by chatRoom.lastMessageAt desc, chatRoom.id desc
+            """)
+    List<ChatMessage> findFirstSearchPage(
+            @Param("memberId") Long memberId,
+            @Param("escapedKeyword") String escapedKeyword,
+            Pageable pageable
+    );
+
+    @Query("""
+            select message
+            from ChatMessage message
+            join fetch message.chatRoom chatRoom
+            where chatRoom.member.id = :memberId
+              and chatRoom.deletedAt is null
+              and message.content like concat('%', :escapedKeyword, '%') escape '\\'
+              and message.id = (
+                  select max(latestMessage.id)
+                  from ChatMessage latestMessage
+                  where latestMessage.chatRoom.id = chatRoom.id
+                    and latestMessage.content like concat('%', :escapedKeyword, '%') escape '\\'
+              )
+              and (
+                  chatRoom.lastMessageAt < :cursorLastMessageAt
+                  or (
+                      chatRoom.lastMessageAt = :cursorLastMessageAt
+                      and chatRoom.id < :cursorId
+                  )
+              )
+            order by chatRoom.lastMessageAt desc, chatRoom.id desc
+            """)
+    List<ChatMessage> findNextSearchPage(
+            @Param("memberId") Long memberId,
+            @Param("escapedKeyword") String escapedKeyword,
+            @Param("cursorLastMessageAt") LocalDateTime cursorLastMessageAt,
+            @Param("cursorId") Long cursorId,
             Pageable pageable
     );
 }

@@ -7,6 +7,7 @@ import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomDetailResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomListResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomSearchResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateResponse;
 import com.ktb.lookddak.domain.chat.service.ChatService;
@@ -57,6 +58,24 @@ public class ChatController {
                 size
         );
 
+        return ResponseEntity
+                .status(SuccessCode.OK.getStatus())
+                .body(ApiResponse.success(SuccessCode.OK, response));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<ChatRoomSearchResponse>> searchChatRooms(
+            @AuthenticationPrincipal MemberPrincipal principal,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long cursor,
+            @RequestParam(defaultValue = "20") Integer size
+    ) {
+        ChatRoomSearchResponse response = chatService.searchChatRooms(
+                principal.getMemberId(),
+                keyword,
+                cursor,
+                size
+        );
         return ResponseEntity
                 .status(SuccessCode.OK.getStatus())
                 .body(ApiResponse.success(SuccessCode.OK, response));

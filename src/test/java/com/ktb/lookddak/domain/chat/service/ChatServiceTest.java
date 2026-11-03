@@ -5,6 +5,7 @@ import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomListResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomSearchResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateResponse;
 import com.ktb.lookddak.domain.chat.entity.ChatGenerationStatus;
@@ -570,11 +571,190 @@ class ChatServiceTest {
         );
     }
 
+    @Test
+    @DisplayName("메시지 내용 검색의 첫 페이지에서 채팅방별 최신 일치 메시지와 다음 Cursor를 반환한다")
+    void searchFirstChatRoomPage() {
+        Member member = createMember(1L);
+        ChatRoom firstRoom = createChatRoom(
+                30L,
+                member,
+                LocalDateTime.of(2026, 11, 3, 15, 0)
+        );
+        ChatRoom secondRoom = createChatRoom(
+                20L,
+                member,
+                LocalDateTime.of(2026, 11, 3, 14, 0)
+        );
+        ChatRoom nextRoom = createChatRoom(
+                10L,
+                member,
+                LocalDateTime.of(2026, 11, 3, 13, 0)
+        );
+        ChatMessage firstMessage = createChatMessage(
+                301L,
+                firstRoom,
+                "검정 반바지에 어울리는 상의를 추천해줘"
+        );
+        ChatMessage secondMessage = createChatMessage(
+                201L,
+                secondRoom,
+                "하얀 반바지랑 어울리면 좋겠어요."
+        );
+        ChatMessage nextMessage = createChatMessage(
+                101L,
+                nextRoom,
+                "린넨 반바지 코디를 알려줘"
+        );
+        given(chatMessageRepository.findFirstSearchPage(
+                eq(1L),
+                eq("반바지"),
+                any(Pageable.class)
+        )).willReturn(List.of(firstMessage, secondMessage, nextMessage));
+
+        ChatRoomSearchResponse response = chatService.searchChatRooms(
+                1L,
+                "반바지",
+                null,
+                2
+        );
+
+        assertThat(response.getItems())
+                .extracting(item -> item.getChatRoomId())
+                .containsExactly(30L, 20L);
+        assertThat(response.getItems())
+                .extracting(item -> item.getMessageId())
+                .containsExactly(301L, 201L);
+        assertThat(response.getNextCursor()).isEqualTo(20L);
+        assertThat(response.isHasNext()).isTrue();
+
+        ArgumentCaptor<Pageable> pageableCaptor =
+                ArgumentCaptor.forClass(Pageable.class);
+        verify(chatMessageRepository).findFirstSearchPage(
+                eq(1L),
+                eq("반바지"),
+                pageableCaptor.capture()
+        );
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("검색 Cursor는 같은 사용자와 검색어에 속한 채팅방만 사용할 수 있다")
+    void searchNextChatRoomPage() {
+        Member member = createMember(1L);
+        LocalDateTime cursorTime = LocalDateTime.of(2026, 11, 3, 14, 0);
+        ChatRoom cursorRoom = createChatRoom(25L, member, cursorTime);
+        ChatRoom nextRoom = createChatRoom(
+                18L,
+                member,
+                cursorTime.minusHours(1)
+        );
+        ChatMessage nextMessage = createChatMessage(
+                181L,
+                nextRoom,
+                "반바지와 잘 어울리는 셔츠"
+        );
+        given(chatRoomRepository.findActiveSearchCursor(1L, 25L, "반바지"))
+                .willReturn(Optional.of(cursorRoom));
+        given(chatMessageRepository.findNextSearchPage(
+                eq(1L),
+                eq("반바지"),
+                eq(cursorTime),
+                eq(25L),
+                any(Pageable.class)
+        )).willReturn(List.of(nextMessage));
+
+        ChatRoomSearchResponse response = chatService.searchChatRooms(
+                1L,
+                "반바지",
+                25L,
+                20
+        );
+
+        assertThat(response.getItems())
+                .extracting(item -> item.getChatRoomId())
+                .containsExactly(18L);
+        assertThat(response.getNextCursor()).isNull();
+        assertThat(response.isHasNext()).isFalse();
+    }
+
+    @Test
+    @DisplayName("검색어의 LIKE 예약문자는 일반 문자열로 이스케이프한다")
+    void escapeSearchKeywordWildcards() {
+        given(chatMessageRepository.findFirstSearchPage(
+                eq(1L),
+                eq("50\\%\\_할인"),
+                any(Pageable.class)
+        )).willReturn(List.of());
+
+        chatService.searchChatRooms(1L, " 50%_할인 ", null, null);
+
+        verify(chatMessageRepository).findFirstSearchPage(
+                eq(1L),
+                eq("50\\%\\_할인"),
+                any(Pageable.class)
+        );
+    }
+
+    @Test
+    @DisplayName("빈 검색어, 길이 초과 검색어, 잘못된 검색 Cursor는 거부한다")
+    void rejectInvalidSearchConditions() {
+        assertSearchError(
+                () -> chatService.searchChatRooms(1L, " ", null, 20),
+                ErrorCode.INVALID_SEARCH_KEYWORD
+        );
+        assertSearchError(
+                () -> chatService.searchChatRooms(
+                        1L,
+                        "가".repeat(101),
+                        null,
+                        20
+                ),
+                ErrorCode.SEARCH_KEYWORD_LENGTH_EXCEEDED
+        );
+        assertSearchError(
+                () -> chatService.searchChatRooms(1L, "반바지", 0L, 20),
+                ErrorCode.INVALID_SEARCH_CURSOR
+        );
+        assertSearchError(
+                () -> chatService.searchChatRooms(1L, "반바지", null, 21),
+                ErrorCode.INVALID_SEARCH_CURSOR
+        );
+
+        verifyNoInteractions(chatMessageRepository, chatRoomRepository);
+    }
+
+    @Test
+    @DisplayName("검색 결과에 없는 Cursor 채팅방은 다음 검색 페이지에 사용할 수 없다")
+    void rejectSearchCursorOutsideResult() {
+        given(chatRoomRepository.findActiveSearchCursor(1L, 25L, "반바지"))
+                .willReturn(Optional.empty());
+
+        assertSearchError(
+                () -> chatService.searchChatRooms(1L, "반바지", 25L, 20),
+                ErrorCode.INVALID_SEARCH_CURSOR
+        );
+
+        verify(chatMessageRepository, never()).findNextSearchPage(
+                any(), any(), any(), any(), any()
+        );
+    }
+
     private void assertPaginationError(org.assertj.core.api.ThrowableAssert.ThrowingCallable callable) {
         assertThatThrownBy(callable)
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.INVALID_PAGINATION_PARAMETER)
+                );
+    }
+
+    private void assertSearchError(
+            org.assertj.core.api.ThrowableAssert.ThrowingCallable callable,
+            ErrorCode expectedErrorCode
+    ) {
+        assertThatThrownBy(callable)
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(expectedErrorCode)
                 );
     }
 
@@ -597,5 +777,15 @@ class ChatServiceTest {
         );
         ReflectionTestUtils.setField(chatRoom, "id", chatRoomId);
         return chatRoom;
+    }
+
+    private ChatMessage createChatMessage(
+            Long messageId,
+            ChatRoom chatRoom,
+            String content
+    ) {
+        ChatMessage message = ChatMessage.createUserText(chatRoom, content);
+        ReflectionTestUtils.setField(message, "id", messageId);
+        return message;
     }
 }

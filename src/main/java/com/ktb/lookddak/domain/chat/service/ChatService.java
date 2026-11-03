@@ -9,6 +9,8 @@ import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomListItemResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomListResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomSearchItemResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomSearchResponse;
 import com.ktb.lookddak.domain.chat.dto.RecommendationResponse;
 import com.ktb.lookddak.domain.chat.dto.RecommendedProductResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateRequest;
@@ -51,6 +53,9 @@ public class ChatService {
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MIN_PAGE_SIZE = 1;
     private static final int MAX_PAGE_SIZE = 100;
+    private static final int SEARCH_DEFAULT_PAGE_SIZE = 20;
+    private static final int SEARCH_MAX_PAGE_SIZE = 20;
+    private static final int SEARCH_KEYWORD_MAX_LENGTH = 100;
     private static final int AI_WISHLIST_PRODUCT_LIMIT = 10;
     private static final long MAX_CHAT_ROOM_COUNT = 100L;
 
@@ -262,6 +267,57 @@ public class ChatService {
                 nextCursor,
                 hasNext
         );
+    }
+
+    public ChatRoomSearchResponse searchChatRooms(
+            Long memberId,
+            String keyword,
+            Long cursor,
+            Integer size
+    ) {
+        String escapedKeyword = validateAndEscapeSearchKeyword(keyword);
+        int pageSize = size == null ? SEARCH_DEFAULT_PAGE_SIZE : size;
+        validateSearchPagination(cursor, pageSize);
+
+        PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
+        List<ChatMessage> messages;
+
+        if (cursor == null) {
+            messages = chatMessageRepository.findFirstSearchPage(
+                    memberId,
+                    escapedKeyword,
+                    pageRequest
+            );
+        } else {
+            ChatRoom cursorRoom = chatRoomRepository.findActiveSearchCursor(
+                    memberId,
+                    cursor,
+                    escapedKeyword
+            ).orElseThrow(() -> new BusinessException(
+                    ErrorCode.INVALID_SEARCH_CURSOR
+            ));
+            messages = chatMessageRepository.findNextSearchPage(
+                    memberId,
+                    escapedKeyword,
+                    cursorRoom.getLastMessageAt(),
+                    cursorRoom.getId(),
+                    pageRequest
+            );
+        }
+
+        boolean hasNext = messages.size() > pageSize;
+        List<ChatMessage> responseMessages = hasNext
+                ? messages.subList(0, pageSize)
+                : messages;
+        List<ChatRoomSearchItemResponse> items = responseMessages.stream()
+                .map(ChatRoomSearchItemResponse::from)
+                .toList();
+        Long nextCursor = hasNext
+                ? responseMessages.get(responseMessages.size() - 1)
+                .getChatRoom().getId()
+                : null;
+
+        return new ChatRoomSearchResponse(items, nextCursor, hasNext);
     }
 
     public ChatRoomDetailResponse getChatRoomDetail(
@@ -513,6 +569,32 @@ public class ChatService {
                 || size > MAX_PAGE_SIZE) {
             throw new BusinessException(ErrorCode.INVALID_PAGINATION_PARAMETER);
         }
+    }
+
+    private void validateSearchPagination(Long cursor, int size) {
+        if ((cursor != null && cursor <= 0)
+                || size < MIN_PAGE_SIZE
+                || size > SEARCH_MAX_PAGE_SIZE) {
+            throw new BusinessException(ErrorCode.INVALID_SEARCH_CURSOR);
+        }
+    }
+
+    private String validateAndEscapeSearchKeyword(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_SEARCH_KEYWORD);
+        }
+
+        String trimmedKeyword = keyword.trim();
+        if (trimmedKeyword.length() > SEARCH_KEYWORD_MAX_LENGTH) {
+            throw new BusinessException(
+                    ErrorCode.SEARCH_KEYWORD_LENGTH_EXCEEDED
+            );
+        }
+
+        return trimmedKeyword
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
     }
 
     private ChatRoom getOwnedActiveChatRoom(Long memberId, Long chatRoomId) {
