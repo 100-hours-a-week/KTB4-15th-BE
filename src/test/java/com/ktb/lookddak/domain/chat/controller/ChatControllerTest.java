@@ -1,6 +1,7 @@
 package com.ktb.lookddak.domain.chat.controller;
 
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatMessageContextResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatMessageDetailResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatGenerationStatusResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
@@ -255,6 +256,54 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.code").value("INVALID_SEARCH_KEYWORD"))
                 .andExpect(jsonPath("$.message")
                         .value("검색어를 입력해주세요."));
+    }
+
+    @Test
+    @DisplayName("검색 기준 메시지 주변의 대화 문맥을 반환한다")
+    void getChatMessageContext() throws Exception {
+        ChatMessageContextResponse response = ChatMessageContextResponse.from(
+                createChatRoom(25L, LocalDateTime.now()),
+                381L,
+                List.of(),
+                370L,
+                392L,
+                true,
+                true
+        );
+        given(chatService.getChatMessageContext(
+                1L,
+                25L,
+                381L,
+                null,
+                null,
+                20,
+                20,
+                null
+        )).willReturn(response);
+
+        mockMvc.perform(get("/api/v1/chat-rooms/25/messages")
+                        .queryParam("aroundMessageId", "381")
+                        .queryParam("beforeSize", "20")
+                        .queryParam("afterSize", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.chatRoomId").value(25))
+                .andExpect(jsonPath("$.data.anchorMessageId").value(381))
+                .andExpect(jsonPath("$.data.previousCursor").value(370))
+                .andExpect(jsonPath("$.data.nextCursor").value(392))
+                .andExpect(jsonPath("$.data.hasPrevious").value(true))
+                .andExpect(jsonPath("$.data.hasNext").value(true));
+
+        verify(chatService).getChatMessageContext(
+                1L,
+                25L,
+                381L,
+                null,
+                null,
+                20,
+                20,
+                null
+        );
     }
 
     @Test

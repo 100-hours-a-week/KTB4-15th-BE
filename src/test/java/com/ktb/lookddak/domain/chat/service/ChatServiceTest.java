@@ -2,6 +2,7 @@ package com.ktb.lookddak.domain.chat.service;
 
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatMessageContextResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomListResponse;
@@ -738,6 +739,114 @@ class ChatServiceTest {
         verify(chatMessageRepository, never()).findNextSearchPage(
                 any(), any(), any(), any(), any()
         );
+    }
+
+    @Test
+    @DisplayName("기준 메시지 주변의 이전·이후 메시지를 시간순으로 반환한다")
+    void getChatMessageContextAroundAnchor() {
+        Member member = createMember(1L);
+        ChatRoom chatRoom = createChatRoom(
+                10L,
+                member,
+                LocalDateTime.of(2026, 11, 3, 15, 0)
+        );
+        ChatMessage anchorMessage = createChatMessage(
+                100L,
+                chatRoom,
+                "검색으로 찾은 메시지"
+        );
+        ChatMessage previousMessage = createChatMessage(
+                90L,
+                chatRoom,
+                "이전 메시지"
+        );
+        ChatMessage oldestMessage = createChatMessage(
+                80L,
+                chatRoom,
+                "더 이전 메시지"
+        );
+        ChatMessage nextMessage = createChatMessage(
+                110L,
+                chatRoom,
+                "이후 메시지"
+        );
+        ChatMessage newestMessage = createChatMessage(
+                120L,
+                chatRoom,
+                "더 이후 메시지"
+        );
+        given(chatRoomRepository.findActiveById(10L))
+                .willReturn(Optional.of(chatRoom));
+        given(chatMessageRepository.findByIdAndChatRoomId(100L, 10L))
+                .willReturn(Optional.of(anchorMessage));
+        given(chatMessageRepository.findPreviousPage(
+                eq(10L),
+                eq(100L),
+                any(Pageable.class)
+        )).willReturn(List.of(previousMessage, oldestMessage));
+        given(chatMessageRepository.findNextPage(
+                eq(10L),
+                eq(100L),
+                any(Pageable.class)
+        )).willReturn(List.of(nextMessage, newestMessage));
+
+        ChatMessageContextResponse response = chatService
+                .getChatMessageContext(
+                        1L,
+                        10L,
+                        100L,
+                        null,
+                        null,
+                        1,
+                        1,
+                        null
+                );
+
+        assertThat(response.getAnchorMessageId()).isEqualTo(100L);
+        assertThat(response.getMessages())
+                .extracting(message -> message.getMessageId())
+                .containsExactly(90L, 100L, 110L);
+        assertThat(response.getPreviousCursor()).isEqualTo(90L);
+        assertThat(response.getNextCursor()).isEqualTo(110L);
+        assertThat(response.isHasPrevious()).isTrue();
+        assertThat(response.isHasNext()).isTrue();
+    }
+
+    @Test
+    @DisplayName("문맥 조회 기준값은 around, before, after 중 하나만 사용할 수 있다")
+    void rejectInvalidMessageContextParameters() {
+        assertPaginationError(() -> chatService.getChatMessageContext(
+                1L,
+                10L,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        ));
+        assertPaginationError(() -> chatService.getChatMessageContext(
+                1L,
+                10L,
+                100L,
+                90L,
+                null,
+                null,
+                null,
+                null
+        ));
+        assertPaginationError(() -> chatService.getChatMessageContext(
+                1L,
+                10L,
+                null,
+                null,
+                100L,
+                null,
+                null,
+                51
+        ));
+
+        verifyNoInteractions(chatRoomRepository, chatMessageRepository);
     }
 
     private void assertPaginationError(org.assertj.core.api.ThrowableAssert.ThrowingCallable callable) {

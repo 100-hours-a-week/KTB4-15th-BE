@@ -2,6 +2,7 @@ package com.ktb.lookddak.domain.chat.controller;
 
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatMessageContextResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatGenerationStatusResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
@@ -94,6 +95,37 @@ public class ChatController {
                 cursor,
                 size
         );
+
+        return ResponseEntity
+                .status(SuccessCode.OK.getStatus())
+                .body(ApiResponse.success(SuccessCode.OK, response));
+    }
+
+    @GetMapping("/{chatRoomId}/messages")
+    public ResponseEntity<ApiResponse<ChatMessageContextResponse>>
+            getChatMessageContext(
+                    @AuthenticationPrincipal MemberPrincipal principal,
+                    @Positive @PathVariable Long chatRoomId,
+                    @RequestParam(required = false) Long aroundMessageId,
+                    @RequestParam(name = "before", required = false)
+                            Long beforeCursor,
+                    @RequestParam(name = "after", required = false)
+                            Long afterCursor,
+                    @RequestParam(required = false) Integer beforeSize,
+                    @RequestParam(required = false) Integer afterSize,
+                    @RequestParam(required = false) Integer size
+            ) {
+        ChatMessageContextResponse response = chatService
+                .getChatMessageContext(
+                        principal.getMemberId(),
+                        chatRoomId,
+                        aroundMessageId,
+                        beforeCursor,
+                        afterCursor,
+                        beforeSize,
+                        afterSize,
+                        size
+                );
 
         return ResponseEntity
                 .status(SuccessCode.OK.getStatus())

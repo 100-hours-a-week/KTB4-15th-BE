@@ -447,6 +447,86 @@ class ChatIntegrationTest {
     }
 
     @Test
+    @DisplayName("검색 기준 메시지 주변 조회와 양방향 추가 조회를 지원한다")
+    void getChatMessageContext() throws Exception {
+        String accessToken = loginAndGetAccessToken();
+        ChatRoom chatRoom = saveChatRoom(
+                member,
+                "검색 위치 이동 테스트",
+                LocalDateTime.now()
+        );
+        ChatMessage oldestMessage = saveCompletedUserMessage(
+                chatRoom,
+                "가장 이전 메시지"
+        );
+        ChatMessage previousMessage = saveCompletedUserMessage(
+                chatRoom,
+                "기준 바로 이전 메시지"
+        );
+        ChatMessage anchorMessage = saveCompletedUserMessage(
+                chatRoom,
+                "검색으로 찾은 기준 메시지"
+        );
+        ChatMessage nextMessage = saveCompletedUserMessage(
+                chatRoom,
+                "기준 바로 이후 메시지"
+        );
+        ChatMessage newestMessage = saveCompletedUserMessage(
+                chatRoom,
+                "가장 이후 메시지"
+        );
+        entityManager.clear();
+
+        mockMvc.perform(get("/api/v1/chat-rooms/{chatRoomId}/messages", chatRoom.getId())
+                        .cookie(new Cookie("accessToken", accessToken))
+                        .queryParam(
+                                "aroundMessageId",
+                                anchorMessage.getId().toString()
+                        )
+                        .queryParam("beforeSize", "1")
+                        .queryParam("afterSize", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.chatRoomId").value(chatRoom.getId()))
+                .andExpect(jsonPath("$.data.anchorMessageId")
+                        .value(anchorMessage.getId()))
+                .andExpect(jsonPath("$.data.messages.length()").value(3))
+                .andExpect(jsonPath("$.data.messages[0].messageId")
+                        .value(previousMessage.getId()))
+                .andExpect(jsonPath("$.data.messages[1].messageId")
+                        .value(anchorMessage.getId()))
+                .andExpect(jsonPath("$.data.messages[2].messageId")
+                        .value(nextMessage.getId()))
+                .andExpect(jsonPath("$.data.previousCursor")
+                        .value(previousMessage.getId()))
+                .andExpect(jsonPath("$.data.nextCursor")
+                        .value(nextMessage.getId()))
+                .andExpect(jsonPath("$.data.hasPrevious").value(true))
+                .andExpect(jsonPath("$.data.hasNext").value(true));
+
+        mockMvc.perform(get("/api/v1/chat-rooms/{chatRoomId}/messages", chatRoom.getId())
+                        .cookie(new Cookie("accessToken", accessToken))
+                        .queryParam("before", previousMessage.getId().toString())
+                        .queryParam("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.anchorMessageId").isEmpty())
+                .andExpect(jsonPath("$.data.messages.length()").value(1))
+                .andExpect(jsonPath("$.data.messages[0].messageId")
+                        .value(oldestMessage.getId()))
+                .andExpect(jsonPath("$.data.hasPrevious").value(false));
+
+        mockMvc.perform(get("/api/v1/chat-rooms/{chatRoomId}/messages", chatRoom.getId())
+                        .cookie(new Cookie("accessToken", accessToken))
+                        .queryParam("after", nextMessage.getId().toString())
+                        .queryParam("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.anchorMessageId").isEmpty())
+                .andExpect(jsonPath("$.data.messages.length()").value(1))
+                .andExpect(jsonPath("$.data.messages[0].messageId")
+                        .value(newestMessage.getId()))
+                .andExpect(jsonPath("$.data.hasNext").value(false));
+    }
+
+    @Test
     @DisplayName("채팅방 상세를 메시지 커서와 추천 상품 상태를 포함해 조회한다")
     void getChatRoomDetailWithRecommendationProducts() throws Exception {
         String accessToken = loginAndGetAccessToken();

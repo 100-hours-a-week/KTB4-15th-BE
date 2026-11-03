@@ -113,6 +113,19 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     @Query("""
             select message
             from ChatMessage message
+            where message.chatRoom.id = :chatRoomId
+              and message.id > :cursor
+            order by message.id asc
+            """)
+    List<ChatMessage> findNextPage(
+            @Param("chatRoomId") Long chatRoomId,
+            @Param("cursor") Long cursor,
+            Pageable pageable
+    );
+
+    @Query("""
+            select message
+            from ChatMessage message
             join fetch message.chatRoom chatRoom
             where chatRoom.member.id = :memberId
               and chatRoom.deletedAt is null
