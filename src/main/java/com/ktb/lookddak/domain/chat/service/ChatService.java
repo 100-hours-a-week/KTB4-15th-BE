@@ -411,12 +411,16 @@ public class ChatService {
             );
         }
 
-        return getNextMessageContext(
-                memberId,
-                chatRoom,
-                afterCursor,
-                pageSize
-        );
+        if (afterCursor != null) {
+            return getNextMessageContext(
+                    memberId,
+                    chatRoom,
+                    afterCursor,
+                    pageSize
+            );
+        }
+
+        return getPreviousMessageContext(memberId, chatRoom, null, pageSize);
     }
 
     public ChatGenerationStatusResponse getGenerationStatus(
@@ -563,11 +567,13 @@ public class ChatService {
             int pageSize
     ) {
         validateMessageCursor(chatRoom.getId(), beforeCursor);
-        List<ChatMessage> fetchedMessages = chatMessageRepository
-                .findPreviousPage(
+        PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
+        List<ChatMessage> fetchedMessages = beforeCursor == null
+                ? chatMessageRepository.findFirstPage(chatRoom.getId(), pageRequest)
+                : chatMessageRepository.findPreviousPage(
                         chatRoom.getId(),
                         beforeCursor,
-                        PageRequest.of(0, pageSize + 1)
+                        pageRequest
                 );
         boolean hasPrevious = fetchedMessages.size() > pageSize;
         List<ChatMessage> messages = new ArrayList<>(
@@ -799,7 +805,7 @@ public class ChatService {
             selectorCount++;
         }
 
-        if (selectorCount != 1
+        if (selectorCount > 1
                 || isNotPositive(aroundMessageId)
                 || isNotPositive(beforeCursor)
                 || isNotPositive(afterCursor)) {

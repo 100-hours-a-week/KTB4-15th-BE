@@ -34,6 +34,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -742,6 +743,59 @@ class ChatServiceTest {
     }
 
     @Test
+    @DisplayName("일반 진입은 최신 메시지를 시간순으로 반환하고 이전 조회 커서를 제공한다")
+    void getLatestMessageContext() {
+        Member member = createMember(1L);
+        ChatRoom chatRoom = createChatRoom(
+                10L, member, LocalDateTime.of(2026, 11, 3, 15, 0)
+        );
+        given(chatRoomRepository.findActiveById(10L))
+                .willReturn(Optional.of(chatRoom));
+        given(chatMessageRepository.findFirstPage(10L, PageRequest.of(0, 3)))
+                .willReturn(List.of(
+                        createChatMessage(100L, chatRoom, "최신"),
+                        createChatMessage(90L, chatRoom, "이전"),
+                        createChatMessage(80L, chatRoom, "더 이전")
+                ));
+
+        ChatMessageContextResponse response = chatService.getChatMessageContext(
+                1L, 10L, null, null, null, null, null, 2
+        );
+
+        assertThat(response.getMessages()).extracting(message -> message.getMessageId())
+                .containsExactly(90L, 100L);
+        assertThat(response.getPreviousCursor()).isEqualTo(90L);
+        assertThat(response.isHasPrevious()).isTrue();
+        assertThat(response.getNextCursor()).isNull();
+        assertThat(response.isHasNext()).isFalse();
+        assertThat(response.getAnchorMessageId()).isNull();
+    }
+
+    @Test
+    @DisplayName("일반 진입은 크기 생략 시 20개를 요청하고 빈 채팅방도 반환한다")
+    void getLatestMessageContextWithDefaultSizeAndEmptyRoom() {
+        Member member = createMember(1L);
+        ChatRoom chatRoom = createChatRoom(
+                10L, member, LocalDateTime.of(2026, 11, 3, 15, 0)
+        );
+        given(chatRoomRepository.findActiveById(10L))
+                .willReturn(Optional.of(chatRoom));
+        given(chatMessageRepository.findFirstPage(10L, PageRequest.of(0, 21)))
+                .willReturn(List.of());
+
+        ChatMessageContextResponse response = chatService.getChatMessageContext(
+                1L, 10L, null, null, null, null, null, null
+        );
+
+        assertThat(response.getMessages()).isEmpty();
+        assertThat(response.getPreviousCursor()).isNull();
+        assertThat(response.getNextCursor()).isNull();
+        assertThat(response.isHasPrevious()).isFalse();
+        assertThat(response.isHasNext()).isFalse();
+        verify(chatMessageRepository).findFirstPage(10L, PageRequest.of(0, 21));
+    }
+
+    @Test
     @DisplayName("기준 메시지 주변의 이전·이후 메시지를 시간순으로 반환한다")
     void getChatMessageContextAroundAnchor() {
         Member member = createMember(1L);
@@ -816,14 +870,7 @@ class ChatServiceTest {
     @DisplayName("문맥 조회 기준값은 around, before, after 중 하나만 사용할 수 있다")
     void rejectInvalidMessageContextParameters() {
         assertPaginationError(() -> chatService.getChatMessageContext(
-                1L,
-                10L,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
+                1L, 10L, null, null, null, 20, null, null
         ));
         assertPaginationError(() -> chatService.getChatMessageContext(
                 1L,
