@@ -12,7 +12,6 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.UUID;
 
@@ -57,10 +56,8 @@ public class ChatV2GenerationResultEventHandler {
 
     private void persistSucceeded(ChatV2GenerationSucceededEvent event) {
         try {
-            ChatSseDoneResponse response = executorMetrics.recordCompleteTransaction(
-                    () -> resultService.complete(
-                            event.getUserMessageId(), event.getResponse()
-                    )
+            ChatSseDoneResponse response = resultService.complete(
+                    event.getUserMessageId(), event.getResponse()
             );
             if (response != null) {
                 sendDone(event.getUserMessageId(), response);
@@ -71,9 +68,7 @@ public class ChatV2GenerationResultEventHandler {
                     event.getUserMessageId(),
                     exception
             );
-            executorMetrics.recordFailTransaction(
-                    () -> resultService.fail(event.getUserMessageId())
-            );
+            resultService.fail(event.getUserMessageId());
             sendError(
                     event.getUserMessageId(),
                     RESULT_PERSISTENCE_FAILED,
@@ -106,11 +101,7 @@ public class ChatV2GenerationResultEventHandler {
 
     private void submit(Long userMessageId, Runnable task) {
         try {
-            long enqueuedAt = System.nanoTime();
             resultPersistenceExecutor.execute(() -> {
-                executorMetrics.queueWait(
-                        Duration.ofNanos(System.nanoTime() - enqueuedAt)
-                );
                 task.run();
             });
         } catch (RejectedExecutionException exception) {
