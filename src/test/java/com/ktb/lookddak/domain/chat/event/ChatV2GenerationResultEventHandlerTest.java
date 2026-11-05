@@ -1,7 +1,6 @@
 package com.ktb.lookddak.domain.chat.event;
 
 import com.ktb.lookddak.domain.chat.dto.ChatSseDoneResponse;
-import com.ktb.lookddak.domain.chat.redis.ChatRedisStreamingService;
 import com.ktb.lookddak.domain.chat.service.ChatGenerationResultService;
 import com.ktb.lookddak.domain.chat.service.ChatSseService;
 import com.ktb.lookddak.global.client.ai.config.AiResultPersistenceExecutorMetrics;
@@ -33,9 +32,6 @@ class ChatV2GenerationResultEventHandlerTest {
 
     @Mock
     private ChatSseService chatSseService;
-
-    @Mock
-    private ChatRedisStreamingService chatRedisStreamingService;
 
     @Mock
     private AiResultPersistenceExecutorMetrics executorMetrics;
@@ -134,7 +130,6 @@ class ChatV2GenerationResultEventHandlerTest {
         return new ChatV2GenerationResultEventHandler(
                 resultService,
                 chatSseService,
-                chatRedisStreamingService,
                 executor,
                 executorMetrics
         );

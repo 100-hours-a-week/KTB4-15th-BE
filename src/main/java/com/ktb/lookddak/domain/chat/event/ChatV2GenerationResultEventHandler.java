@@ -2,7 +2,6 @@ package com.ktb.lookddak.domain.chat.event;
 
 import com.ktb.lookddak.domain.chat.dto.ChatSseDoneResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatSseErrorResponse;
-import com.ktb.lookddak.domain.chat.redis.ChatRedisStreamingService;
 import com.ktb.lookddak.domain.chat.service.ChatGenerationResultService;
 import com.ktb.lookddak.domain.chat.service.ChatSseService;
 import com.ktb.lookddak.global.client.ai.config.AiResultPersistenceExecutorMetrics;
@@ -13,7 +12,6 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.RejectedExecutionException;
-import java.util.UUID;
 
 @Slf4j
 @Component
@@ -26,21 +24,18 @@ public class ChatV2GenerationResultEventHandler {
 
     private final ChatGenerationResultService resultService;
     private final ChatSseService chatSseService;
-    private final ChatRedisStreamingService chatRedisStreamingService;
     private final ThreadPoolTaskExecutor resultPersistenceExecutor;
     private final AiResultPersistenceExecutorMetrics executorMetrics;
 
     public ChatV2GenerationResultEventHandler(
             ChatGenerationResultService resultService,
             ChatSseService chatSseService,
-            ChatRedisStreamingService chatRedisStreamingService,
             @Qualifier("aiResultPersistenceExecutor")
             ThreadPoolTaskExecutor resultPersistenceExecutor,
             AiResultPersistenceExecutorMetrics executorMetrics
     ) {
         this.resultService = resultService;
         this.chatSseService = chatSseService;
-        this.chatRedisStreamingService = chatRedisStreamingService;
         this.resultPersistenceExecutor = resultPersistenceExecutor;
         this.executorMetrics = executorMetrics;
     }
@@ -60,7 +55,11 @@ public class ChatV2GenerationResultEventHandler {
                     event.getUserMessageId(), event.getResponse()
             );
             if (response != null) {
-                sendDone(event.getUserMessageId(), response);
+                chatSseService.send(
+                        event.getUserMessageId(),
+                        "done",
+                        response
+                );
             }
         } catch (Exception exception) {
             log.error(
@@ -69,13 +68,17 @@ public class ChatV2GenerationResultEventHandler {
                     exception
             );
             resultService.fail(event.getUserMessageId());
-            sendError(
+            chatSseService.send(
                     event.getUserMessageId(),
-                    RESULT_PERSISTENCE_FAILED,
-                    "AI 응답 결과를 저장하지 못했습니다."
+                    "error",
+                    new ChatSseErrorResponse(
+                            event.getUserMessageId(),
+                            RESULT_PERSISTENCE_FAILED,
+                            "AI 응답 결과를 저장하지 못했습니다."
+                    )
             );
         } finally {
-            completeLocalSseWhenRedisDisabled(event.getUserMessageId());
+            chatSseService.complete(event.getUserMessageId());
         }
     }
 
@@ -94,16 +97,22 @@ public class ChatV2GenerationResultEventHandler {
                     exception
             );
         } finally {
-            sendError(event.getUserMessageId(), event.getCode(), event.getMessage());
-            completeLocalSseWhenRedisDisabled(event.getUserMessageId());
+            chatSseService.send(
+                    event.getUserMessageId(),
+                    "error",
+                    new ChatSseErrorResponse(
+                            event.getUserMessageId(),
+                            event.getCode(),
+                            event.getMessage()
+                    )
+            );
+            chatSseService.complete(event.getUserMessageId());
         }
     }
 
     private void submit(Long userMessageId, Runnable task) {
         try {
-            resultPersistenceExecutor.execute(() -> {
-                task.run();
-            });
+            resultPersistenceExecutor.execute(task);
         } catch (RejectedExecutionException exception) {
             executorMetrics.rejected();
             log.error(
@@ -130,60 +139,15 @@ public class ChatV2GenerationResultEventHandler {
                     exception
             );
         } finally {
-            sendError(
+            chatSseService.send(
                     userMessageId,
-                    RESULT_PERSISTENCE_REJECTED,
-                    "요청이 많아 응답 결과를 처리하지 못했습니다. 다시 시도해 주세요."
+                    "error",
+                    new ChatSseErrorResponse(
+                            userMessageId,
+                            RESULT_PERSISTENCE_REJECTED,
+                            "요청이 많아 응답 결과를 처리하지 못했습니다. 다시 시도해 주세요."
+                    )
             );
-            completeLocalSseWhenRedisDisabled(userMessageId);
-        }
-    }
-
-    private void sendDone(Long userMessageId, ChatSseDoneResponse response) {
-        if (chatRedisStreamingService.isEnabled()) {
-            try {
-                chatRedisStreamingService.complete(
-                        userMessageId,
-                        UUID.randomUUID().toString(),
-                        response
-                );
-            } catch (RuntimeException exception) {
-                log.error("Redis terminal publish failed userMessageId={}", userMessageId, exception);
-                chatSseService.sendDirectTerminalAndComplete(userMessageId, "done", response);
-            }
-            return;
-        }
-        chatSseService.send(userMessageId, "done", response);
-    }
-
-    private void sendError(Long userMessageId, String code, String message) {
-        if (chatRedisStreamingService.isEnabled()) {
-            try {
-                chatRedisStreamingService.fail(
-                        userMessageId,
-                        UUID.randomUUID().toString(),
-                        code,
-                        message
-                );
-            } catch (RuntimeException exception) {
-                log.error("Redis error publish failed userMessageId={}", userMessageId, exception);
-                chatSseService.sendDirectTerminalAndComplete(
-                        userMessageId,
-                        "error",
-                        new ChatSseErrorResponse(userMessageId, code, message)
-                );
-            }
-            return;
-        }
-        chatSseService.send(
-                userMessageId,
-                "error",
-                new ChatSseErrorResponse(userMessageId, code, message)
-        );
-    }
-
-    private void completeLocalSseWhenRedisDisabled(Long userMessageId) {
-        if (!chatRedisStreamingService.isEnabled()) {
             chatSseService.complete(userMessageId);
         }
     }

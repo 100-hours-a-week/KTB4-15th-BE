@@ -1,6 +1,5 @@
 package com.ktb.lookddak.domain.chat.event;
 
-import com.ktb.lookddak.domain.chat.redis.ChatRedisStreamingService;
 import com.ktb.lookddak.domain.chat.service.ChatSseService;
 import com.ktb.lookddak.global.client.ai.chat.AiChatStreamEvent;
 import com.ktb.lookddak.global.client.ai.chat.AiChatStreamingClient;
@@ -36,9 +35,6 @@ class ChatV2GenerationStreamListenerTest {
     private ChatSseService chatSseService;
 
     @Mock
-    private ChatRedisStreamingService chatRedisStreamingService;
-
-    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     @Test
@@ -47,7 +43,6 @@ class ChatV2GenerationStreamListenerTest {
         ChatV2GenerationStreamListener listener = new ChatV2GenerationStreamListener(
                 aiChatStreamingClient,
                 chatSseService,
-                chatRedisStreamingService,
                 eventPublisher
         );
         given(aiChatStreamingClient.stream(any(AiChatRequest.class)))
@@ -75,12 +70,6 @@ class ChatV2GenerationStreamListenerTest {
 
         listener.handle(event());
 
-        verify(chatRedisStreamingService).initialize(100L);
-        verify(chatRedisStreamingService).recordToken(
-                eq(100L),
-                any(String.class),
-                eq("추천을 찾고 있어요.")
-        );
         verify(chatSseService).sendToken(100L, "추천을 찾고 있어요.");
         verify(chatSseService, never()).send(
                 eq(100L),
@@ -96,7 +85,6 @@ class ChatV2GenerationStreamListenerTest {
         ChatV2GenerationStreamListener listener = new ChatV2GenerationStreamListener(
                 aiChatStreamingClient,
                 chatSseService,
-                chatRedisStreamingService,
                 eventPublisher
         );
         given(aiChatStreamingClient.stream(any(AiChatRequest.class)))
@@ -109,29 +97,6 @@ class ChatV2GenerationStreamListenerTest {
         listener.handle(event());
 
         verify(eventPublisher).publishEvent(any(ChatV2GenerationFailedEvent.class));
-    }
-
-    @Test
-    @DisplayName("Redis Pub/Sub이 활성화되면 listener는 로컬 emitter에 token을 중복 전송하지 않는다")
-    void doNotSendTokenDirectlyWhenRedisIsEnabled() {
-        ChatV2GenerationStreamListener listener = new ChatV2GenerationStreamListener(
-                aiChatStreamingClient,
-                chatSseService,
-                chatRedisStreamingService,
-                eventPublisher
-        );
-        given(chatRedisStreamingService.isEnabled()).willReturn(true);
-        given(aiChatStreamingClient.stream(any(AiChatRequest.class)))
-                .willReturn(Flux.just(AiChatStreamEvent.token(
-                        new AiChatTokenResponse(10L, "추천을 찾고 있어요.")
-                )));
-
-        listener.handle(event());
-
-        verify(chatRedisStreamingService).recordToken(
-                eq(100L), any(String.class), eq("추천을 찾고 있어요.")
-        );
-        verify(chatSseService, never()).sendToken(100L, "추천을 찾고 있어요.");
     }
 
     private ChatV2GenerationRequestedEvent event() {
