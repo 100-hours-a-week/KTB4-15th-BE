@@ -56,7 +56,6 @@ class ChatV2ServiceTest {
                 chatRoomRepository,
                 chatMessageRepository
         );
-        ReflectionTestUtils.setField(chatV2Service, "maxChatRoomCount", 100L);
     }
 
     @Test
@@ -66,8 +65,6 @@ class ChatV2ServiceTest {
         LocalDateTime createdAt = LocalDateTime.of(2026, 10, 6, 22, 0);
         given(memberRepository.findActiveByIdForUpdate(1L))
                 .willReturn(Optional.of(member));
-        given(chatRoomRepository.countByMemberIdAndDeletedAtIsNull(1L))
-                .willReturn(0L);
         given(chatRoomRepository.save(any(ChatRoom.class)))
                 .willAnswer(invocation -> {
                     ChatRoom chatRoom = invocation.getArgument(0);

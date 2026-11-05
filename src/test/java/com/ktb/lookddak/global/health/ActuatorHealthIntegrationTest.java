@@ -12,7 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(properties = "management.health.redis.enabled=false")
+@SpringBootTest
 @AutoConfigureMockMvc
 class ActuatorHealthIntegrationTest {
 
@@ -20,7 +20,7 @@ class ActuatorHealthIntegrationTest {
     private MockMvc mockMvc;
 
     @Test
-    @DisplayName("인증 없이 Actuator health 상태를 조회한다")
+    @DisplayName("인증 없이 Actuator Health 상태를 조회한다")
     void getHealthWithoutAuthentication() throws Exception {
         mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk())

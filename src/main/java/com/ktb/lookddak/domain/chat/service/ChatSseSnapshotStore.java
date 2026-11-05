@@ -19,15 +19,6 @@ public class ChatSseSnapshotStore {
         states.remove(userMessageId, state);
     }
 
-    public void remove(Long userMessageId) {
-        states.remove(userMessageId);
-    }
-
-    /** 현재 JVM에 fallback 용도로 남아 있는 메시지별 누적 본문 수다. */
-    public int size() {
-        return states.size();
-    }
-
     static class SnapshotState {
 
         private final Object lock = new Object();
