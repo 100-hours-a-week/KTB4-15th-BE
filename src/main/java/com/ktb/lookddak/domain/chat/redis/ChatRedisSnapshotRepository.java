@@ -16,8 +16,9 @@ import java.util.Optional;
  * <p>각 변경은 호출자가 전달한 eventId로 식별한다. Redis 응답 유실 뒤 같은 eventId로
  * 재시도하면 기존 seq만 반환하고, content와 seq는 다시 변경하지 않는다.</p>
  *
- * <p>TTL은 아직 여기서 설정하지 않는다. 최종 보관 시간은 재연결/새로고침 요구사항을
- * 측정한 뒤 운영 설정으로 정할 예정이므로, 지금 단계에서 임의의 만료 시간을 강제하지 않는다.</p>
+ * <p>생성 중에는 짧은 유실 복구 시간을 위해 TTL을 계속 연장하고, 완료·실패 후에는 더 짧은 TTL로
+ * 전환한다. Snapshot 본문과 상태, eventId 중복 방지 키가 무기한 남지 않도록 모든 쓰기는 Lua 안에서
+ * TTL을 함께 갱신한다.</p>
  */
 @Repository
 public class ChatRedisSnapshotRepository {
@@ -33,11 +34,12 @@ public class ChatRedisSnapshotRepository {
                     if initialized == '1' then
                         return 0
                     end
-                    redis.call('SET', KEYS[1], '')
+                    redis.call('SET', KEYS[1], '', 'PX', ARGV[1])
                     redis.call('HSET', KEYS[2],
                         'initialized', '1',
                         'seq', '0',
                         'status', 'GENERATING')
+                    redis.call('PEXPIRE', KEYS[2], ARGV[1])
                     return 1
                     """,
             Long.class
@@ -61,8 +63,10 @@ public class ChatRedisSnapshotRepository {
 
                     local nextSeq = redis.call('HINCRBY', KEYS[2], 'seq', 1)
                     redis.call('APPEND', KEYS[1], ARGV[1])
-                    redis.call('SET', KEYS[3], tostring(nextSeq))
+                    redis.call('SET', KEYS[3], tostring(nextSeq), 'PX', ARGV[3])
                     redis.call('HSET', KEYS[2], 'lastEventId', ARGV[2])
+                    redis.call('PEXPIRE', KEYS[1], ARGV[3])
+                    redis.call('PEXPIRE', KEYS[2], ARGV[3])
                     return {'APPLIED', tostring(nextSeq), currentStatus}
                     """,
             List.class
@@ -85,10 +89,12 @@ public class ChatRedisSnapshotRepository {
                     end
 
                     local nextSeq = redis.call('HINCRBY', KEYS[2], 'seq', 1)
-                    redis.call('SET', KEYS[3], tostring(nextSeq))
+                    redis.call('SET', KEYS[3], tostring(nextSeq), 'PX', ARGV[3])
                     redis.call('HSET', KEYS[2],
                         'status', ARGV[1],
                         'lastEventId', ARGV[2])
+                    redis.call('PEXPIRE', KEYS[1], ARGV[3])
+                    redis.call('PEXPIRE', KEYS[2], ARGV[3])
                     return {'APPLIED', tostring(nextSeq), ARGV[1]}
                     """,
             List.class
@@ -110,20 +116,25 @@ public class ChatRedisSnapshotRepository {
 
     private final StringRedisTemplate redisTemplate;
     private final ChatRedisKeyFactory keyFactory;
+    private final long generatingTtlMillis;
+    private final long terminalTtlMillis;
 
     public ChatRedisSnapshotRepository(
             StringRedisTemplate redisTemplate,
-            ChatRedisKeyFactory keyFactory
+            ChatRedisKeyFactory keyFactory,
+            ChatRedisProperties properties
     ) {
         this.redisTemplate = redisTemplate;
         this.keyFactory = keyFactory;
+        this.generatingTtlMillis = properties.getGeneratingTtl().toMillis();
+        this.terminalTtlMillis = properties.getTerminalTtl().toMillis();
     }
 
     /**
      * 메시지 생성 직후 호출한다. 같은 메시지에 대한 중복 초기화는 기존 Snapshot을 보존한다.
      */
     public void initialize(Long userMessageId) {
-        redisTemplate.execute(INITIALIZE_SCRIPT, snapshotKeys(userMessageId));
+        redisTemplate.execute(INITIALIZE_SCRIPT, snapshotKeys(userMessageId), String.valueOf(generatingTtlMillis));
     }
 
     /**
@@ -141,7 +152,8 @@ public class ChatRedisSnapshotRepository {
                 APPEND_TOKEN_SCRIPT,
                 writeKeys(userMessageId, eventId),
                 token,
-                eventId
+                eventId,
+                String.valueOf(generatingTtlMillis)
         );
         return toWriteResult(result, userMessageId, eventId);
     }
@@ -163,7 +175,8 @@ public class ChatRedisSnapshotRepository {
                 TRANSITION_STATUS_SCRIPT,
                 writeKeys(userMessageId, eventId),
                 status.name(),
-                eventId
+                eventId,
+                String.valueOf(terminalTtlMillis)
         );
         return toWriteResult(result, userMessageId, eventId);
     }

@@ -221,7 +221,7 @@ public class ChatSseService {
                         message.getContent(),
                         products
                 ));
-                completeRedisConnection(userMessageId, connection);
+                completeTerminalRedisConnection(userMessageId, connection);
                 return;
             }
             if (result.getGenerationStatus() == ChatGenerationStatus.FAILED) {
@@ -230,7 +230,7 @@ public class ChatSseService {
                         "AI_GENERATION_FAILED",
                         "AI 응답 생성에 실패했습니다. 다시 시도해 주세요."
                 ));
-                completeRedisConnection(userMessageId, connection);
+                completeTerminalRedisConnection(userMessageId, connection);
             }
         }
     }
@@ -467,14 +467,14 @@ public class ChatSseService {
             send(userMessageId, connection.emitter, "done", new ChatSseDoneResponse(
                     userMessageId, event.content(), event.products()
             ));
-            completeRedisConnection(userMessageId, connection);
+            completeTerminalRedisConnection(userMessageId, connection);
             return;
         }
         if (event.type() == ChatRedisEventType.ERROR) {
             send(userMessageId, connection.emitter, "error", new ChatSseErrorResponse(
                     userMessageId, event.code(), event.message()
             ));
-            completeRedisConnection(userMessageId, connection);
+            completeTerminalRedisConnection(userMessageId, connection);
         }
     }
 
@@ -536,8 +536,7 @@ public class ChatSseService {
                 degradedConnection.buffer.clear();
             }
         }
-        ChatSseSnapshotStore.SnapshotState state = snapshotStore.getOrCreate(userMessageId);
-        snapshotStore.remove(userMessageId, state);
+        snapshotStore.remove(userMessageId);
     }
 
     /**
@@ -556,6 +555,15 @@ public class ChatSseService {
         }
         redisConnections.remove(userMessageId, connection);
         degradedRedisConnections.remove(userMessageId, connection);
+    }
+
+    /**
+     * Redis의 terminal event 또는 DB의 terminal 상태를 전송한 뒤에만 JVM fallback Snapshot을
+     * 제거한다. 단순 연결 종료나 복구 버퍼 초과 시에는 생성이 계속될 수 있으므로 보존한다.
+     */
+    private void completeTerminalRedisConnection(Long userMessageId, RedisConnection connection) {
+        completeRedisConnection(userMessageId, connection);
+        snapshotStore.remove(userMessageId);
     }
 
     private void switchRedisConnectionToLocal(Long userMessageId, RedisConnection connection) {
@@ -633,7 +641,7 @@ public class ChatSseService {
                 send(userMessageId, connection.emitter, "done", new ChatSseDoneResponse(
                         userMessageId, message.getContent(), products
                 ));
-                completeRedisConnection(userMessageId, connection);
+                completeTerminalRedisConnection(userMessageId, connection);
                 return;
             }
             if (result.getGenerationStatus() == ChatGenerationStatus.FAILED) {
@@ -642,7 +650,7 @@ public class ChatSseService {
                         "AI_GENERATION_FAILED",
                         "AI 응답 생성에 실패했습니다. 다시 시도해 주세요."
                 ));
-                completeRedisConnection(userMessageId, connection);
+                completeTerminalRedisConnection(userMessageId, connection);
             }
         }
     }
@@ -660,6 +668,11 @@ public class ChatSseService {
 
     boolean hasConnection(Long userMessageId) {
         return emitters.containsKey(userMessageId);
+    }
+
+    /** 동일 messageId 재연결은 기존 연결을 교체하므로, map 크기가 실제 활성 SSE 수다. */
+    public int activeEmitterCount() {
+        return emitters.size();
     }
 
     private static class RedisConnection {

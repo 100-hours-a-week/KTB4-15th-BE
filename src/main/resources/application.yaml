@@ -44,6 +44,8 @@ chat:
     enabled: ${CHAT_REDIS_ENABLED:false}
     key-prefix: ${CHAT_REDIS_KEY_PREFIX:lookddak:chat}
     recovery-buffer-max-events: ${CHAT_REDIS_RECOVERY_BUFFER_MAX_EVENTS:512}
+    generating-ttl: ${CHAT_REDIS_GENERATING_TTL:10m}
+    terminal-ttl: ${CHAT_REDIS_TERMINAL_TTL:5m}
 
 ai:
   server:

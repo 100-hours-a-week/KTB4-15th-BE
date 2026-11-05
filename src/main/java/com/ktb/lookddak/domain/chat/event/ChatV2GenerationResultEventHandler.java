@@ -12,6 +12,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.UUID;
 
@@ -56,8 +57,10 @@ public class ChatV2GenerationResultEventHandler {
 
     private void persistSucceeded(ChatV2GenerationSucceededEvent event) {
         try {
-            ChatSseDoneResponse response = resultService.complete(
-                    event.getUserMessageId(), event.getResponse()
+            ChatSseDoneResponse response = executorMetrics.recordCompleteTransaction(
+                    () -> resultService.complete(
+                            event.getUserMessageId(), event.getResponse()
+                    )
             );
             if (response != null) {
                 sendDone(event.getUserMessageId(), response);
@@ -68,7 +71,9 @@ public class ChatV2GenerationResultEventHandler {
                     event.getUserMessageId(),
                     exception
             );
-            resultService.fail(event.getUserMessageId());
+            executorMetrics.recordFailTransaction(
+                    () -> resultService.fail(event.getUserMessageId())
+            );
             sendError(
                     event.getUserMessageId(),
                     RESULT_PERSISTENCE_FAILED,
@@ -101,7 +106,13 @@ public class ChatV2GenerationResultEventHandler {
 
     private void submit(Long userMessageId, Runnable task) {
         try {
-            resultPersistenceExecutor.execute(task);
+            long enqueuedAt = System.nanoTime();
+            resultPersistenceExecutor.execute(() -> {
+                executorMetrics.queueWait(
+                        Duration.ofNanos(System.nanoTime() - enqueuedAt)
+                );
+                task.run();
+            });
         } catch (RejectedExecutionException exception) {
             executorMetrics.rejected();
             log.error(

@@ -20,16 +20,18 @@ import static org.mockito.Mockito.when;
 class ChatRedisSnapshotRepositoryTest {
 
     private final StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+    private final ChatRedisProperties properties = new ChatRedisProperties(false, "lookddak:chat");
     private final ChatRedisSnapshotRepository repository = new ChatRedisSnapshotRepository(
             redisTemplate,
-            new ChatRedisKeyFactory(new ChatRedisProperties(false, "lookddak:chat"))
+            new ChatRedisKeyFactory(properties),
+            properties
     );
 
     @Test
     @DisplayName("새 token 이벤트는 Redis가 발급한 seq로 한 번만 반영한다")
     void appendTokenReturnsAppliedSequence() {
         when(redisTemplate.execute(
-                any(DefaultRedisScript.class), anyList(), anyString(), anyString()
+                any(DefaultRedisScript.class), anyList(), anyString(), anyString(), anyString()
         )).thenReturn(List.of("APPLIED", "7", "GENERATING"));
 
         ChatRedisSnapshotWriteResult result = repository.appendToken(4365L, "event-7", "추천");
@@ -43,7 +45,7 @@ class ChatRedisSnapshotRepositoryTest {
     @DisplayName("같은 eventId 재시도는 기존 seq를 반환하고 다시 발행하지 않도록 표시한다")
     void returnDuplicateForRetriedEvent() {
         when(redisTemplate.execute(
-                any(DefaultRedisScript.class), anyList(), anyString(), anyString()
+                any(DefaultRedisScript.class), anyList(), anyString(), anyString(), anyString()
         )).thenReturn(List.of("DUPLICATE", "7", "GENERATING"));
 
         ChatRedisSnapshotWriteResult result = repository.appendToken(4365L, "event-7", "추천");
@@ -56,7 +58,7 @@ class ChatRedisSnapshotRepositoryTest {
     @DisplayName("초기화되지 않은 Snapshot에 대한 token 추가는 명확히 거절한다")
     void rejectUninitializedSnapshot() {
         when(redisTemplate.execute(
-                any(DefaultRedisScript.class), anyList(), anyString(), anyString()
+                any(DefaultRedisScript.class), anyList(), anyString(), anyString(), anyString()
         )).thenReturn(List.of("UNINITIALIZED", "", ""));
 
         assertThatThrownBy(() -> repository.appendToken(4365L, "event-7", "추천"))
@@ -68,7 +70,7 @@ class ChatRedisSnapshotRepositoryTest {
     @DisplayName("종료 상태인 Snapshot에 다른 token을 적용하려 하면 거절한다")
     void rejectInvalidState() {
         when(redisTemplate.execute(
-                any(DefaultRedisScript.class), anyList(), anyString(), anyString()
+                any(DefaultRedisScript.class), anyList(), anyString(), anyString(), anyString()
         )).thenReturn(List.of("INVALID_STATE", "10", "COMPLETED"));
 
         assertThatThrownBy(() -> repository.appendToken(4365L, "event-11", "추가 토큰"))
@@ -115,10 +117,15 @@ class ChatRedisSnapshotRepositoryTest {
                 .contains("GET', KEYS[3]")
                 .contains("HINCRBY")
                 .contains("APPEND")
+                .contains("PEXPIRE", "ARGV[3]")
                 .contains("DUPLICATE")
                 .contains("INVALID_STATE");
         assertThat(ChatRedisSnapshotRepository.transitionStatusScript())
                 .contains("currentStatus ~= 'GENERATING'")
+                .contains("PEXPIRE", "ARGV[3]")
                 .contains("DUPLICATE");
+        assertThat(ChatRedisSnapshotRepository.initializeScript())
+                .contains("'PX', ARGV[1]")
+                .contains("PEXPIRE");
     }
 }
