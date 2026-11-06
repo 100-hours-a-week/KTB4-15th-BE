@@ -28,6 +28,7 @@ dependencies {
 	implementation 'io.sentry:sentry-spring-boot-4-starter:8.58.0'
 	implementation 'software.amazon.awssdk:s3'
 	implementation 'software.amazon.awssdk:sqs'
+	implementation 'software.amazon.awssdk:sts'
 	implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'com.mysql:mysql-connector-j'
