@@ -5,6 +5,8 @@ import com.ktb.lookddak.domain.product.dto.ProductRankingResponse;
 import com.ktb.lookddak.domain.product.service.ProductService;
 import com.ktb.lookddak.global.response.ApiResponse;
 import com.ktb.lookddak.global.response.SuccessCode;
+import com.ktb.lookddak.global.security.principal.MemberPrincipal;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -38,10 +40,11 @@ public class ProductController {
     @PostMapping("/{productId}/purchase-link-clicks")
     public ResponseEntity<ApiResponse<ProductPurchaseLinkClickResponse>>
     recordPurchaseLinkClick(
+            @AuthenticationPrincipal MemberPrincipal principal,
             @Positive @PathVariable Long productId
     ) {
         ProductPurchaseLinkClickResponse response =
-                productService.recordPurchaseLinkClick(productId);
+                productService.recordPurchaseLinkClick(principal.getMemberId(), productId);
 
         return ResponseEntity
                 .status(SuccessCode.OK.getStatus())

@@ -7,6 +7,7 @@ import com.ktb.lookddak.domain.product.dto.ProductRankingResponse;
 import com.ktb.lookddak.domain.product.entity.Product;
 import com.ktb.lookddak.domain.product.entity.ProductRankingType;
 import com.ktb.lookddak.domain.product.repository.ProductRepository;
+import com.ktb.lookddak.domain.product.repository.ProductClickReceiptRepository;
 import com.ktb.lookddak.domain.wishlist.repository.WishlistRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
@@ -15,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,6 +30,7 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final WishlistRepository wishlistRepository;
+    private final ProductClickReceiptRepository clickReceiptRepository;
 
     public ProductRankingResponse getRankings(String type) {
         ProductRankingType rankingType = ProductRankingType.from(type);
@@ -52,17 +56,26 @@ public class ProductService {
 
     @Transactional
     public ProductPurchaseLinkClickResponse recordPurchaseLinkClick(
+            Long memberId,
             Long productId
     ) {
-        int updatedRowCount = productRepository.incrementClickCount(productId);
-        if (updatedRowCount == 0) {
-            throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
-        }
-
         Product product = productRepository.findById(productId)
-                .orElseThrow(() ->
-                        new BusinessException(ErrorCode.PRODUCT_NOT_FOUND)
-                );
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
+
+        clickReceiptRepository.ensureReceipt(memberId, productId);
+        // 동일 회원·상품의 잠금을 획득한 뒤 시각을 계산한다.
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        int claimedRowCount = clickReceiptRepository.claimClick(
+                memberId, productId, now, now.minusHours(24)
+        );
+
+        // 집계 시각과 누적 클릭 수는 같은 트랜잭션에서 반영한다.
+        if (claimedRowCount == 1) {
+            int updatedRowCount = productRepository.incrementClickCount(productId);
+            if (updatedRowCount == 0) {
+                throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
+            }
+        }
 
         return ProductPurchaseLinkClickResponse.from(product);
     }

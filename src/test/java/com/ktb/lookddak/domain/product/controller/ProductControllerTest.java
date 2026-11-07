@@ -12,6 +12,13 @@ import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import com.ktb.lookddak.global.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import com.ktb.lookddak.global.security.principal.MemberPrincipal;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
+import static org.mockito.Mockito.lenient;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -32,11 +39,27 @@ class ProductControllerTest {
     @Mock
     private ProductService productService;
 
+    @Mock
+    private MemberPrincipal principal;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(principal.getMemberId()).thenReturn(10L);
+        SecurityContextHolder.getContext().setAuthentication(
+                UsernamePasswordAuthenticationToken.authenticated(principal, null, java.util.List.of())
+        );
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
+
     @Test
     @DisplayName("구매 링크 클릭을 집계하고 구매 URL을 반환한다")
     void recordPurchaseLinkClick() throws Exception {
         MockMvc mockMvc = createMockMvc();
-        given(productService.recordPurchaseLinkClick(1L))
+        given(productService.recordPurchaseLinkClick(10L, 1L))
                 .willReturn(new ProductPurchaseLinkClickResponse(
                         "https://shop.lookddak.com/products/1"
                 ));
@@ -51,14 +74,14 @@ class ProductControllerTest {
                 .andExpect(jsonPath("$.message")
                         .value("요청이 성공적으로 처리되었습니다."));
 
-        verify(productService).recordPurchaseLinkClick(1L);
+        verify(productService).recordPurchaseLinkClick(10L, 1L);
     }
 
     @Test
     @DisplayName("존재하지 않는 상품이면 404 Not Found를 반환한다")
     void rejectMissingProduct() throws Exception {
         MockMvc mockMvc = createMockMvc();
-        given(productService.recordPurchaseLinkClick(999L))
+        given(productService.recordPurchaseLinkClick(10L, 999L))
                 .willThrow(new BusinessException(
                         ErrorCode.PRODUCT_NOT_FOUND
                 ));
@@ -126,6 +149,7 @@ class ProductControllerTest {
     private MockMvc createMockMvc() {
         return MockMvcBuilders
                 .standaloneSetup(new ProductController(productService))
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }

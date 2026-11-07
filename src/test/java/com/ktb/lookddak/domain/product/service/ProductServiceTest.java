@@ -7,6 +7,9 @@ import com.ktb.lookddak.domain.product.entity.Product;
 import com.ktb.lookddak.domain.product.entity.ProductItemType;
 import com.ktb.lookddak.domain.product.entity.ProductRankingType;
 import com.ktb.lookddak.domain.product.repository.ProductRepository;
+import com.ktb.lookddak.domain.product.repository.ProductClickReceiptRepository;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import com.ktb.lookddak.domain.wishlist.repository.WishlistRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
@@ -35,6 +38,9 @@ class ProductServiceTest {
     @Mock
     private WishlistRepository wishlistRepository;
 
+    @Mock
+    private ProductClickReceiptRepository clickReceiptRepository;
+
     @InjectMocks
     private ProductService productService;
 
@@ -43,11 +49,12 @@ class ProductServiceTest {
     void recordPurchaseLinkClick() {
         Product product = createProduct();
         given(productRepository.incrementClickCount(1L)).willReturn(1);
+        given(clickReceiptRepository.claimClick(eq(10L), eq(1L), any(), any())).willReturn(1);
         given(productRepository.findById(1L))
                 .willReturn(Optional.of(product));
 
         ProductPurchaseLinkClickResponse response =
-                productService.recordPurchaseLinkClick(1L);
+                productService.recordPurchaseLinkClick(10L, 1L);
 
         assertThat(response.getPurchaseUrl())
                 .isEqualTo("https://shop.lookddak.com/products/1");
@@ -58,14 +65,22 @@ class ProductServiceTest {
     @Test
     @DisplayName("존재하지 않는 상품의 구매 링크 클릭은 집계하지 않는다")
     void rejectMissingProduct() {
-        given(productRepository.incrementClickCount(999L)).willReturn(0);
 
         assertThatThrownBy(() ->
-                productService.recordPurchaseLinkClick(999L)
+                productService.recordPurchaseLinkClick(10L, 999L)
         )
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.PRODUCT_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("중복 클릭은 집계하지 않고 구매 URL을 반환한다")
+    void duplicateClickReturnsUrlWithoutIncrement() {
+        given(productRepository.findById(1L)).willReturn(Optional.of(createProduct()));
+        ProductPurchaseLinkClickResponse response = productService.recordPurchaseLinkClick(10L, 1L);
+        assertThat(response.getPurchaseUrl()).isEqualTo("https://shop.lookddak.com/products/1");
+        verify(productRepository, never()).incrementClickCount(any());
     }
 
     @Test
