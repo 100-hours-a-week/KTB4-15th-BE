@@ -9,6 +9,15 @@ spring:
       max-request-size: 11MB
   jpa:
     open-in-view: false
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
+      # Snapshot/PubSub 장애를 SSE fallback으로 빠르게 전환하기 위한 Redis 명령 응답 제한이다.
+      # 이 시간이 지나면 생성 BE는 local fallback, 다른 BE는 DB terminal fallback으로 전환한다.
+      timeout: ${REDIS_COMMAND_TIMEOUT:1s}
 
 server:
   sse-port: ${SSE_SERVER_PORT:8081}
@@ -29,6 +38,14 @@ internal:
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS}
+
+chat:
+  redis:
+    enabled: ${CHAT_REDIS_ENABLED:false}
+    key-prefix: ${CHAT_REDIS_KEY_PREFIX:lookddak:chat}
+    recovery-buffer-max-events: ${CHAT_REDIS_RECOVERY_BUFFER_MAX_EVENTS:512}
+    generating-ttl: ${CHAT_REDIS_GENERATING_TTL:10m}
+    terminal-ttl: ${CHAT_REDIS_TERMINAL_TTL:5m}
 
 ai:
   server:
