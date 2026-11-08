@@ -1,4 +1,15 @@
 spring:
+  data:
+    redis:
+      # Cluster seed nodes: comma-separated host:port entries supplied by deployment.
+      cluster:
+        nodes: ${REDIS_CLUSTER_NODES}
+      lettuce:
+        cluster:
+          refresh:
+            # Spring Boot 4.1 enables all adaptive refresh triggers by default.
+            period: 30s
+            dynamic-refresh-sources: true
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}

@@ -94,6 +94,10 @@ fitting:
     visibility-timeout-seconds: ${FITTING_RESULT_CONSUMER_VISIBILITY_TIMEOUT_SECONDS:60}
 
 management:
+  health:
+    redis:
+      # Redis is optional for chat; failures fall back to local SSE and DB terminal state.
+      enabled: ${MANAGEMENT_HEALTH_REDIS_ENABLED:false}
   endpoints:
     web:
       exposure:
