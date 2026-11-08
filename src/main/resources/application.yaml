@@ -96,7 +96,7 @@ fitting:
 management:
   health:
     redis:
-      # Redis is optional for chat; failures fall back to local SSE and DB terminal state.
+      # Redis 장애 시 로컬 SSE와 DB 최종 상태 조회로 대체하므로 Redis 헬스체크는 기본 비활성화한다.
       enabled: ${MANAGEMENT_HEALTH_REDIS_ENABLED:false}
   endpoints:
     web:
