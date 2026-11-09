@@ -1,5 +1,6 @@
 package com.ktb.lookddak.domain.chat.dto;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.ktb.lookddak.domain.product.entity.Product;
@@ -43,17 +44,20 @@ public class RecommendedProductResponse {
 
     private final Long fittingCandidateId;
 
+    @JsonCreator
     private RecommendedProductResponse(
-            Long productId,
-            String productName,
-            String productImageUrl,
-            Integer currentPrice,
-            String color,
-            ProductItemType itemType,
-            String purchaseUrl,
-            String recommendedReason,
-            Long wishlistId,
-            Long fittingCandidateId
+            @JsonProperty("productId") Long productId,
+            @JsonProperty("productName") String productName,
+            @JsonProperty("productImageUrl") String productImageUrl,
+            @JsonProperty("currentPrice") Integer currentPrice,
+            @JsonProperty("color") String color,
+            @JsonProperty("itemType") ProductItemType itemType,
+            @JsonProperty("purchaseUrl") String purchaseUrl,
+            @JsonProperty("recommendedReason") String recommendedReason,
+            @JsonProperty("isWishlisted") boolean wishlisted,
+            @JsonProperty("wishlistId") Long wishlistId,
+            @JsonProperty("isFittingCandidate") boolean fittingCandidate,
+            @JsonProperty("fittingCandidateId") Long fittingCandidateId
     ) {
         this.productId = productId;
         this.productName = productName;
@@ -63,9 +67,9 @@ public class RecommendedProductResponse {
         this.itemType = itemType;
         this.purchaseUrl = purchaseUrl;
         this.recommendedReason = recommendedReason;
-        this.wishlisted = wishlistId != null;
+        this.wishlisted = wishlisted;
         this.wishlistId = wishlistId;
-        this.fittingCandidate = fittingCandidateId != null;
+        this.fittingCandidate = fittingCandidate;
         this.fittingCandidateId = fittingCandidateId;
     }
 
@@ -85,7 +89,9 @@ public class RecommendedProductResponse {
                 product.getItemType(),
                 product.getPurchaseUrl(),
                 recommendationProduct.getRecommendedReason(),
+                wishlistId != null,
                 wishlistId,
+                fittingCandidateId != null,
                 fittingCandidateId
         );
     }
