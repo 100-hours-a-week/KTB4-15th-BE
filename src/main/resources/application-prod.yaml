@@ -1,15 +1,4 @@
 spring:
-  data:
-    redis:
-      # Redis Cluster 초기 접속 노드 목록을 배포 환경변수로 주입한다. 여러 노드는 쉼표로 구분한다.
-      cluster:
-        nodes: ${REDIS_CLUSTER_NODES}
-      lettuce:
-        cluster:
-          refresh:
-            # Spring Boot 4.1부터 적응형 토폴로지 갱신이 기본 활성화되므로 주기만 별도로 설정한다.
-            period: 30s
-            dynamic-refresh-sources: true
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
