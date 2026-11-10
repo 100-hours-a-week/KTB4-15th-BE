@@ -14,7 +14,6 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -50,7 +49,7 @@ class FittingJobResponseTest {
         assertThat(generatingResponse.getStatus())
                 .isEqualTo(FittingJobStatus.GENERATING);
         assertThat(generatingResponse.getCreatedAt())
-                .isEqualTo(LocalDateTime.of(2026, 10, 20, 12, 0).toInstant(ZoneOffset.UTC));
+                .isEqualTo(LocalDateTime.of(2026, 10, 20, 12, 0));
         assertThat(generatingResponse.getResult()).isNull();
         assertThat(failedResponse.getStatus())
                 .isEqualTo(FittingJobStatus.FAILED);

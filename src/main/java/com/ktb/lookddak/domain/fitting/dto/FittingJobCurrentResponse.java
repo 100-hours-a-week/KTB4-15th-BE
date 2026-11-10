@@ -5,9 +5,7 @@ import com.ktb.lookddak.domain.fitting.entity.FittingJob;
 import com.ktb.lookddak.domain.fitting.entity.FittingJobStatus;
 import lombok.Getter;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 
 @Getter
@@ -22,7 +20,7 @@ public class FittingJobCurrentResponse {
 
     private final Long fittingJobId;
     private final FittingJobStatus status;
-    private final Instant createdAt;
+    private final LocalDateTime createdAt;
     private final boolean resultViewed;
     private final List<FittingJobCurrentProductResponse> products;
 
@@ -35,7 +33,7 @@ public class FittingJobCurrentResponse {
     ) {
         this.fittingJobId = fittingJobId;
         this.status = status;
-        this.createdAt = createdAt == null ? null : createdAt.toInstant(ZoneOffset.UTC);
+        this.createdAt = createdAt;
         this.resultViewed = resultViewed;
         this.products = products;
     }
