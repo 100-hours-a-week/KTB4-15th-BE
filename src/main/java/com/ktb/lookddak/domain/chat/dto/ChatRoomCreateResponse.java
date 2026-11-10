@@ -3,7 +3,9 @@ package com.ktb.lookddak.domain.chat.dto;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import lombok.Getter;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Getter
 @JsonPropertyOrder({"chatRoomId", "messageId", "createdAt"})
@@ -11,7 +13,7 @@ public class ChatRoomCreateResponse {
 
     private final Long chatRoomId;
     private final Long messageId;
-    private final LocalDateTime createdAt;
+    private final Instant createdAt;
 
     public ChatRoomCreateResponse(
             Long chatRoomId,
@@ -20,6 +22,6 @@ public class ChatRoomCreateResponse {
     ) {
         this.chatRoomId = chatRoomId;
         this.messageId = messageId;
-        this.createdAt = createdAt;
+        this.createdAt = createdAt == null ? null : createdAt.toInstant(ZoneOffset.UTC);
     }
 }

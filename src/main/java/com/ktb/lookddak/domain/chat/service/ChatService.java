@@ -3,12 +3,15 @@ package com.ktb.lookddak.domain.chat.service;
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatMessageDetailResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatMessageContextResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatGenerationStatusResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomDetailResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomListItemResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomListResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomSearchItemResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomSearchResponse;
 import com.ktb.lookddak.domain.chat.dto.RecommendationResponse;
 import com.ktb.lookddak.domain.chat.dto.RecommendedProductResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateRequest;
@@ -39,6 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +55,11 @@ public class ChatService {
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MIN_PAGE_SIZE = 1;
     private static final int MAX_PAGE_SIZE = 100;
+    private static final int SEARCH_DEFAULT_PAGE_SIZE = 20;
+    private static final int SEARCH_MAX_PAGE_SIZE = 20;
+    private static final int SEARCH_KEYWORD_MAX_LENGTH = 100;
+    private static final int CONTEXT_DEFAULT_PAGE_SIZE = 20;
+    private static final int CONTEXT_MAX_PAGE_SIZE = 50;
     private static final int AI_WISHLIST_PRODUCT_LIMIT = 10;
     private static final long MAX_CHAT_ROOM_COUNT = 100L;
 
@@ -264,6 +273,57 @@ public class ChatService {
         );
     }
 
+    public ChatRoomSearchResponse searchChatRooms(
+            Long memberId,
+            String keyword,
+            Long cursor,
+            Integer size
+    ) {
+        String escapedKeyword = validateAndEscapeSearchKeyword(keyword);
+        int pageSize = size == null ? SEARCH_DEFAULT_PAGE_SIZE : size;
+        validateSearchPagination(cursor, pageSize);
+
+        PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
+        List<ChatMessage> messages;
+
+        if (cursor == null) {
+            messages = chatMessageRepository.findFirstSearchPage(
+                    memberId,
+                    escapedKeyword,
+                    pageRequest
+            );
+        } else {
+            ChatMessage cursorMessage = chatMessageRepository.findActiveSearchCursor(
+                    memberId,
+                    cursor,
+                    escapedKeyword
+            ).orElseThrow(() -> new BusinessException(
+                    ErrorCode.INVALID_SEARCH_CURSOR
+            ));
+            messages = chatMessageRepository.findNextSearchPage(
+                    memberId,
+                    escapedKeyword,
+                    cursorMessage.getCreatedAt(),
+                    cursorMessage.getId(),
+                    pageRequest
+            );
+        }
+
+        boolean hasNext = messages.size() > pageSize;
+        List<ChatMessage> responseMessages = hasNext
+                ? messages.subList(0, pageSize)
+                : messages;
+        List<ChatRoomSearchItemResponse> items = responseMessages.stream()
+                .map(ChatRoomSearchItemResponse::from)
+                .toList();
+        Long nextCursor = hasNext
+                ? responseMessages.get(responseMessages.size() - 1)
+                .getId()
+                : null;
+
+        return new ChatRoomSearchResponse(items, nextCursor, hasNext);
+    }
+
     public ChatRoomDetailResponse getChatRoomDetail(
             Long memberId,
             Long chatRoomId,
@@ -308,6 +368,59 @@ public class ChatService {
                 nextCursor,
                 hasNext
         );
+    }
+
+    public ChatMessageContextResponse getChatMessageContext(
+            Long memberId,
+            Long chatRoomId,
+            Long aroundMessageId,
+            Long beforeCursor,
+            Long afterCursor,
+            Integer beforeSize,
+            Integer afterSize,
+            Integer size
+    ) {
+        validateMessageContextParameters(
+                aroundMessageId,
+                beforeCursor,
+                afterCursor,
+                beforeSize,
+                afterSize,
+                size
+        );
+
+        ChatRoom chatRoom = getOwnedActiveChatRoomForRead(memberId, chatRoomId);
+
+        if (aroundMessageId != null) {
+            return getContextAroundMessage(
+                    memberId,
+                    chatRoom,
+                    aroundMessageId,
+                    beforeSize == null ? CONTEXT_DEFAULT_PAGE_SIZE : beforeSize,
+                    afterSize == null ? CONTEXT_DEFAULT_PAGE_SIZE : afterSize
+            );
+        }
+
+        int pageSize = size == null ? CONTEXT_DEFAULT_PAGE_SIZE : size;
+        if (beforeCursor != null) {
+            return getPreviousMessageContext(
+                    memberId,
+                    chatRoom,
+                    beforeCursor,
+                    pageSize
+            );
+        }
+
+        if (afterCursor != null) {
+            return getNextMessageContext(
+                    memberId,
+                    chatRoom,
+                    afterCursor,
+                    pageSize
+            );
+        }
+
+        return getPreviousMessageContext(memberId, chatRoom, null, pageSize);
     }
 
     public ChatGenerationStatusResponse getGenerationStatus(
@@ -382,6 +495,172 @@ public class ChatService {
         return new ChatGenerationStatusResponse(
                 generationStatus,
                 messageResponse
+        );
+    }
+
+    private ChatMessageContextResponse getContextAroundMessage(
+            Long memberId,
+            ChatRoom chatRoom,
+            Long aroundMessageId,
+            int beforeSize,
+            int afterSize
+    ) {
+        ChatMessage anchorMessage = chatMessageRepository
+                .findByIdAndChatRoomId(aroundMessageId, chatRoom.getId())
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.CHAT_MESSAGE_NOT_FOUND
+                ));
+
+        List<ChatMessage> fetchedBeforeMessages = chatMessageRepository
+                .findPreviousPage(
+                        chatRoom.getId(),
+                        anchorMessage.getId(),
+                        PageRequest.of(0, beforeSize + 1)
+                );
+        boolean hasPrevious = fetchedBeforeMessages.size() > beforeSize;
+        List<ChatMessage> beforeMessages = new ArrayList<>(
+                hasPrevious
+                        ? fetchedBeforeMessages.subList(0, beforeSize)
+                        : fetchedBeforeMessages
+        );
+        Collections.reverse(beforeMessages);
+
+        List<ChatMessage> fetchedAfterMessages = chatMessageRepository
+                .findNextPage(
+                        chatRoom.getId(),
+                        anchorMessage.getId(),
+                        PageRequest.of(0, afterSize + 1)
+                );
+        boolean hasNext = fetchedAfterMessages.size() > afterSize;
+        List<ChatMessage> afterMessages = hasNext
+                ? fetchedAfterMessages.subList(0, afterSize)
+                : fetchedAfterMessages;
+
+        List<ChatMessage> contextMessages = new ArrayList<>();
+        contextMessages.addAll(beforeMessages);
+        contextMessages.add(anchorMessage);
+        contextMessages.addAll(afterMessages);
+
+        Long previousCursor = hasPrevious && !beforeMessages.isEmpty()
+                ? beforeMessages.get(0).getId()
+                : null;
+        Long nextCursor = hasNext && !afterMessages.isEmpty()
+                ? afterMessages.get(afterMessages.size() - 1).getId()
+                : null;
+
+        return createMessageContextResponse(
+                memberId,
+                chatRoom,
+                anchorMessage.getId(),
+                contextMessages,
+                previousCursor,
+                nextCursor,
+                hasPrevious,
+                hasNext
+        );
+    }
+
+    private ChatMessageContextResponse getPreviousMessageContext(
+            Long memberId,
+            ChatRoom chatRoom,
+            Long beforeCursor,
+            int pageSize
+    ) {
+        validateMessageCursor(chatRoom.getId(), beforeCursor);
+        PageRequest pageRequest = PageRequest.of(0, pageSize + 1);
+        List<ChatMessage> fetchedMessages = beforeCursor == null
+                ? chatMessageRepository.findFirstPage(chatRoom.getId(), pageRequest)
+                : chatMessageRepository.findPreviousPage(
+                        chatRoom.getId(),
+                        beforeCursor,
+                        pageRequest
+                );
+        boolean hasPrevious = fetchedMessages.size() > pageSize;
+        List<ChatMessage> messages = new ArrayList<>(
+                hasPrevious
+                        ? fetchedMessages.subList(0, pageSize)
+                        : fetchedMessages
+        );
+        Collections.reverse(messages);
+
+        Long previousCursor = hasPrevious && !messages.isEmpty()
+                ? messages.get(0).getId()
+                : null;
+
+        return createMessageContextResponse(
+                memberId,
+                chatRoom,
+                null,
+                messages,
+                previousCursor,
+                null,
+                hasPrevious,
+                false
+        );
+    }
+
+    private ChatMessageContextResponse getNextMessageContext(
+            Long memberId,
+            ChatRoom chatRoom,
+            Long afterCursor,
+            int pageSize
+    ) {
+        validateMessageCursor(chatRoom.getId(), afterCursor);
+        List<ChatMessage> fetchedMessages = chatMessageRepository
+                .findNextPage(
+                        chatRoom.getId(),
+                        afterCursor,
+                        PageRequest.of(0, pageSize + 1)
+                );
+        boolean hasNext = fetchedMessages.size() > pageSize;
+        List<ChatMessage> messages = hasNext
+                ? fetchedMessages.subList(0, pageSize)
+                : fetchedMessages;
+
+        Long nextCursor = hasNext && !messages.isEmpty()
+                ? messages.get(messages.size() - 1).getId()
+                : null;
+
+        return createMessageContextResponse(
+                memberId,
+                chatRoom,
+                null,
+                messages,
+                null,
+                nextCursor,
+                false,
+                hasNext
+        );
+    }
+
+    private ChatMessageContextResponse createMessageContextResponse(
+            Long memberId,
+            ChatRoom chatRoom,
+            Long anchorMessageId,
+            List<ChatMessage> messages,
+            Long previousCursor,
+            Long nextCursor,
+            boolean hasPrevious,
+            boolean hasNext
+    ) {
+        Map<Long, RecommendationResponse> recommendationResponses =
+                createRecommendationResponses(memberId, messages);
+        List<ChatMessageDetailResponse> messageResponses = new ArrayList<>();
+        for (ChatMessage message : messages) {
+            messageResponses.add(ChatMessageDetailResponse.from(
+                    message,
+                    recommendationResponses.get(message.getId())
+            ));
+        }
+
+        return ChatMessageContextResponse.from(
+                chatRoom,
+                anchorMessageId,
+                messageResponses,
+                previousCursor,
+                nextCursor,
+                hasPrevious,
+                hasNext
         );
     }
 
@@ -507,12 +786,91 @@ public class ChatService {
         }
     }
 
+    private void validateMessageContextParameters(
+            Long aroundMessageId,
+            Long beforeCursor,
+            Long afterCursor,
+            Integer beforeSize,
+            Integer afterSize,
+            Integer size
+    ) {
+        int selectorCount = 0;
+        if (aroundMessageId != null) {
+            selectorCount++;
+        }
+        if (beforeCursor != null) {
+            selectorCount++;
+        }
+        if (afterCursor != null) {
+            selectorCount++;
+        }
+
+        if (selectorCount > 1
+                || isNotPositive(aroundMessageId)
+                || isNotPositive(beforeCursor)
+                || isNotPositive(afterCursor)) {
+            throw new BusinessException(ErrorCode.INVALID_PAGINATION_PARAMETER);
+        }
+
+        if (aroundMessageId != null) {
+            if (size != null) {
+                throw new BusinessException(
+                        ErrorCode.INVALID_PAGINATION_PARAMETER
+                );
+            }
+            validateMessageContextSize(beforeSize);
+            validateMessageContextSize(afterSize);
+            return;
+        }
+
+        if (beforeSize != null || afterSize != null) {
+            throw new BusinessException(ErrorCode.INVALID_PAGINATION_PARAMETER);
+        }
+        validateMessageContextSize(size);
+    }
+
+    private boolean isNotPositive(Long value) {
+        return value != null && value <= 0;
+    }
+
+    private void validateMessageContextSize(Integer size) {
+        if (size != null && (size < MIN_PAGE_SIZE || size > CONTEXT_MAX_PAGE_SIZE)) {
+            throw new BusinessException(ErrorCode.INVALID_PAGINATION_PARAMETER);
+        }
+    }
+
     private void validatePagination(Long cursor, int size) {
         if ((cursor != null && cursor <= 0)
                 || size < MIN_PAGE_SIZE
                 || size > MAX_PAGE_SIZE) {
             throw new BusinessException(ErrorCode.INVALID_PAGINATION_PARAMETER);
         }
+    }
+
+    private void validateSearchPagination(Long cursor, int size) {
+        if ((cursor != null && cursor <= 0)
+                || size < MIN_PAGE_SIZE
+                || size > SEARCH_MAX_PAGE_SIZE) {
+            throw new BusinessException(ErrorCode.INVALID_SEARCH_CURSOR);
+        }
+    }
+
+    private String validateAndEscapeSearchKeyword(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_SEARCH_KEYWORD);
+        }
+
+        String trimmedKeyword = keyword.trim();
+        if (trimmedKeyword.length() > SEARCH_KEYWORD_MAX_LENGTH) {
+            throw new BusinessException(
+                    ErrorCode.SEARCH_KEYWORD_LENGTH_EXCEEDED
+            );
+        }
+
+        return trimmedKeyword
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
     }
 
     private ChatRoom getOwnedActiveChatRoom(Long memberId, Long chatRoomId) {

@@ -2,9 +2,11 @@ package com.ktb.lookddak.domain.chat.service;
 
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatMessageContextResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomListResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomSearchResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateRequest;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateResponse;
 import com.ktb.lookddak.domain.chat.entity.ChatGenerationStatus;
@@ -32,10 +34,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -133,7 +137,7 @@ class ChatServiceTest {
 
         assertThat(response.getChatRoomId()).isEqualTo(10L);
         assertThat(response.getMessageId()).isEqualTo(100L);
-        assertThat(response.getCreatedAt()).isEqualTo(createdAt);
+        assertThat(response.getCreatedAt()).isEqualTo(createdAt.toInstant(ZoneOffset.UTC));
 
         ArgumentCaptor<ChatRoom> chatRoomCaptor = ArgumentCaptor.forClass(ChatRoom.class);
         verify(chatRoomRepository).save(chatRoomCaptor.capture());
@@ -244,7 +248,7 @@ class ChatServiceTest {
         assertThat(response.getChatRoomId()).isEqualTo(10L);
         assertThat(response.getMessageId()).isEqualTo(101L);
         assertThat(response.getContent()).isEqualTo("검은색으로 추천해줘");
-        assertThat(response.getCreatedAt()).isEqualTo(createdAt);
+        assertThat(response.getCreatedAt()).isEqualTo(createdAt.toInstant(ZoneOffset.UTC));
         assertThat(chatRoom.getLastMessageAt()).isAfter(initialLastMessageAt);
 
         ArgumentCaptor<ChatMessage> messageCaptor = ArgumentCaptor.forClass(ChatMessage.class);
@@ -570,11 +574,345 @@ class ChatServiceTest {
         );
     }
 
+    @Test
+    @DisplayName("메시지 내용 검색의 첫 페이지에서 일치한 메시지와 다음 Cursor를 반환한다")
+    void searchFirstChatRoomPage() {
+        Member member = createMember(1L);
+        ChatRoom firstRoom = createChatRoom(
+                30L,
+                member,
+                LocalDateTime.of(2026, 11, 3, 15, 0)
+        );
+        ChatRoom nextRoom = createChatRoom(
+                10L,
+                member,
+                LocalDateTime.of(2026, 11, 3, 13, 0)
+        );
+        ChatMessage firstMessage = createChatMessage(
+                301L,
+                firstRoom,
+                "검정 반바지에 어울리는 상의를 추천해줘"
+        );
+        ChatMessage secondMessage = createChatMessage(
+                201L,
+                firstRoom,
+                "하얀 반바지랑 어울리면 좋겠어요."
+        );
+        ChatMessage nextMessage = createChatMessage(
+                101L,
+                nextRoom,
+                "린넨 반바지 코디를 알려줘"
+        );
+        given(chatMessageRepository.findFirstSearchPage(
+                eq(1L),
+                eq("반바지"),
+                any(Pageable.class)
+        )).willReturn(List.of(firstMessage, secondMessage, nextMessage));
+
+        ChatRoomSearchResponse response = chatService.searchChatRooms(
+                1L,
+                "반바지",
+                null,
+                2
+        );
+
+        assertThat(response.getItems())
+                .extracting(item -> item.getChatRoomId())
+                .containsExactly(30L, 30L);
+        assertThat(response.getItems())
+                .extracting(item -> item.getMessageId())
+                .containsExactly(301L, 201L);
+        assertThat(response.getNextCursor()).isEqualTo(201L);
+        assertThat(response.isHasNext()).isTrue();
+
+        ArgumentCaptor<Pageable> pageableCaptor =
+                ArgumentCaptor.forClass(Pageable.class);
+        verify(chatMessageRepository).findFirstSearchPage(
+                eq(1L),
+                eq("반바지"),
+                pageableCaptor.capture()
+        );
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("검색 Cursor는 같은 사용자와 검색어에 속한 메시지만 사용할 수 있다")
+    void searchNextChatRoomPage() {
+        Member member = createMember(1L);
+        LocalDateTime cursorTime = LocalDateTime.of(2026, 11, 3, 14, 0);
+        ChatRoom cursorRoom = createChatRoom(25L, member, cursorTime);
+        ChatRoom nextRoom = createChatRoom(
+                18L,
+                member,
+                cursorTime.minusHours(1)
+        );
+        ChatMessage nextMessage = createChatMessage(
+                181L,
+                nextRoom,
+                "반바지와 잘 어울리는 셔츠"
+        );
+        ChatMessage cursorMessage = createChatMessage(
+                25L,
+                cursorRoom,
+                "반바지를 찾고 있어요"
+        );
+        ReflectionTestUtils.setField(cursorMessage, "createdAt", cursorTime);
+        given(chatMessageRepository.findActiveSearchCursor(1L, 25L, "반바지"))
+                .willReturn(Optional.of(cursorMessage));
+        given(chatMessageRepository.findNextSearchPage(
+                eq(1L),
+                eq("반바지"),
+                eq(cursorTime),
+                eq(25L),
+                any(Pageable.class)
+        )).willReturn(List.of(nextMessage));
+
+        ChatRoomSearchResponse response = chatService.searchChatRooms(
+                1L,
+                "반바지",
+                25L,
+                20
+        );
+
+        assertThat(response.getItems())
+                .extracting(item -> item.getChatRoomId())
+                .containsExactly(18L);
+        assertThat(response.getNextCursor()).isNull();
+        assertThat(response.isHasNext()).isFalse();
+    }
+
+    @Test
+    @DisplayName("검색어의 LIKE 예약문자는 일반 문자열로 이스케이프한다")
+    void escapeSearchKeywordWildcards() {
+        given(chatMessageRepository.findFirstSearchPage(
+                eq(1L),
+                eq("50\\%\\_할인"),
+                any(Pageable.class)
+        )).willReturn(List.of());
+
+        chatService.searchChatRooms(1L, " 50%_할인 ", null, null);
+
+        verify(chatMessageRepository).findFirstSearchPage(
+                eq(1L),
+                eq("50\\%\\_할인"),
+                any(Pageable.class)
+        );
+    }
+
+    @Test
+    @DisplayName("빈 검색어, 길이 초과 검색어, 잘못된 검색 Cursor는 거부한다")
+    void rejectInvalidSearchConditions() {
+        assertSearchError(
+                () -> chatService.searchChatRooms(1L, " ", null, 20),
+                ErrorCode.INVALID_SEARCH_KEYWORD
+        );
+        assertSearchError(
+                () -> chatService.searchChatRooms(
+                        1L,
+                        "가".repeat(101),
+                        null,
+                        20
+                ),
+                ErrorCode.SEARCH_KEYWORD_LENGTH_EXCEEDED
+        );
+        assertSearchError(
+                () -> chatService.searchChatRooms(1L, "반바지", 0L, 20),
+                ErrorCode.INVALID_SEARCH_CURSOR
+        );
+        assertSearchError(
+                () -> chatService.searchChatRooms(1L, "반바지", null, 21),
+                ErrorCode.INVALID_SEARCH_CURSOR
+        );
+
+        verifyNoInteractions(chatMessageRepository, chatRoomRepository);
+    }
+
+    @Test
+    @DisplayName("검색 결과에 없는 Cursor 메시지는 다음 검색 페이지에 사용할 수 없다")
+    void rejectSearchCursorOutsideResult() {
+        given(chatMessageRepository.findActiveSearchCursor(1L, 25L, "반바지"))
+                .willReturn(Optional.empty());
+
+        assertSearchError(
+                () -> chatService.searchChatRooms(1L, "반바지", 25L, 20),
+                ErrorCode.INVALID_SEARCH_CURSOR
+        );
+
+        verify(chatMessageRepository, never()).findNextSearchPage(
+                any(), any(), any(), any(), any()
+        );
+    }
+
+    @Test
+    @DisplayName("일반 진입은 최신 메시지를 시간순으로 반환하고 이전 조회 커서를 제공한다")
+    void getLatestMessageContext() {
+        Member member = createMember(1L);
+        ChatRoom chatRoom = createChatRoom(
+                10L, member, LocalDateTime.of(2026, 11, 3, 15, 0)
+        );
+        given(chatRoomRepository.findActiveById(10L))
+                .willReturn(Optional.of(chatRoom));
+        given(chatMessageRepository.findFirstPage(10L, PageRequest.of(0, 3)))
+                .willReturn(List.of(
+                        createChatMessage(100L, chatRoom, "최신"),
+                        createChatMessage(90L, chatRoom, "이전"),
+                        createChatMessage(80L, chatRoom, "더 이전")
+                ));
+
+        ChatMessageContextResponse response = chatService.getChatMessageContext(
+                1L, 10L, null, null, null, null, null, 2
+        );
+
+        assertThat(response.getMessages()).extracting(message -> message.getMessageId())
+                .containsExactly(90L, 100L);
+        assertThat(response.getPreviousCursor()).isEqualTo(90L);
+        assertThat(response.isHasPrevious()).isTrue();
+        assertThat(response.getNextCursor()).isNull();
+        assertThat(response.isHasNext()).isFalse();
+        assertThat(response.getAnchorMessageId()).isNull();
+    }
+
+    @Test
+    @DisplayName("일반 진입은 크기 생략 시 20개를 요청하고 빈 채팅방도 반환한다")
+    void getLatestMessageContextWithDefaultSizeAndEmptyRoom() {
+        Member member = createMember(1L);
+        ChatRoom chatRoom = createChatRoom(
+                10L, member, LocalDateTime.of(2026, 11, 3, 15, 0)
+        );
+        given(chatRoomRepository.findActiveById(10L))
+                .willReturn(Optional.of(chatRoom));
+        given(chatMessageRepository.findFirstPage(10L, PageRequest.of(0, 21)))
+                .willReturn(List.of());
+
+        ChatMessageContextResponse response = chatService.getChatMessageContext(
+                1L, 10L, null, null, null, null, null, null
+        );
+
+        assertThat(response.getMessages()).isEmpty();
+        assertThat(response.getPreviousCursor()).isNull();
+        assertThat(response.getNextCursor()).isNull();
+        assertThat(response.isHasPrevious()).isFalse();
+        assertThat(response.isHasNext()).isFalse();
+        verify(chatMessageRepository).findFirstPage(10L, PageRequest.of(0, 21));
+    }
+
+    @Test
+    @DisplayName("기준 메시지 주변의 이전·이후 메시지를 시간순으로 반환한다")
+    void getChatMessageContextAroundAnchor() {
+        Member member = createMember(1L);
+        ChatRoom chatRoom = createChatRoom(
+                10L,
+                member,
+                LocalDateTime.of(2026, 11, 3, 15, 0)
+        );
+        ChatMessage anchorMessage = createChatMessage(
+                100L,
+                chatRoom,
+                "검색으로 찾은 메시지"
+        );
+        ChatMessage previousMessage = createChatMessage(
+                90L,
+                chatRoom,
+                "이전 메시지"
+        );
+        ChatMessage oldestMessage = createChatMessage(
+                80L,
+                chatRoom,
+                "더 이전 메시지"
+        );
+        ChatMessage nextMessage = createChatMessage(
+                110L,
+                chatRoom,
+                "이후 메시지"
+        );
+        ChatMessage newestMessage = createChatMessage(
+                120L,
+                chatRoom,
+                "더 이후 메시지"
+        );
+        given(chatRoomRepository.findActiveById(10L))
+                .willReturn(Optional.of(chatRoom));
+        given(chatMessageRepository.findByIdAndChatRoomId(100L, 10L))
+                .willReturn(Optional.of(anchorMessage));
+        given(chatMessageRepository.findPreviousPage(
+                eq(10L),
+                eq(100L),
+                any(Pageable.class)
+        )).willReturn(List.of(previousMessage, oldestMessage));
+        given(chatMessageRepository.findNextPage(
+                eq(10L),
+                eq(100L),
+                any(Pageable.class)
+        )).willReturn(List.of(nextMessage, newestMessage));
+
+        ChatMessageContextResponse response = chatService
+                .getChatMessageContext(
+                        1L,
+                        10L,
+                        100L,
+                        null,
+                        null,
+                        1,
+                        1,
+                        null
+                );
+
+        assertThat(response.getAnchorMessageId()).isEqualTo(100L);
+        assertThat(response.getMessages())
+                .extracting(message -> message.getMessageId())
+                .containsExactly(90L, 100L, 110L);
+        assertThat(response.getPreviousCursor()).isEqualTo(90L);
+        assertThat(response.getNextCursor()).isEqualTo(110L);
+        assertThat(response.isHasPrevious()).isTrue();
+        assertThat(response.isHasNext()).isTrue();
+    }
+
+    @Test
+    @DisplayName("문맥 조회 기준값은 around, before, after 중 하나만 사용할 수 있다")
+    void rejectInvalidMessageContextParameters() {
+        assertPaginationError(() -> chatService.getChatMessageContext(
+                1L, 10L, null, null, null, 20, null, null
+        ));
+        assertPaginationError(() -> chatService.getChatMessageContext(
+                1L,
+                10L,
+                100L,
+                90L,
+                null,
+                null,
+                null,
+                null
+        ));
+        assertPaginationError(() -> chatService.getChatMessageContext(
+                1L,
+                10L,
+                null,
+                null,
+                100L,
+                null,
+                null,
+                51
+        ));
+
+        verifyNoInteractions(chatRoomRepository, chatMessageRepository);
+    }
+
     private void assertPaginationError(org.assertj.core.api.ThrowableAssert.ThrowingCallable callable) {
         assertThatThrownBy(callable)
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.INVALID_PAGINATION_PARAMETER)
+                );
+    }
+
+    private void assertSearchError(
+            org.assertj.core.api.ThrowableAssert.ThrowingCallable callable,
+            ErrorCode expectedErrorCode
+    ) {
+        assertThatThrownBy(callable)
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(expectedErrorCode)
                 );
     }
 
@@ -597,5 +935,15 @@ class ChatServiceTest {
         );
         ReflectionTestUtils.setField(chatRoom, "id", chatRoomId);
         return chatRoom;
+    }
+
+    private ChatMessage createChatMessage(
+            Long messageId,
+            ChatRoom chatRoom,
+            String content
+    ) {
+        ChatMessage message = ChatMessage.createUserText(chatRoom, content);
+        ReflectionTestUtils.setField(message, "id", messageId);
+        return message;
     }
 }

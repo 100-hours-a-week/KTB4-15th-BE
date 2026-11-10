@@ -17,6 +17,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -103,7 +104,7 @@ class ChatRoomDetailResponseTest {
         assertThat(response.getRecommendation().getRecommendationId())
                 .isEqualTo(15L);
         assertThat(response.getRecommendation().getProducts()).hasSize(1);
-        assertThat(response.getCreatedAt()).isEqualTo(createdAt);
+        assertThat(response.getCreatedAt()).isEqualTo(createdAt.toInstant(ZoneOffset.UTC));
     }
 
     @Test

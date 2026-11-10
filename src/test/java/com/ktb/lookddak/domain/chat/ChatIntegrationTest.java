@@ -373,6 +373,160 @@ class ChatIntegrationTest {
     }
 
     @Test
+    @DisplayName("메시지 내용만 검색하고 일치한 모든 메시지를 Cursor로 조회한다")
+    void searchChatRoomsWithCursor() throws Exception {
+        String accessToken = loginAndGetAccessToken();
+        LocalDateTime sameTime = LocalDateTime.of(2026, 11, 3, 15, 0);
+        ChatRoom olderRoom = saveChatRoom(
+                member,
+                "오래된 반바지 대화",
+                sameTime.minusHours(1)
+        );
+        ChatRoom newerRoom = saveChatRoom(
+                member,
+                "최신 채팅방",
+                sameTime
+        );
+        ChatRoom titleOnlyRoom = saveChatRoom(
+                member,
+                "반바지라는 제목만 있는 채팅방",
+                sameTime.plusHours(1)
+        );
+        ChatMessage olderMatchedMessage = saveCompletedUserMessage(
+                olderRoom,
+                "반바지에 어울리는 셔츠를 찾아줘"
+        );
+        ChatMessage firstNewerMatchedMessage = saveCompletedUserMessage(
+                newerRoom,
+                "반바지를 입고 싶어요"
+        );
+        ChatMessage newerMatchedMessage = saveCompletedUserMessage(
+                newerRoom,
+                "검정 반바지로 다시 추천해줘"
+        );
+        saveCompletedUserMessage(titleOnlyRoom, "제목 검색 대상이 아니에요");
+        entityManager.clear();
+
+        mockMvc.perform(get("/api/v1/chat-rooms/search")
+                        .cookie(new Cookie("accessToken", accessToken))
+                        .queryParam("keyword", "반바지")
+                        .queryParam("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.items.length()").value(2))
+                .andExpect(jsonPath("$.data.items[0].chatRoomId")
+                        .value(newerRoom.getId()))
+                .andExpect(jsonPath("$.data.items[0].messageId")
+                        .value(newerMatchedMessage.getId()))
+                .andExpect(jsonPath("$.data.items[0].message")
+                        .value("검정 반바지로 다시 추천해줘"))
+                .andExpect(jsonPath("$.data.items[1].chatRoomId")
+                        .value(newerRoom.getId()))
+                .andExpect(jsonPath("$.data.items[1].messageId")
+                        .value(firstNewerMatchedMessage.getId()))
+                .andExpect(jsonPath("$.data.nextCursor")
+                        .value(firstNewerMatchedMessage.getId()))
+                .andExpect(jsonPath("$.data.hasNext").value(true));
+
+        mockMvc.perform(get("/api/v1/chat-rooms/search")
+                        .cookie(new Cookie("accessToken", accessToken))
+                        .queryParam("keyword", "반바지")
+                        .queryParam(
+                                "cursor",
+                                firstNewerMatchedMessage.getId().toString()
+                        )
+                        .queryParam("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.items[0].chatRoomId")
+                        .value(olderRoom.getId()))
+                .andExpect(jsonPath("$.data.items[0].messageId")
+                        .value(olderMatchedMessage.getId()))
+                .andExpect(jsonPath("$.data.nextCursor").isEmpty())
+                .andExpect(jsonPath("$.data.hasNext").value(false));
+    }
+
+    @Test
+    @DisplayName("검색 기준 메시지 주변 조회와 양방향 추가 조회를 지원한다")
+    void getChatMessageContext() throws Exception {
+        String accessToken = loginAndGetAccessToken();
+        ChatRoom chatRoom = saveChatRoom(
+                member,
+                "검색 위치 이동 테스트",
+                LocalDateTime.now()
+        );
+        ChatMessage oldestMessage = saveCompletedUserMessage(
+                chatRoom,
+                "가장 이전 메시지"
+        );
+        ChatMessage previousMessage = saveCompletedUserMessage(
+                chatRoom,
+                "기준 바로 이전 메시지"
+        );
+        ChatMessage anchorMessage = saveCompletedUserMessage(
+                chatRoom,
+                "검색으로 찾은 기준 메시지"
+        );
+        ChatMessage nextMessage = saveCompletedUserMessage(
+                chatRoom,
+                "기준 바로 이후 메시지"
+        );
+        ChatMessage newestMessage = saveCompletedUserMessage(
+                chatRoom,
+                "가장 이후 메시지"
+        );
+        entityManager.clear();
+
+        mockMvc.perform(get("/api/v1/chat-rooms/{chatRoomId}/messages", chatRoom.getId())
+                        .cookie(new Cookie("accessToken", accessToken))
+                        .queryParam(
+                                "aroundMessageId",
+                                anchorMessage.getId().toString()
+                        )
+                        .queryParam("beforeSize", "1")
+                        .queryParam("afterSize", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.chatRoomId").value(chatRoom.getId()))
+                .andExpect(jsonPath("$.data.anchorMessageId")
+                        .value(anchorMessage.getId()))
+                .andExpect(jsonPath("$.data.messages.length()").value(3))
+                .andExpect(jsonPath("$.data.messages[0].messageId")
+                        .value(previousMessage.getId()))
+                .andExpect(jsonPath("$.data.messages[1].messageId")
+                        .value(anchorMessage.getId()))
+                .andExpect(jsonPath("$.data.messages[2].messageId")
+                        .value(nextMessage.getId()))
+                .andExpect(jsonPath("$.data.previousCursor")
+                        .value(previousMessage.getId()))
+                .andExpect(jsonPath("$.data.nextCursor")
+                        .value(nextMessage.getId()))
+                .andExpect(jsonPath("$.data.hasPrevious").value(true))
+                .andExpect(jsonPath("$.data.hasNext").value(true));
+
+        mockMvc.perform(get("/api/v1/chat-rooms/{chatRoomId}/messages", chatRoom.getId())
+                        .cookie(new Cookie("accessToken", accessToken))
+                        .queryParam("before", previousMessage.getId().toString())
+                        .queryParam("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.anchorMessageId").isEmpty())
+                .andExpect(jsonPath("$.data.messages.length()").value(1))
+                .andExpect(jsonPath("$.data.messages[0].messageId")
+                        .value(oldestMessage.getId()))
+                .andExpect(jsonPath("$.data.hasPrevious").value(false));
+
+        mockMvc.perform(get("/api/v1/chat-rooms/{chatRoomId}/messages", chatRoom.getId())
+                        .cookie(new Cookie("accessToken", accessToken))
+                        .queryParam("after", nextMessage.getId().toString())
+                        .queryParam("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.anchorMessageId").isEmpty())
+                .andExpect(jsonPath("$.data.messages.length()").value(1))
+                .andExpect(jsonPath("$.data.messages[0].messageId")
+                        .value(newestMessage.getId()))
+                .andExpect(jsonPath("$.data.hasNext").value(false));
+    }
+
+    @Test
     @DisplayName("채팅방 상세를 메시지 커서와 추천 상품 상태를 포함해 조회한다")
     void getChatRoomDetailWithRecommendationProducts() throws Exception {
         String accessToken = loginAndGetAccessToken();

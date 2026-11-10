@@ -15,6 +15,7 @@ import com.ktb.lookddak.domain.chat.repository.ChatRoomRepository;
 import com.ktb.lookddak.global.exception.BusinessException;
 import com.ktb.lookddak.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,7 +27,6 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class ChatV2Service {
 
-    private static final long MAX_CHAT_ROOM_COUNT = 100L;
     private static final List<ChatGenerationStatus> ACTIVE_STATUSES = List.of(
             ChatGenerationStatus.PENDING,
             ChatGenerationStatus.GENERATING
@@ -35,6 +35,9 @@ public class ChatV2Service {
     private final MemberRepository memberRepository;
     private final ChatRoomRepository chatRoomRepository;
     private final ChatMessageRepository chatMessageRepository;
+
+    @Value("${chat.max-room-count:100}")
+    private long maxChatRoomCount;
 
     @Transactional
     public ChatRoomCreateResponse createChatRoom(
@@ -49,7 +52,7 @@ public class ChatV2Service {
         long chatRoomCount = chatRoomRepository
                 .countByMemberIdAndDeletedAtIsNull(memberId);
 
-        if (chatRoomCount >= MAX_CHAT_ROOM_COUNT) {
+        if (chatRoomCount >= maxChatRoomCount) {
             throw new BusinessException(ErrorCode.CHAT_ROOM_LIMIT_EXCEEDED);
         }
 

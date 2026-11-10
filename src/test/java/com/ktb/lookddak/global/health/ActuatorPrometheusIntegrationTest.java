@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "management.endpoints.web.exposure.include=health,prometheus",
+        "management.health.redis.enabled=false",
         "management.metrics.distribution.percentiles-histogram.http.server.requests=true",
         "management.metrics.distribution.minimum-expected-value.http.server.requests=5ms",
         "management.metrics.distribution.maximum-expected-value.http.server.requests=60s",

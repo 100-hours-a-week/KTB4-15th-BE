@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -107,5 +108,72 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             @Param("chatRoomId") Long chatRoomId,
             @Param("cursor") Long cursor,
             Pageable pageable
+    );
+
+    @Query("""
+            select message
+            from ChatMessage message
+            where message.chatRoom.id = :chatRoomId
+              and message.id > :cursor
+            order by message.id asc
+            """)
+    List<ChatMessage> findNextPage(
+            @Param("chatRoomId") Long chatRoomId,
+            @Param("cursor") Long cursor,
+            Pageable pageable
+    );
+
+    @Query("""
+            select message
+            from ChatMessage message
+            join fetch message.chatRoom chatRoom
+            where chatRoom.member.id = :memberId
+              and chatRoom.deletedAt is null
+              and message.content like concat('%', :escapedKeyword, '%') escape '\\'
+            order by message.createdAt desc, message.id desc
+            """)
+    List<ChatMessage> findFirstSearchPage(
+            @Param("memberId") Long memberId,
+            @Param("escapedKeyword") String escapedKeyword,
+            Pageable pageable
+    );
+
+    @Query("""
+            select message
+            from ChatMessage message
+            join fetch message.chatRoom chatRoom
+            where chatRoom.member.id = :memberId
+              and chatRoom.deletedAt is null
+              and message.content like concat('%', :escapedKeyword, '%') escape '\\'
+              and (
+                  message.createdAt < :cursorCreatedAt
+                  or (
+                      message.createdAt = :cursorCreatedAt
+                      and message.id < :cursorId
+                  )
+              )
+            order by message.createdAt desc, message.id desc
+            """)
+    List<ChatMessage> findNextSearchPage(
+            @Param("memberId") Long memberId,
+            @Param("escapedKeyword") String escapedKeyword,
+            @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
+            @Param("cursorId") Long cursorId,
+            Pageable pageable
+    );
+
+    @Query("""
+            select message
+            from ChatMessage message
+            join fetch message.chatRoom chatRoom
+            where message.id = :cursorId
+              and chatRoom.member.id = :memberId
+              and chatRoom.deletedAt is null
+              and message.content like concat('%', :escapedKeyword, '%') escape '\\'
+            """)
+    Optional<ChatMessage> findActiveSearchCursor(
+            @Param("memberId") Long memberId,
+            @Param("cursorId") Long cursorId,
+            @Param("escapedKeyword") String escapedKeyword
     );
 }

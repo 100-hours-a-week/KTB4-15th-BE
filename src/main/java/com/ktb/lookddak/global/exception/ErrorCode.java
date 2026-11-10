@@ -44,6 +44,9 @@ public enum ErrorCode {
     CHAT_ROOM_ACCESS_DENIED(HttpStatus.FORBIDDEN, "해당 채팅방에 접근할 권한이 없습니다."),
     CHAT_ROOM_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "채팅방은 최대 100개까지 생성할 수 있습니다."),
     CHAT_MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "채팅 메시지를 찾을 수 없습니다."),
+    INVALID_SEARCH_KEYWORD(HttpStatus.BAD_REQUEST, "검색어를 입력해주세요."),
+    SEARCH_KEYWORD_LENGTH_EXCEEDED(HttpStatus.BAD_REQUEST, "검색어는 최대 100자까지 입력할 수 있어요."),
+    INVALID_SEARCH_CURSOR(HttpStatus.BAD_REQUEST, "올바른 검색 페이지를 요청해주세요."),
     AI_RESPONSE_GENERATING(HttpStatus.CONFLICT, "AI 응답을 생성 중입니다."),
 
     // Product errors

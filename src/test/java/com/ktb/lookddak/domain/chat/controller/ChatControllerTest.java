@@ -1,12 +1,15 @@
 package com.ktb.lookddak.domain.chat.controller;
 
 import com.ktb.lookddak.domain.chat.dto.ChatMessageCreateResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatMessageContextResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatMessageDetailResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatGenerationStatusResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomCreateResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomDetailResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomListItemResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomListResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomSearchItemResponse;
+import com.ktb.lookddak.domain.chat.dto.ChatRoomSearchResponse;
 import com.ktb.lookddak.domain.chat.dto.ChatRoomTitleUpdateResponse;
 import com.ktb.lookddak.domain.chat.dto.RecommendationResponse;
 import com.ktb.lookddak.domain.chat.dto.RecommendedProductResponse;
@@ -130,7 +133,7 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.data.items[0].title")
                         .value("가을 출근용 니트 추천"))
                 .andExpect(jsonPath("$.data.items[0].lastMessageAt")
-                        .value("2026-09-21T15:00:00"))
+                        .value("2026-09-21T15:00:00Z"))
                 .andExpect(jsonPath("$.data.nextCursor").value(25))
                 .andExpect(jsonPath("$.data.hasNext").value(true))
                 .andExpect(jsonPath("$.message")
@@ -189,6 +192,118 @@ class ChatControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"))
                 .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    @DisplayName("메시지 키워드 검색 결과를 Cursor 형식으로 반환한다")
+    void searchChatRooms() throws Exception {
+        ChatRoomSearchItemResponse item = createSearchItem(
+                25L,
+                381L,
+                "반바지로 알아봐줘."
+        );
+        given(chatService.searchChatRooms(1L, "반바지", null, 20))
+                .willReturn(new ChatRoomSearchResponse(
+                        List.of(item),
+                        25L,
+                        true
+                ));
+
+        mockMvc.perform(get("/api/v1/chat-rooms/search")
+                        .queryParam("keyword", "반바지"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.items[0].chatRoomId").value(25))
+                .andExpect(jsonPath("$.data.items[0].title")
+                        .value("가을 출근용 니트 추천"))
+                .andExpect(jsonPath("$.data.items[0].messageId").value(381))
+                .andExpect(jsonPath("$.data.items[0].message")
+                        .value("반바지로 알아봐줘."))
+                .andExpect(jsonPath("$.data.nextCursor").value(25))
+                .andExpect(jsonPath("$.data.hasNext").value(true))
+                .andExpect(jsonPath("$.message")
+                        .value("요청이 성공적으로 처리되었습니다."));
+
+        verify(chatService).searchChatRooms(1L, "반바지", null, 20);
+    }
+
+    @Test
+    @DisplayName("검색 결과가 없으면 빈 목록과 공통 성공 문구를 반환한다")
+    void searchEmptyChatRooms() throws Exception {
+        given(chatService.searchChatRooms(1L, "없는검색어", null, 20))
+                .willReturn(new ChatRoomSearchResponse(List.of(), null, false));
+
+        mockMvc.perform(get("/api/v1/chat-rooms/search")
+                        .queryParam("keyword", "없는검색어"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.items").isEmpty())
+                .andExpect(jsonPath("$.data.nextCursor").isEmpty())
+                .andExpect(jsonPath("$.data.hasNext").value(false))
+                .andExpect(jsonPath("$.message")
+                        .value("요청이 성공적으로 처리되었습니다."));
+    }
+
+    @Test
+    @DisplayName("빈 검색어는 400 Bad Request를 반환한다")
+    void rejectBlankSearchKeyword() throws Exception {
+        given(chatService.searchChatRooms(1L, " ", null, 20))
+                .willThrow(new BusinessException(ErrorCode.INVALID_SEARCH_KEYWORD));
+
+        mockMvc.perform(get("/api/v1/chat-rooms/search")
+                        .queryParam("keyword", " "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_SEARCH_KEYWORD"))
+                .andExpect(jsonPath("$.message")
+                        .value("검색어를 입력해주세요."));
+    }
+
+    @Test
+    @DisplayName("검색 기준 메시지 주변의 대화 문맥을 반환한다")
+    void getChatMessageContext() throws Exception {
+        ChatMessageContextResponse response = ChatMessageContextResponse.from(
+                createChatRoom(25L, LocalDateTime.now()),
+                381L,
+                List.of(),
+                370L,
+                392L,
+                true,
+                true
+        );
+        given(chatService.getChatMessageContext(
+                1L,
+                25L,
+                381L,
+                null,
+                null,
+                20,
+                20,
+                null
+        )).willReturn(response);
+
+        mockMvc.perform(get("/api/v1/chat-rooms/25/messages")
+                        .queryParam("aroundMessageId", "381")
+                        .queryParam("beforeSize", "20")
+                        .queryParam("afterSize", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.chatRoomId").value(25))
+                .andExpect(jsonPath("$.data.anchorMessageId").value(381))
+                .andExpect(jsonPath("$.data.previousCursor").value(370))
+                .andExpect(jsonPath("$.data.nextCursor").value(392))
+                .andExpect(jsonPath("$.data.hasPrevious").value(true))
+                .andExpect(jsonPath("$.data.hasNext").value(true));
+
+        verify(chatService).getChatMessageContext(
+                1L,
+                25L,
+                381L,
+                null,
+                null,
+                20,
+                20,
+                null
+        );
     }
 
     @Test
@@ -370,7 +485,7 @@ class ChatControllerTest {
                         .isEmpty())
                 .andExpect(jsonPath("$.data.message.recommendation").isEmpty())
                 .andExpect(jsonPath("$.data.message.createdAt")
-                        .value("2026-09-08T12:30:03"));
+                        .value("2026-09-08T12:30:03Z"));
 
         verify(chatService).getGenerationStatus(1L, 123L, 101L);
     }
@@ -417,7 +532,7 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.data.chatRoomId").value(10))
                 .andExpect(jsonPath("$.data.messageId").value(100))
                 .andExpect(jsonPath("$.data.createdAt")
-                        .value("2026-09-24T16:50:00"))
+                        .value("2026-09-24T16:50:00Z"))
                 .andExpect(jsonPath("$.message")
                         .value("리소스가 성공적으로 생성되었습니다."));
 
@@ -448,7 +563,7 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.data.messageId").value(101))
                 .andExpect(jsonPath("$.data.content").value("검은색으로 추천해줘"))
                 .andExpect(jsonPath("$.data.createdAt")
-                        .value("2026-09-24T16:55:00"));
+                        .value("2026-09-24T16:55:00Z"));
 
         verify(chatV2Service).createMessage(eq(1L), eq(10L), any());
     }
@@ -639,6 +754,19 @@ class ChatControllerTest {
         );
         ReflectionTestUtils.setField(chatRoom, "id", chatRoomId);
         return chatRoom;
+    }
+
+    private ChatRoomSearchItemResponse createSearchItem(
+            Long chatRoomId,
+            Long messageId,
+            String content
+    ) {
+        ChatMessage message = ChatMessage.createUserText(
+                createChatRoom(chatRoomId, LocalDateTime.now()),
+                content
+        );
+        ReflectionTestUtils.setField(message, "id", messageId);
+        return ChatRoomSearchItemResponse.from(message);
     }
 
     private Product createProduct(Long productId) {

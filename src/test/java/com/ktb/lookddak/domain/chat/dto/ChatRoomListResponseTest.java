@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,7 +26,7 @@ class ChatRoomListResponseTest {
 
         assertThat(item.getChatRoomId()).isEqualTo(25L);
         assertThat(item.getTitle()).isEqualTo("가을 출근용 니트 추천");
-        assertThat(item.getLastMessageAt()).isEqualTo(lastMessageAt);
+        assertThat(item.getLastMessageAt()).isEqualTo(lastMessageAt.toInstant(ZoneOffset.UTC));
     }
 
     @Test
