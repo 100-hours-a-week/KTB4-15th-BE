@@ -6,7 +6,9 @@ import com.ktb.lookddak.domain.chat.entity.ChatMessage;
 import com.ktb.lookddak.domain.chat.entity.ChatSenderType;
 import lombok.Getter;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Getter
 @JsonPropertyOrder({
@@ -24,7 +26,7 @@ public class ChatMessageDetailResponse {
     private final String content;
     private final ChatGenerationStatus generationStatus;
     private final RecommendationResponse recommendation;
-    private final LocalDateTime createdAt;
+    private final Instant createdAt;
 
     private ChatMessageDetailResponse(
             Long messageId,
@@ -39,7 +41,7 @@ public class ChatMessageDetailResponse {
         this.content = content;
         this.generationStatus = generationStatus;
         this.recommendation = recommendation;
-        this.createdAt = createdAt;
+        this.createdAt = createdAt == null ? null : createdAt.toInstant(ZoneOffset.UTC);
     }
 
     public static ChatMessageDetailResponse from(

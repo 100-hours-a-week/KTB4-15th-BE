@@ -25,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -92,7 +93,7 @@ class ChatV2ServiceTest {
 
         assertThat(response.getChatRoomId()).isEqualTo(10L);
         assertThat(response.getMessageId()).isEqualTo(100L);
-        assertThat(response.getCreatedAt()).isEqualTo(createdAt);
+        assertThat(response.getCreatedAt()).isEqualTo(createdAt.toInstant(ZoneOffset.UTC));
 
         ArgumentCaptor<ChatMessage> captor = ArgumentCaptor
                 .forClass(ChatMessage.class);
@@ -134,7 +135,7 @@ class ChatV2ServiceTest {
         );
 
         assertThat(response.getMessageId()).isEqualTo(101L);
-        assertThat(response.getCreatedAt()).isEqualTo(createdAt);
+        assertThat(response.getCreatedAt()).isEqualTo(createdAt.toInstant(ZoneOffset.UTC));
 
         ArgumentCaptor<ChatMessage> captor = ArgumentCaptor
                 .forClass(ChatMessage.class);

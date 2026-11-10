@@ -133,7 +133,7 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.data.items[0].title")
                         .value("가을 출근용 니트 추천"))
                 .andExpect(jsonPath("$.data.items[0].lastMessageAt")
-                        .value("2026-09-21T15:00:00"))
+                        .value("2026-09-21T15:00:00Z"))
                 .andExpect(jsonPath("$.data.nextCursor").value(25))
                 .andExpect(jsonPath("$.data.hasNext").value(true))
                 .andExpect(jsonPath("$.message")
@@ -485,7 +485,7 @@ class ChatControllerTest {
                         .isEmpty())
                 .andExpect(jsonPath("$.data.message.recommendation").isEmpty())
                 .andExpect(jsonPath("$.data.message.createdAt")
-                        .value("2026-09-08T12:30:03"));
+                        .value("2026-09-08T12:30:03Z"));
 
         verify(chatService).getGenerationStatus(1L, 123L, 101L);
     }
@@ -532,7 +532,7 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.data.chatRoomId").value(10))
                 .andExpect(jsonPath("$.data.messageId").value(100))
                 .andExpect(jsonPath("$.data.createdAt")
-                        .value("2026-09-24T16:50:00"))
+                        .value("2026-09-24T16:50:00Z"))
                 .andExpect(jsonPath("$.message")
                         .value("리소스가 성공적으로 생성되었습니다."));
 
@@ -563,7 +563,7 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.data.messageId").value(101))
                 .andExpect(jsonPath("$.data.content").value("검은색으로 추천해줘"))
                 .andExpect(jsonPath("$.data.createdAt")
-                        .value("2026-09-24T16:55:00"));
+                        .value("2026-09-24T16:55:00Z"));
 
         verify(chatV2Service).createMessage(eq(1L), eq(10L), any());
     }

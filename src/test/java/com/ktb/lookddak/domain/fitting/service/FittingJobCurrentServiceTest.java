@@ -19,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -73,7 +74,7 @@ class FittingJobCurrentServiceTest {
                 FittingJobStatus.GENERATING
         );
         assertThat(response.getCreatedAt()).isEqualTo(
-                LocalDateTime.of(2026, 10, 20, 12, 0)
+                LocalDateTime.of(2026, 10, 20, 12, 0).toInstant(ZoneOffset.UTC)
         );
         assertThat(response.isResultViewed()).isFalse();
         assertThat(response.getProducts()).singleElement().satisfies(item -> {
