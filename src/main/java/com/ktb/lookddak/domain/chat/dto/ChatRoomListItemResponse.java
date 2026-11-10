@@ -3,14 +3,16 @@ package com.ktb.lookddak.domain.chat.dto;
 import com.ktb.lookddak.domain.chat.entity.ChatRoom;
 import lombok.Getter;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Getter
 public class ChatRoomListItemResponse {
 
     private final Long chatRoomId;
     private final String title;
-    private final LocalDateTime lastMessageAt;
+    private final Instant lastMessageAt;
 
     private ChatRoomListItemResponse(
             Long chatRoomId,
@@ -19,7 +21,7 @@ public class ChatRoomListItemResponse {
     ) {
         this.chatRoomId = chatRoomId;
         this.title = title;
-        this.lastMessageAt = lastMessageAt;
+        this.lastMessageAt = lastMessageAt == null ? null : lastMessageAt.toInstant(ZoneOffset.UTC);
     }
 
     public static ChatRoomListItemResponse from(ChatRoom chatRoom) {

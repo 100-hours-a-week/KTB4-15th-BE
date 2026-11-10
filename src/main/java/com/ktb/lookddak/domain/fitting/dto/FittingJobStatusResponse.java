@@ -5,7 +5,9 @@ import com.ktb.lookddak.domain.fitting.entity.FittingJob;
 import com.ktb.lookddak.domain.fitting.entity.FittingJobStatus;
 import lombok.Getter;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Getter
 @JsonPropertyOrder({"fittingJobId", "status", "createdAt", "result"})
@@ -13,7 +15,7 @@ public class FittingJobStatusResponse {
 
     private final Long fittingJobId;
     private final FittingJobStatus status;
-    private final LocalDateTime createdAt;
+    private final Instant createdAt;
     private final FittingResultResponse result;
 
     private FittingJobStatusResponse(
@@ -24,7 +26,7 @@ public class FittingJobStatusResponse {
     ) {
         this.fittingJobId = fittingJobId;
         this.status = status;
-        this.createdAt = createdAt;
+        this.createdAt = createdAt == null ? null : createdAt.toInstant(ZoneOffset.UTC);
         this.result = result;
     }
 

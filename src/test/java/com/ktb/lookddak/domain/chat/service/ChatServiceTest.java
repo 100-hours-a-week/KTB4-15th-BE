@@ -39,6 +39,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -136,7 +137,7 @@ class ChatServiceTest {
 
         assertThat(response.getChatRoomId()).isEqualTo(10L);
         assertThat(response.getMessageId()).isEqualTo(100L);
-        assertThat(response.getCreatedAt()).isEqualTo(createdAt);
+        assertThat(response.getCreatedAt()).isEqualTo(createdAt.toInstant(ZoneOffset.UTC));
 
         ArgumentCaptor<ChatRoom> chatRoomCaptor = ArgumentCaptor.forClass(ChatRoom.class);
         verify(chatRoomRepository).save(chatRoomCaptor.capture());
@@ -247,7 +248,7 @@ class ChatServiceTest {
         assertThat(response.getChatRoomId()).isEqualTo(10L);
         assertThat(response.getMessageId()).isEqualTo(101L);
         assertThat(response.getContent()).isEqualTo("검은색으로 추천해줘");
-        assertThat(response.getCreatedAt()).isEqualTo(createdAt);
+        assertThat(response.getCreatedAt()).isEqualTo(createdAt.toInstant(ZoneOffset.UTC));
         assertThat(chatRoom.getLastMessageAt()).isAfter(initialLastMessageAt);
 
         ArgumentCaptor<ChatMessage> messageCaptor = ArgumentCaptor.forClass(ChatMessage.class);
