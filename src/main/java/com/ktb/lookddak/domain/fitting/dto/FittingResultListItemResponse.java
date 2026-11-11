@@ -3,9 +3,7 @@ package com.ktb.lookddak.domain.fitting.dto;
 import com.ktb.lookddak.domain.fitting.entity.FittingResult;
 import lombok.Getter;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 
 @Getter
 public class FittingResultListItemResponse {
@@ -13,7 +11,7 @@ public class FittingResultListItemResponse {
     private final Long fittingResultId;
     private final String resultImageUrl;
     private final String outfitName;
-    private final Instant savedAt;
+    private final LocalDateTime savedAt;
 
     private FittingResultListItemResponse(
             Long fittingResultId,
@@ -24,7 +22,7 @@ public class FittingResultListItemResponse {
         this.fittingResultId = fittingResultId;
         this.resultImageUrl = resultImageUrl;
         this.outfitName = outfitName;
-        this.savedAt = savedAt == null ? null : savedAt.toInstant(ZoneOffset.UTC);
+        this.savedAt = savedAt;
     }
 
     public static FittingResultListItemResponse from(

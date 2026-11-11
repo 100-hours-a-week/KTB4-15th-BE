@@ -6,9 +6,7 @@ import com.ktb.lookddak.domain.fitting.entity.FittingResult;
 import com.ktb.lookddak.domain.fitting.entity.FittingTempResult;
 import lombok.Getter;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 
 @Getter
@@ -33,7 +31,7 @@ public class FittingTempResultDetailResponse {
     private final String outfitName;
     private final String comment;
     private final List<FittingResultProductResponse> products;
-    private final Instant expiresAt;
+    private final LocalDateTime expiresAt;
 
     private FittingTempResultDetailResponse(
             Long fittingJobId,
@@ -54,7 +52,7 @@ public class FittingTempResultDetailResponse {
         this.outfitName = outfitName;
         this.comment = comment;
         this.products = List.copyOf(products);
-        this.expiresAt = expiresAt == null ? null : expiresAt.toInstant(ZoneOffset.UTC);
+        this.expiresAt = expiresAt;
     }
 
     public static FittingTempResultDetailResponse from(
